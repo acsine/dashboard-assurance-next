@@ -1,0 +1,53 @@
+{
+    "pages": {
+        "home": {
+            "title": "Innovate Solutions Partners",
+            "description": "We are a team of experts in the field of software development and design.",
+            "demoPackages": "Demo Packages",
+            "demoApi": "Demo API",
+            "zustandStateManagement": "State management with Zustand",
+            "globalStore": "Simple and performant global store",
+            "skeletonLoading": "Skeleton loading",
+            "elegantUI": "Elegant user interfaces while loading",
+            "loading": "Loading...",
+            "trySkeleton": "Try Skeleton loading experience",
+            "triggerAsync": "Trigger Async Action",
+            "tryNuqs": "Try Nuqs Query Parameters",
+            "tryNuqsDescription": "Auto-sync with URL",
+            "tryNuqsContent": "Detected parameter :",
+            "zustandEnabled": "Zustand enabled",
+            "TanStackEnabled": "TanStack Query enabled",
+            "sonnerEnabled": "Sonner enabled",
+            "zodEnabled": "Zod enabled",
+            "skeletonLoadingEnabled": "Skeleton loading enabled",
+            "nuqsEnabled": "Nuqs enabled",
+            "jsonPlaceholderIntegrated": "JSONPlaceholder API integrated"
+        }
+    },
+    "postsDemo": {
+        "error": {
+            "title": "Error loading posts",
+            "description": "Failed to load posts. Check your network connection."
+        },
+        "title": "Posts",
+        "description": "Demo with JSONPlaceholder API",
+        "newPostButton": "New Post",
+        "newPostTitle": "Create new post",
+        "newPostDescription": "Share your ideas with the community",
+        "postTitle": "Post title",
+        "postTitlePlaceholder": "A catchy title",
+        "postContent": "Content",
+        "postContentPlaceholder": "Write something interesting...",
+        "postSubmitButton": "Publish post",
+        "postSubmitLoading": "Publishing...",
+        "postCancelButton": "Cancel",
+        "postPaginationMessage": "Showing <bold>{displayCount, number}</bold> posts out of <bold>{totalCount, number}</bold>",
+        "postDisplayMessage": "Data from JSONPlaceholder API"
+    },
+    "alert": {
+        "success": {
+            "title": "Success",
+            "message": "Action performed successfully"
+        }
+    }
+}

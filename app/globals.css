@@ -1,0 +1,264 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: 'Poppins';
+  src: url('/fonts/Poppins-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  src: url('/fonts/Poppins-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  src: url('/fonts/Poppins-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  src: url('/fonts/Poppins-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+body {
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+}
+
+/* RTL Support */
+.rtl {
+  direction: rtl;
+}
+
+.ltr {
+  direction: ltr;
+}
+
+/* RTL-specific adjustments */
+[dir="rtl"] .space-x-8 > * + * {
+  margin-right: 2rem;
+  margin-left: 0;
+}
+
+[dir="rtl"] .text-left {
+  text-align: right;
+}
+
+[dir="rtl"] .text-right {
+  text-align: left;
+}
+
+/* Ensure proper spacing for RTL */
+[dir="rtl"] .ml-10 {
+  margin-right: 2.5rem;
+  margin-left: 0;
+}
+
+/* Additional utility classes if needed */
+@layer utilities {
+  .text-balance {
+      text-wrap: balance;
+  }
+}
+
+/* Base CSS variables */
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+
+  /* Cultural Theme Variables - Default (Western) */
+  --cultural-error: 239 68 68; /* red-500 */
+  --cultural-warning: 245 158 11; /* amber-500 */
+  --cultural-success: 34 197 94; /* green-500 */
+  --cultural-info: 59 130 246; /* blue-500 */
+  --cultural-primary: 59 130 246; /* blue-600 */
+  --cultural-secondary: 107 114 128; /* gray-500 */
+}
+
+/* Chinese Cultural Theme */
+[data-cultural-theme="zh"] {
+  --cultural-error: 249 115 22; /* orange-500 - avoiding red for errors */
+  --cultural-warning: 245 158 11; /* amber-500 */
+  --cultural-success: 239 68 68; /* red-500 - red for luck! */
+  --cultural-info: 59 130 246; /* blue-500 */
+  --cultural-primary: 239 68 68; /* red primary for luck */
+  --cultural-secondary: 107 114 128; /* gray-500 */
+}
+
+/* Japanese Cultural Theme */
+[data-cultural-theme="ja"] {
+  --cultural-error: 249 115 22; /* orange-500 */
+  --cultural-warning: 245 158 11; /* amber-500 */
+  --cultural-success: 34 197 94; /* green-500 */
+  --cultural-info: 59 130 246; /* blue-500 */
+  --cultural-primary: 99 102 241; /* indigo-500 - valued in Japanese culture */
+  --cultural-secondary: 107 114 128; /* gray-500 */
+}
+
+/* Arabic Cultural Theme */
+[data-cultural-theme="ar"] {
+  --cultural-error: 239 68 68; /* red-500 */
+  --cultural-warning: 245 158 11; /* amber-500 */
+  --cultural-success: 34 197 94; /* green-500 - very positive in Islamic culture */
+  --cultural-info: 59 130 246; /* blue-500 */
+  --cultural-primary: 34 197 94; /* green primary */
+  --cultural-secondary: 107 114 128; /* gray-500 */
+}
+
+/* Spanish Cultural Theme */
+[data-cultural-theme="es"] {
+  --cultural-error: 239 68 68; /* red-500 */
+  --cultural-warning: 245 158 11; /* amber-500 */
+  --cultural-success: 34 197 94; /* green-500 */
+  --cultural-info: 59 130 246; /* blue-500 */
+  --cultural-primary: 239 68 68; /* red primary - cultural affinity */
+  --cultural-secondary: 107 114 128; /* gray-500 */
+}
+
+/* Italian Cultural Theme */
+[data-cultural-theme="it"] {
+  --cultural-error: 239 68 68; /* red-500 */
+  --cultural-warning: 245 158 11; /* amber-500 */
+  --cultural-success: 34 197 94; /* green-500 */
+  --cultural-info: 59 130 246; /* blue-500 */
+  --cultural-primary: 34 197 94; /* green primary - Italian flag influence */
+  --cultural-secondary: 107 114 128; /* gray-500 */
+}
+
+/* Portuguese Cultural Theme */
+[data-cultural-theme="pt"] {
+  --cultural-error: 239 68 68; /* red-500 */
+  --cultural-warning: 245 158 11; /* amber-500 */
+  --cultural-success: 34 197 94; /* green-500 */
+  --cultural-info: 59 130 246; /* blue-500 */
+  --cultural-primary: 34 197 94; /* green primary - Portuguese flag influence */
+  --cultural-secondary: 107 114 128; /* gray-500 */
+}
+
+/* German Cultural Theme */
+[data-cultural-theme="de"] {
+  --cultural-error: 239 68 68; /* red-500 */
+  --cultural-warning: 245 158 11; /* amber-500 */
+  --cultural-success: 34 197 94; /* green-500 */
+  --cultural-info: 59 130 246; /* blue-500 */
+  --cultural-primary: 59 130 246; /* blue primary */
+  --cultural-secondary: 107 114 128; /* gray-500 */
+}
+
+/* French Cultural Theme */
+[data-cultural-theme="fr"] {
+  --cultural-error: 239 68 68; /* red-500 */
+  --cultural-warning: 245 158 11; /* amber-500 */
+  --cultural-success: 34 197 94; /* green-500 */
+  --cultural-info: 59 130 246; /* blue-500 */
+  --cultural-primary: 59 130 246; /* blue primary */
+  --cultural-secondary: 107 114 128; /* gray-500 */
+}
+
+/* Swahili Cultural Theme */
+[data-cultural-theme="sw"] {
+  --cultural-error: 239 68 68; /* red-500 */
+  --cultural-warning: 245 158 11; /* amber-500 */
+  --cultural-success: 34 197 94; /* green-500 */
+  --cultural-info: 59 130 246; /* blue-500 */
+  --cultural-primary: 34 197 94; /* green primary */
+  --cultural-secondary: 107 114 128; /* gray-500 */
+}
+
+/* Cultural utility classes */
+@layer utilities {
+  .text-cultural-error {
+      color: rgb(var(--cultural-error));
+  }
+  .text-cultural-warning {
+      color: rgb(var(--cultural-warning));
+  }
+  .text-cultural-success {
+      color: rgb(var(--cultural-success));
+  }
+  .text-cultural-info {
+      color: rgb(var(--cultural-info));
+  }
+  .text-cultural-primary {
+      color: rgb(var(--cultural-primary));
+  }
+  .text-cultural-secondary {
+      color: rgb(var(--cultural-secondary));
+  }
+
+  .bg-cultural-error {
+      background-color: rgb(var(--cultural-error));
+  }
+  .bg-cultural-warning {
+      background-color: rgb(var(--cultural-warning));
+  }
+  .bg-cultural-success {
+      background-color: rgb(var(--cultural-success));
+  }
+  .bg-cultural-info {
+      background-color: rgb(var(--cultural-info));
+  }
+  .bg-cultural-primary {
+      background-color: rgb(var(--cultural-primary));
+  }
+  .bg-cultural-secondary {
+      background-color: rgb(var(--cultural-secondary));
+  }
+
+  .border-cultural-error {
+      border-color: rgb(var(--cultural-error));
+  }
+  .border-cultural-warning {
+      border-color: rgb(var(--cultural-warning));
+  }
+  .border-cultural-success {
+      border-color: rgb(var(--cultural-success));
+  }
+  .border-cultural-info {
+      border-color: rgb(var(--cultural-info));
+  }
+  .border-cultural-primary {
+      border-color: rgb(var(--cultural-primary));
+  }
+  .border-cultural-secondary {
+      border-color: rgb(var(--cultural-secondary));
+  }
+
+  /* Cultural background opacity classes */
+  .bg-cultural-error-light {
+      background-color: rgb(var(--cultural-error) / 0.1);
+  }
+  .bg-cultural-warning-light {
+      background-color: rgb(var(--cultural-warning) / 0.1);
+  }
+  .bg-cultural-success-light {
+      background-color: rgb(var(--cultural-success) / 0.1);
+  }
+  .bg-cultural-info-light {
+      background-color: rgb(var(--cultural-info) / 0.1);
+  }
+
+  .border-cultural-error-light {
+      border-color: rgb(var(--cultural-error) / 0.3);
+  }
+  .border-cultural-warning-light {
+      border-color: rgb(var(--cultural-warning) / 0.3);
+  }
+  .border-cultural-success-light {
+      border-color: rgb(var(--cultural-success) / 0.3);
+  }
+  .border-cultural-info-light {
+      border-color: rgb(var(--cultural-info) / 0.3);
+  }
+}

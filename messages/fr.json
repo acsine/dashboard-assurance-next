@@ -1,0 +1,53 @@
+{
+    "pages": {
+        "home": {
+            "title": "Innovate Solutions Partners",
+            "description": "Nous sommes une équipe d'experts dans le domaine du développement logiciel et du design.",
+            "demoPackages": "Packages de Démo",
+            "demoApi": "API de Démo",
+            "zustandStateManagement": "Gestion d'état avec Zustand",
+            "globalStore": "Store global simple et performant",
+            "skeletonLoading": "Chargement Skeleton",
+            "elegantUI": "Interfaces utilisateur élégantes pendant le chargement",
+            "loading": "Chargement...",
+            "trySkeleton": "Essayez l'expérience de chargement Skeleton",
+            "triggerAsync": "Déclencher Action Asynchrone",
+            "tryNuqs": "Essayez Nuqs Query Parameters",
+            "tryNuqsDescription": "Synchronisation automatique avec l'URL",
+            "tryNuqsContent": "Paramètre détecté :",
+            "zustandEnabled": "Zustand activé",
+            "TanStackEnabled": "TanStack Query activé",
+            "sonnerEnabled": "Sonner activé",
+            "zodEnabled": "Zod activé",
+            "skeletonLoadingEnabled": "Chargement squelette activé",
+            "nuqsEnabled": "Nuqs activé",
+            "jsonPlaceholderIntegrated": "API JSONPlaceholder intégrée"
+        }
+    },
+    "postsDemo": {
+        "error": {
+            "title": "Erreur lors du chargement des posts",
+            "description": "Impossible de charger les posts. Vérifiez votre connexion réseau."
+        },
+        "title": "Posts",
+        "description": "Démo avec l'API JSONPlaceholder",
+        "newPostButton": "Nouveau Post",
+        "newPostTitle": "Créer un nouveau post",
+        "newPostDescription": "Partagez vos idées avec la communauté",
+        "postTitle": "Titre du post",
+        "postTitlePlaceholder": "Un titre accrocheur",
+        "postContent": "Contenu",
+        "postContentPlaceholder": "Écrivez quelque chose d'intéressant...",
+        "postSubmitButton": "Publier le post",
+        "postSubmitLoading": "Publication...",
+        "postCancelButton": "Annuler",
+        "postPaginationMessage": "Affichage de <bold>{displayCount, number}</bold> posts sur <bold>{totalCount, number}</bold>",
+        "postDisplayMessage": "Données de l'API JSONPlaceholder"
+    },
+    "alert": {
+        "success": {
+            "title": "Succès",
+            "message": "Action effectuée avec succès"
+        }
+    }
+}
