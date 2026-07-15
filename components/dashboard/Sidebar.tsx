@@ -1,4 +1,4 @@
-import { useState, useEffect, useTransition } from 'react'
+import { useState, useEffect } from 'react'
 import { usePathname, useRouter } from '@/i18n/navigation'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { useSidebarStore } from '@/lib/stores/sidebar-store'
@@ -19,6 +19,8 @@ import {
   MessageSquare,
 } from 'lucide-react'
 import Link from 'next/link'
+import { authApi } from '@/lib/api/mobi-assur'
+import { ROLES } from '@/lib/auth/roles'
 
 export default function Sidebar() {
   const pathname = usePathname()
@@ -35,9 +37,10 @@ export default function Sidebar() {
     setNavigatingTo(null)
   }, [pathname])
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await authApi.logout().catch(() => undefined)
     logout()
-    router.push('/login')
+    router.replace('/login')
   }
 
   const handleNavigation = (path: string, e: React.MouseEvent) => {
@@ -55,56 +58,56 @@ export default function Sidebar() {
       name: 'Vue d\'ensemble',
       path: '/dashboard',
       icon: LayoutDashboard,
-      roles: ['ADMIN', 'BACKOFFICE', 'ADMIN_AGENCE', 'AGENT_TERRAIN'],
+      roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
     },
     {
       name: 'Clients',
       path: '/dashboard/clients',
       icon: Users,
-      roles: ['ADMIN', 'BACKOFFICE', 'ADMIN_AGENCE', 'AGENT_TERRAIN'],
+      roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
     },
     {
       name: 'Contrats',
       path: '/dashboard/contracts',
       icon: FileText,
-      roles: ['ADMIN', 'BACKOFFICE', 'ADMIN_AGENCE', 'AGENT_TERRAIN'],
+      roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
     },
     {
       name: 'Prospects',
       path: '/dashboard/prospects',
       icon: UserCheck,
-      roles: ['ADMIN', 'BACKOFFICE', 'ADMIN_AGENCE'],
+      roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
     },
     {
       name: 'Portefeuille / Wallet',
       path: '/dashboard/wallet',
       icon: Wallet,
-      roles: ['ADMIN', 'BACKOFFICE', 'ADMIN_AGENCE'],
+      roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
     },
     {
       name: 'Support & Chat',
       path: '/dashboard/support',
       icon: MessageSquare,
-      roles: ['ADMIN', 'BACKOFFICE', 'ADMIN_AGENCE'],
+      roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
     },
     {
       name: 'Utilisateurs',
       path: '/dashboard/users',
       icon: ShieldAlert,
-      roles: ['ADMIN', 'ADMIN_AGENCE'],
+      roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
     },
     {
       name: 'Paramètres',
       path: '/dashboard/settings',
       icon: Settings,
-      roles: ['ADMIN', 'ADMIN_AGENCE'],
+      roles: [ROLES.ADMIN],
     },
   ]
 
-  const userRole = user?.role || 'ADMIN'
+  const userRole = user?.role
 
   const filteredMenuItems = menuItems.filter(
-    (item) => !item.roles || item.roles.includes(userRole)
+    (item) => userRole !== undefined && item.roles.some((role) => role === userRole)
   )
 
   return (

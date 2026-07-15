@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { UserCheck, Check, X, AlertCircle } from 'lucide-react'
+import { RoleGuard } from '@/components/auth/RoleGuard'
 
 export default function ProspectsPage() {
   const queryClient = useQueryClient()
@@ -136,6 +137,7 @@ export default function ProspectsPage() {
                       </Button>
                     </form>
                   ) : (
+                    <RoleGuard permission="agency:mutate" fallback={null}>
                     <div className="flex gap-2 shrink-0">
                       <Button
                         onClick={() => approveMutation.mutate(req.id)}
@@ -157,6 +159,7 @@ export default function ProspectsPage() {
                         Rejeter
                       </Button>
                     </div>
+                    </RoleGuard>
                   )}
                 </div>
               ))}

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, Suspense } from 'react'
-import { useRouter, usePathname } from '@/i18n/navigation'
+import { useRouter } from '@/i18n/navigation'
 import { useSearchParams } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { clientsApi, contractsApi } from '@/lib/api/mobi-assur'
@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
-import { ArrowLeft, Loader2, Save, FileText, Plus, Trash, User } from 'lucide-react'
+import { ArrowLeft, Loader2, Save, FileText, User } from 'lucide-react'
 import Link from 'next/link'
 
 function NewContractFormContent() {
@@ -23,7 +23,6 @@ function NewContractFormContent() {
 
   // Form states
   const [clientId, setClientId] = useState(preselectedClientId)
-  const [productType, setProductType] = useState<'CAT1' | 'CAT11'>('CAT1')
   const [subscriptionType, setSubscriptionType] = useState('AFFAIRE_NOUVELLE')
   const [zoneCirculation, setZoneCirculation] = useState('ZONE_C')
   const [dateEffet, setDateEffet] = useState('')
@@ -32,14 +31,7 @@ function NewContractFormContent() {
   // Driver details
   const [driverName, setDriverName] = useState('')
 
-  // Vehicles subset
-  const [vehiclesInput, setVehiclesInput] = useState<Array<{
-    brand: string
-    model: string
-    chassis: string
-    immat: string
-    power: number
-  }>>([{ brand: '', model: '', chassis: '', immat: '', power: 7 }])
+  const [vehicleId, setVehicleId] = useState('')
 
   // Hydrate lists of clients
   const { data: clients = [], isLoading: loadingClients } = useQuery({
@@ -48,6 +40,12 @@ function NewContractFormContent() {
   })
 
   const safeClients = Array.isArray(clients) ? clients : []
+
+  const { data: vehicles = [], isLoading: loadingVehicles } = useQuery({
+    queryKey: ['client-vehicles', clientId],
+    queryFn: () => clientsApi.listVehicles(clientId),
+    enabled: !!clientId,
+  })
 
   // Autofill client ID if lists are ready and parameter exists
   useEffect(() => {
@@ -68,56 +66,22 @@ function NewContractFormContent() {
     },
   })
 
-  const handleAddVehicleRow = () => {
-    setVehiclesInput([...vehiclesInput, { brand: '', model: '', chassis: '', immat: '', power: 7 }])
-  }
-
-  const handleRemoveVehicleRow = (index: number) => {
-    if (vehiclesInput.length === 1) return
-    setVehiclesInput(vehiclesInput.filter((_, idx) => idx !== index))
-  }
-
-  const handleVehicleValueChange = (index: number, field: string, value: any) => {
-    const updated = [...vehiclesInput]
-    updated[index] = { ...updated[index], [field]: value }
-    setVehiclesInput(updated)
-  }
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!clientId || !dateEffet) {
-      toast.error('Client et Date d\'effet sont obligatoires')
+    if (!clientId || !vehicleId || !dateEffet) {
+      toast.error('Client, véhicule existant et date d’effet sont obligatoires')
       return
     }
-
-    // Validate that vehicles are entered
-    const invalidVehicle = vehiclesInput.some((v) => !v.brand || !v.chassis)
-    if (invalidVehicle) {
-      toast.error('Veuillez renseigner la marque et le châssis de chaque véhicule')
-      return
-    }
-
-    // Adapt to API Payload Schema
-    const vehiclesPayload = vehiclesInput.map((v) => ({
-      vehicle: {
-        marque: v.brand,
-        modele: v.model || undefined,
-        immatriculation: v.immat || undefined,
-        chassis_num: v.chassis,
-        puissance_fiscale: Number(v.power),
-      },
-      prime_vehicule: 0, // auto calculated by backend V1
-    }))
 
     createContractMutation.mutate({
       client_id: clientId,
-      product_type: productType,
+      product_type: 'CAT1',
       subscription_type: subscriptionType,
       zone_circulation: zoneCirculation,
       date_effet: new Date(dateEffet).toISOString(),
       duree_jours: Number(dureeJours),
       conducteur_nom: driverName || undefined,
-      vehicles: vehiclesPayload,
+      vehicles: [{ vehicle_id: vehicleId, prime_vehicule: 0 }],
     })
   }
 
@@ -159,7 +123,10 @@ function NewContractFormContent() {
                     ) : (
                       <select
                         value={clientId}
-                        onChange={(e) => setClientId(e.target.value)}
+                        onChange={(e) => {
+                          setClientId(e.target.value)
+                          setVehicleId('')
+                        }}
                         className="flex h-11 w-full rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-0 focus-visible:border-transparent font-medium"
                         required
                       >
@@ -198,14 +165,7 @@ function NewContractFormContent() {
                     <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
                       Produit *
                     </label>
-                    <select
-                      value={productType}
-                      onChange={(e) => setProductType(e.target.value as 'CAT1' | 'CAT11')}
-                      className="flex h-11 w-full rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs transition-colors focus-visible:outline-none"
-                    >
-                      <option value="CAT1">Véhicule de tourisme (CAT 1)</option>
-                      <option value="CAT11">Flotte (CAT 11)</option>
-                    </select>
+                    <Input value="Véhicule de tourisme (CAT 1)" disabled className="h-11 text-xs" />
                   </div>
 
                   <div className="space-y-1">
@@ -269,118 +229,30 @@ function NewContractFormContent() {
 
               {/* Vehicles specifications */}
               <div className="space-y-4 pt-4">
-                <div className="flex justify-between items-center border-b border-gray-50 pb-2">
-                  <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
-                    Véhicules de la police
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={handleAddVehicleRow}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all cursor-pointer"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Ajouter un autre véhicule
-                  </button>
-                </div>
-
-                <div className="space-y-6">
-                  {vehiclesInput.map((veh, index) => (
-                    <div
-                      key={index}
-                      className="p-5 border border-gray-100 bg-gray-50/20 rounded-2xl space-y-4 relative"
-                    >
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-gray-700">
-                          Véhicule #{index + 1}
-                        </span>
-                        {vehiclesInput.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveVehicleRow(index)}
-                            className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
-                          >
-                            <Trash className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                            Marque *
-                          </label>
-                          <Input
-                            placeholder="Toyota"
-                            value={veh.brand}
-                            onChange={(e) =>
-                              handleVehicleValueChange(index, 'brand', e.target.value)
-                            }
-                            className="h-10 text-xs border-gray-200 bg-white"
-                            required
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                            Modèle
-                          </label>
-                          <Input
-                            placeholder="Corolla"
-                            value={veh.model}
-                            onChange={(e) =>
-                              handleVehicleValueChange(index, 'model', e.target.value)
-                            }
-                            className="h-10 text-xs border-gray-200 bg-white"
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                            N° Châssis *
-                          </label>
-                          <Input
-                            placeholder="VIN..."
-                            value={veh.chassis}
-                            onChange={(e) =>
-                              handleVehicleValueChange(index, 'chassis', e.target.value)
-                            }
-                            className="h-10 text-xs border-gray-200 bg-white"
-                            required
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                            Immatriculation
-                          </label>
-                          <Input
-                            placeholder="LT..."
-                            value={veh.immat}
-                            onChange={(e) =>
-                              handleVehicleValueChange(index, 'immat', e.target.value)
-                            }
-                            className="h-10 text-xs border-gray-200 bg-white"
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                            Puis. Fiscale (CV)
-                          </label>
-                          <Input
-                            type="number"
-                            placeholder="7"
-                            value={veh.power}
-                            onChange={(e) =>
-                              handleVehicleValueChange(index, 'power', e.target.value)
-                            }
-                            className="h-10 text-xs border-gray-200 bg-white"
-                          />
-                        </div>
-                      </div>
-                    </div>
+                <h3 className="border-b border-gray-50 pb-2 text-sm font-bold uppercase tracking-wider text-gray-900">
+                  Véhicule assuré (mono-véhicule V1)
+                </h3>
+                <select
+                  value={vehicleId}
+                  onChange={(event) => setVehicleId(event.target.value)}
+                  disabled={!clientId || loadingVehicles}
+                  required
+                  className="flex h-11 w-full rounded-xl border border-gray-200 bg-white px-4 text-xs disabled:bg-gray-50"
+                >
+                  <option value="">
+                    {loadingVehicles ? 'Chargement...' : 'Sélectionner un véhicule existant'}
+                  </option>
+                  {vehicles.map((vehicle) => (
+                    <option key={vehicle.id} value={vehicle.id}>
+                      {vehicle.marque} {vehicle.modele || ''} — {vehicle.immatriculation || vehicle.chassis_num}
+                    </option>
                   ))}
-                </div>
+                </select>
+                {clientId && !loadingVehicles && vehicles.length === 0 && (
+                  <p className="text-xs text-amber-700">
+                    Ce client n’a aucun véhicule. Ajoutez-le d’abord depuis sa fiche client.
+                  </p>
+                )}
               </div>
 
               {/* Action triggers */}

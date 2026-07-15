@@ -33,25 +33,12 @@ export default function LoginPage() {
         password: password,
       })
 
-      const data = response.data || response
-      const accessToken = data.access_token
-      const refreshToken = data.refresh_token
-
-      if (accessToken) {
-        const userProfile = {
-          id: data.user_id || data.user?.id || 'admin-temp-id',
-          email: loginMethod === 'email' ? identifier : undefined,
-          phone: loginMethod === 'phone' ? identifier : undefined,
-          full_name: data.full_name || data.user?.full_name || 'Administrateur MOBI-ASSUR',
-          role: data.role || data.user?.role || 'ADMIN',
-          is_active: true,
-        }
-
-        loginStore(accessToken, refreshToken, userProfile)
+      if (response.user) {
+        loginStore(response.user)
         toast.success(response.message || 'Connexion réussie')
         router.push('/dashboard')
       } else {
-        toast.error('Token non reçu')
+        toast.error('Profil utilisateur non reçu')
       }
 
     } catch (err: any) {

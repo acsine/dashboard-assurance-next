@@ -9,8 +9,9 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { Settings, Save, Loader2, RefreshCw } from 'lucide-react'
+import { RoleGuard } from '@/components/auth/RoleGuard'
 
-export default function SettingsPage() {
+function SettingsContent() {
   const queryClient = useQueryClient()
 
   // Form input states
@@ -32,9 +33,9 @@ export default function SettingsPage() {
     if (pricing) {
       if (pricing.accessoires !== undefined) setAccessoires(pricing.accessoires.toString())
       if (pricing.asac !== undefined) setAsac(pricing.asac.toString())
-      if (pricing.fga !== undefined) setFga(pricing.fga.toString())
-      if (pricing.cr !== undefined) setCr(pricing.cr.toString())
-      if (pricing.tva !== undefined) setTva(pricing.tva.toString())
+      if (pricing.dta !== undefined) setFga(pricing.dta.toString())
+      if (pricing.carte_rose_fee !== undefined) setCr(pricing.carte_rose_fee.toString())
+      if (pricing.tva_rate !== undefined) setTva((pricing.tva_rate * 100).toString())
       if (pricing.commission_rate !== undefined) setCommissionRate(pricing.commission_rate.toString())
     }
   }, [pricing])
@@ -51,9 +52,9 @@ export default function SettingsPage() {
       updateSettingsMutation.mutate({
         accessoires: Number(accessoires),
         asac: Number(asac),
-        fga: Number(fga),
-        cr: Number(cr),
-        tva: Number(tva),
+        dta: Number(fga),
+        carte_rose_fee: Number(cr),
+        tva_rate: Number(tva) / 100,
         commission_rate: Number(commissionRate) / 100, // convert percentage
       })
     },
@@ -77,9 +78,9 @@ export default function SettingsPage() {
     saveSettingsMutation.mutate({
       accessoires: Number(accessoires),
       asac: Number(asac),
-      fga: Number(fga),
-      cr: Number(cr),
-      tva: Number(tva),
+      dta: Number(fga),
+      carte_rose_fee: Number(cr),
+      tva_rate: Number(tva) / 100,
       commission_rate: Number(commissionRate) / 100,
     })
   }
@@ -222,5 +223,13 @@ export default function SettingsPage() {
         </Card>
       </div>
     </div>
+  )
+}
+
+export default function SettingsPage() {
+  return (
+    <RoleGuard permission="settings:manage">
+      <SettingsContent />
+    </RoleGuard>
   )
 }

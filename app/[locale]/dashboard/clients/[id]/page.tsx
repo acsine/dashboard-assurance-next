@@ -24,7 +24,10 @@ import {
   Edit2,
   Save,
   X,
+  Download,
+  Eye,
 } from 'lucide-react'
+import { RoleGuard } from '@/components/auth/RoleGuard'
 
 
 export default function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -141,7 +144,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
       modele: vehicleModel || undefined,
       immatriculation: vehicleImmat || undefined,
       chassis_num: vehicleChassis,
-      puissance_fiscale: vehiclePower ? parseInt(vehiclePower) : undefined,
+      puissance_cv: vehiclePower ? parseInt(vehiclePower) : undefined,
     })
   }
 
@@ -171,13 +174,15 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
             <FileText className="h-4 w-4" />
             Nouveau Contrat
           </LinkButton>
-          <button 
-            onClick={startEditing}
-            className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-xl transition-all shadow-sm cursor-pointer"
-          >
-            <Edit2 className="h-4 w-4" />
-            Modifier le Profil
-          </button>
+          <RoleGuard permission="agency:mutate" fallback={null}>
+            <button 
+              onClick={startEditing}
+              className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-xl transition-all shadow-sm cursor-pointer"
+            >
+              <Edit2 className="h-4 w-4" />
+              Modifier le Profil
+            </button>
+          </RoleGuard>
         </div>
       </div>
 
@@ -193,12 +198,14 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
                   <User className="h-4 w-4 text-blue-500" /> Profil Client
                 </CardTitle>
                 {!isEditing ? (
+                  <RoleGuard permission="agency:mutate" fallback={null}>
                   <button
                     onClick={startEditing}
                     className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                   >
                     <Edit2 className="h-4 w-4" />
                   </button>
+                  </RoleGuard>
                 ) : (
                   <button
                     onClick={() => setIsEditing(false)}
@@ -355,13 +362,15 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
                 <CardTitle className="text-sm font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
                   <Car className="h-4 w-4 text-blue-500" /> Véhicules
                 </CardTitle>
-                <button
-                  onClick={() => setShowAddVehicle(!showAddVehicle)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all cursor-pointer"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Ajouter un véhicule
-                </button>
+                <RoleGuard permission="agency:mutate" fallback={null}>
+                  <button
+                    onClick={() => setShowAddVehicle(!showAddVehicle)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Ajouter un véhicule
+                  </button>
+                </RoleGuard>
               </CardHeader>
               <CardContent className="pt-6">
                 {showAddVehicle && (
@@ -523,13 +532,21 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
                           <th className="pb-3 px-2 text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">
                             Statut
                           </th>
+                          <th className="pb-3 px-2 text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                            Actions
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
                         {clientContracts.map((contract) => (
                           <tr key={contract.id} className="border-b border-gray-50 last:border-0">
                             <td className="py-4 px-2 whitespace-nowrap font-mono font-bold text-sm text-gray-900">
-                              {contract.id.substring(0, 8).toUpperCase()}
+                              <Link
+                                href={`/dashboard/contracts/${contract.id}`}
+                                className="text-blue-600 hover:underline"
+                              >
+                                {contract.id.substring(0, 8).toUpperCase()}
+                              </Link>
                             </td>
                             <td className="py-4 px-2 whitespace-nowrap text-sm text-gray-600">
                               {contract.product_type} / {contract.subscription_type}
@@ -548,6 +565,14 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
                                 {contract.status}
                               </span>
                             </td>
+                            <td className="py-4 px-2 whitespace-nowrap">
+                              <Link
+                                href={`/dashboard/contracts/${contract.id}`}
+                                className="text-xs font-semibold text-blue-600 hover:underline"
+                              >
+                                Voir documents
+                              </Link>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -556,9 +581,149 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
                 )}
               </CardContent>
             </Card>
+
+            {/* Documents générés par contrat */}
+            <ClientDocumentsPanel contracts={clientContracts} />
           </div>
         </div>
       </div>
     </div>
+  )
+}
+
+function ClientDocumentsPanel({ contracts }: { contracts: Array<{ id: string; status: string }> }) {
+  const paidContracts = contracts.filter((c) => c.status === 'PAYE')
+  const [selectedContractId, setSelectedContractId] = useState(paidContracts[0]?.id || '')
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+
+  const { data: documents = [], isFetching, refetch } = useQuery({
+    queryKey: ['client-contract-docs', selectedContractId],
+    queryFn: () => contractsApi.listDocs(selectedContractId),
+    enabled: !!selectedContractId,
+  })
+
+  const generatePackMutation = useMutation({
+    mutationFn: () => contractsApi.generatePack(selectedContractId),
+    onSuccess: () => {
+      toast.success('Pack de documents généré')
+      refetch()
+    },
+    onError: (err: any) => toast.error(err.message || 'Erreur de génération'),
+  })
+
+  if (paidContracts.length === 0) {
+    return (
+      <Card className="border-gray-100 shadow-sm bg-white">
+        <CardHeader className="pb-4 border-b border-gray-50">
+          <CardTitle className="text-sm font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
+            <FileText className="h-4 w-4 text-blue-500" /> Documents assurance
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl text-xs text-amber-700 font-medium">
+            Les documents (CP, Attestation, Carte Rose, Reçu) deviennent disponibles après
+            encaissement (statut PAYE) sur un contrat du client.
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const docs = Array.isArray(documents) ? documents : []
+
+  return (
+    <Card className="border-gray-100 shadow-sm bg-white">
+      <CardHeader className="pb-4 border-b border-gray-50 flex flex-row items-center justify-between gap-3 flex-wrap">
+        <CardTitle className="text-sm font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
+          <FileText className="h-4 w-4 text-blue-500" /> Documents assurance
+        </CardTitle>
+        <div className="flex items-center gap-2">
+          <select
+            value={selectedContractId}
+            onChange={(e) => setSelectedContractId(e.target.value)}
+            className="h-9 rounded-xl border border-gray-200 bg-white px-3 text-xs"
+          >
+            {paidContracts.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.id.substring(0, 8).toUpperCase()}
+              </option>
+            ))}
+          </select>
+          <RoleGuard permission="agency:mutate" fallback={null}>
+            <button
+              onClick={() => generatePackMutation.mutate()}
+              disabled={generatePackMutation.isPending || !selectedContractId}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-blue-600 disabled:bg-gray-200 disabled:text-gray-400 rounded-xl border-0 cursor-pointer"
+            >
+              {generatePackMutation.isPending ? 'Génération...' : 'Générer le Pack'}
+            </button>
+          </RoleGuard>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-6 space-y-3">
+        {isFetching ? (
+          <div className="text-center text-gray-400 py-6 text-sm">Chargement des documents...</div>
+        ) : docs.length === 0 ? (
+          <div className="p-4 border border-dashed border-gray-200 rounded-2xl text-center text-xs text-gray-500">
+            Aucun document généré. Cliquez sur « Générer le Pack ».
+          </div>
+        ) : (
+          docs.map((doc: any) => (
+            <div
+              key={doc.id}
+              className="flex items-center justify-between p-3.5 rounded-2xl border border-gray-100 bg-gray-50/20 gap-3"
+            >
+              <div>
+                <span className="font-bold text-xs text-gray-900 block">
+                  {doc.doc_type} ({doc.format})
+                </span>
+                <span className="text-[10px] text-gray-400 block mt-0.5">
+                  {doc.generated_at
+                    ? `Généré le ${new Date(doc.generated_at).toLocaleString('fr-FR')}`
+                    : 'Document disponible'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const url = await contractsApi.previewDoc(selectedContractId, doc.id)
+                      setPreviewUrl(url)
+                      window.open(url, '_blank', 'noopener,noreferrer')
+                    } catch {
+                      toast.error('Impossible d\'ouvrir l\'aperçu')
+                    }
+                  }}
+                  className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl cursor-pointer border-0"
+                  title="Aperçu"
+                >
+                  <Eye className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    toast.promise(contractsApi.downloadDoc(selectedContractId, doc.id), {
+                      loading: 'Téléchargement...',
+                      success: 'Document téléchargé',
+                      error: 'Erreur lors du téléchargement',
+                    })
+                  }}
+                  className="p-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl cursor-pointer border-0"
+                  title="Télécharger"
+                >
+                  <Download className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+        {previewUrl && (
+          <p className="text-[10px] text-gray-400">
+            Aperçu ouvert dans un nouvel onglet.
+          </p>
+        )}
+      </CardContent>
+    </Card>
   )
 }

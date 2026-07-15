@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { Wallet, Check, X, FileText, Loader2, Upload, Target, Edit, TrendingUp, Award } from 'lucide-react'
+import { validateUploadFile } from '@/lib/files/validation'
+import { RoleGuard } from '@/components/auth/RoleGuard'
 
 export default function WalletPage() {
   const queryClient = useQueryClient()
@@ -45,24 +47,8 @@ export default function WalletPage() {
 
   // Approve Withdrawal Mutation
   const approveMutation = useMutation({
-    mutationFn: async ({ id, formData }: { id: string; formData: FormData }) => {
-      const token = localStorage.getItem('mobi_access_token')
-      const res = await fetch(
-        `https://gestion-d-assurance-v1-ten.vercel.app/wallet/withdrawals/${id}/approve`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: formData,
-        }
-      )
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.detail || 'Erreur lors de la validation du retrait')
-      }
-      return res.json()
-    },
+    mutationFn: ({ id, formData }: { id: string; formData: FormData }) =>
+      walletApi.approveWithdrawalWithProofs(id, formData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pending-withdrawals'] })
       toast.success('Retrait validé avec succès (Solde débité)')
@@ -116,6 +102,13 @@ export default function WalletPage() {
     e.preventDefault()
     if (!paymentRef || !paymentDate || !signatureFile || !proofsFiles || proofsFiles.length === 0) {
       toast.error('Veuillez remplir tous les champs obligatoires et joindre les fichiers')
+      return
+    }
+    try {
+      validateUploadFile(signatureFile)
+      Array.from(proofsFiles).forEach(validateUploadFile)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Fichier invalide')
       return
     }
 
@@ -234,6 +227,7 @@ export default function WalletPage() {
 
                       <div className="flex gap-2 shrink-0">
                         {approvingId !== w.id && rejectingId !== w.id && (
+                          <RoleGuard permission="agency:mutate" fallback={null}>
                           <>
                             <Button
                               onClick={() => setApprovingId(w.id)}
@@ -253,6 +247,7 @@ export default function WalletPage() {
                               Rejeter
                             </Button>
                           </>
+                          </RoleGuard>
                         )}
                       </div>
                     </div>
@@ -496,13 +491,15 @@ export default function WalletPage() {
                                 <span className="font-bold text-sm text-slate-600">
                                   {w.monthly_objective.toLocaleString('fr-FR')} FCFA
                                 </span>
-                                <button
-                                  onClick={() => startEditing(w.agent_id, w.monthly_objective)}
-                                  className="p-1 rounded text-gray-400 hover:text-blue-600 hover:bg-gray-50 transition-colors cursor-pointer border-0"
-                                  title="Modifier l'objectif"
-                                >
-                                  <Edit className="h-3.5 w-3.5" />
-                                </button>
+                                <RoleGuard permission="agency:mutate" fallback={null}>
+                                  <button
+                                    onClick={() => startEditing(w.agent_id, w.monthly_objective)}
+                                    className="p-1 rounded text-gray-400 hover:text-blue-600 hover:bg-gray-50 transition-colors cursor-pointer border-0"
+                                    title="Modifier l'objectif"
+                                  >
+                                    <Edit className="h-3.5 w-3.5" />
+                                  </button>
+                                </RoleGuard>
                               </div>
                             )}
                           </td>
@@ -532,14 +529,16 @@ export default function WalletPage() {
                             </div>
                           </td>
                           <td className="py-5 text-right">
-                            <Button
-                              onClick={() => startEditing(w.agent_id, w.monthly_objective)}
-                              variant="outline"
-                              size="sm"
-                              className="text-xs border-gray-200 hover:bg-gray-50 hover:text-slate-800"
-                            >
-                              Fixer l'Objectif
-                            </Button>
+                            <RoleGuard permission="agency:mutate" fallback={null}>
+                              <Button
+                                onClick={() => startEditing(w.agent_id, w.monthly_objective)}
+                                variant="outline"
+                                size="sm"
+                                className="text-xs border-gray-200 hover:bg-gray-50 hover:text-slate-800"
+                              >
+                                Fixer l'Objectif
+                              </Button>
+                            </RoleGuard>
                           </td>
                         </tr>
                       )

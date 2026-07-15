@@ -2,7 +2,9 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, use } from 'react'
-import { contractsApi, clientsApi } from '@/lib/api/mobi-assur'
+import { contractsApi, clientsApi, type PaymentMethod } from '@/lib/api/mobi-assur'
+import { RoleGuard } from '@/components/auth/RoleGuard'
+import { paymentSummary } from '@/lib/payments'
 import Header from '@/components/dashboard/Header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,6 +27,8 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
   const queryClient = useQueryClient()
   const [showAddPayment, setShowAddPayment] = useState(false)
   const [paymentAmount, setPaymentAmount] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('ESPECES')
+  const [paymentReference, setPaymentReference] = useState('')
 
   // Query Contract profile
   const { data: contract, isLoading: loadingContract } = useQuery({
@@ -45,14 +49,26 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
     queryFn: () => contractsApi.listDocs(id),
   })
 
+  const { data: payments = [] } = useQuery({
+    queryKey: ['contract-payments', id],
+    queryFn: () => contractsApi.listPayments(id),
+  })
+
   // Add Payment Mutation
   const addPaymentMutation = useMutation({
-    mutationFn: (amount: number) => contractsApi.addPayment(id, { amount }),
+    mutationFn: (amount: number) =>
+      contractsApi.addPayment(id, {
+        amount,
+        method: paymentMethod,
+        reference_externe: paymentReference.trim() || undefined,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contract', id] })
+      queryClient.invalidateQueries({ queryKey: ['contract-payments', id] })
       toast.success('Paiement enregistré (Statut: PENDING)')
       setShowAddPayment(false)
       setPaymentAmount('')
+      setPaymentReference('')
     },
     onError: (err: any) => {
       toast.error(err.message || 'Erreur lors de l\'ajout du paiement')
@@ -67,6 +83,7 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
     mutationFn: (paymentId: string) => contractsApi.validatePayment(id, paymentId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contract', id] })
+      queryClient.invalidateQueries({ queryKey: ['contract-payments', id] })
       toast.success('Paiement validé avec succès (Contrat: PAYE)')
     },
     onError: (err: any) => {
@@ -88,12 +105,19 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
 
   const handleAddPayment = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!paymentAmount || isNaN(Number(paymentAmount))) {
+    if (!paymentAmount || isNaN(Number(paymentAmount)) || Number(paymentAmount) <= 0) {
       toast.error('Montant valide requis')
+      return
+    }
+    if (balance > 0 && Number(paymentAmount) > balance) {
+      toast.error('Le versement dépasse le solde restant')
       return
     }
     addPaymentMutation.mutate(Number(paymentAmount))
   }
+
+  const totalDue = contract?.pttc ?? contract?.prime_ttc ?? 0
+  const { paid: totalPaid, balance } = paymentSummary(totalDue, payments)
 
   if (loadingContract) {
     return (
@@ -194,7 +218,7 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
                       Prime Totale (TTC)
                     </span>
                     <span className="text-base font-extrabold text-blue-600 mt-1 block">
-                      {(contract?.prime_ttc || 0).toLocaleString('fr-FR')} FCFA
+                      {totalDue.toLocaleString('fr-FR')} FCFA
                     </span>
                   </div>
                 </div>
@@ -207,13 +231,15 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
                 <CardTitle className="text-sm font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
                   <FileSpreadsheet className="h-4 w-4 text-blue-500" /> Documents & Attestations
                 </CardTitle>
-                <button
-                  onClick={() => generatePackMutation.mutate()}
-                  disabled={generatePackMutation.isPending || contract?.status !== 'PAYE'}
-                  className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 disabled:bg-gray-150 disabled:text-gray-400 rounded-xl transition-all cursor-pointer border-0"
-                >
-                  {generatePackMutation.isPending ? 'Génération...' : 'Générer le Pack'}
-                </button>
+                <RoleGuard permission="agency:mutate" fallback={null}>
+                  <button
+                    onClick={() => generatePackMutation.mutate()}
+                    disabled={generatePackMutation.isPending || contract?.status !== 'PAYE'}
+                    className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 disabled:bg-gray-150 disabled:text-gray-400 rounded-xl transition-all cursor-pointer border-0"
+                  >
+                    {generatePackMutation.isPending ? 'Génération...' : 'Générer le Pack'}
+                  </button>
+                </RoleGuard>
               </CardHeader>
               <CardContent className="pt-6">
                 {contract?.status !== 'PAYE' ? (
@@ -270,12 +296,14 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
                   <DollarSign className="h-4 w-4 text-blue-500" /> Règlement
                 </CardTitle>
                 {contract?.status !== 'PAYE' && (
+                  <RoleGuard permission="payments:manage" fallback={null}>
                   <button
                     onClick={() => setShowAddPayment(!showAddPayment)}
                     className="text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer"
                   >
                     Déclarer
                   </button>
+                  </RoleGuard>
                 )}
               </CardHeader>
               <CardContent className="pt-6 space-y-4">
@@ -286,11 +314,30 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
                     </span>
                     <Input
                       type="number"
+                      min="1"
+                      max={balance || undefined}
                       placeholder="Ex: 50000"
                       value={paymentAmount}
                       onChange={(e) => setPaymentAmount(e.target.value)}
                       className="h-10 text-xs border-gray-205"
                       required
+                    />
+                    <select
+                      value={paymentMethod}
+                      onChange={(event) => setPaymentMethod(event.target.value as PaymentMethod)}
+                      className="flex h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-xs"
+                    >
+                      <option value="ESPECES">Espèces</option>
+                      <option value="ORANGE_MONEY">Orange Money</option>
+                      <option value="MTN_MOMO">MTN MoMo</option>
+                      <option value="CHEQUE">Chèque</option>
+                      <option value="VIREMENT">Virement</option>
+                    </select>
+                    <Input
+                      placeholder="Référence externe (facultative)"
+                      value={paymentReference}
+                      onChange={(event) => setPaymentReference(event.target.value)}
+                      className="h-10 text-xs border-gray-200"
                     />
                     <div className="flex gap-2 justify-end pt-1">
                       <Button
@@ -314,6 +361,52 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
                   </form>
                 )}
 
+                <div className="grid grid-cols-2 gap-3 rounded-2xl border border-gray-100 bg-gray-50 p-3 text-xs">
+                  <div>
+                    <span className="block text-gray-400">Cumul validé</span>
+                    <strong>{totalPaid.toLocaleString('fr-FR')} FCFA</strong>
+                  </div>
+                  <div>
+                    <span className="block text-gray-400">Solde restant</span>
+                    <strong>{balance.toLocaleString('fr-FR')} FCFA</strong>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  {payments.length === 0 ? (
+                    <p className="text-xs text-gray-400">Aucun versement enregistré.</p>
+                  ) : (
+                    payments.map((payment) => (
+                      <div key={payment.id} className="rounded-xl border border-gray-100 p-3 text-xs">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <strong>{Number(payment.amount).toLocaleString('fr-FR')} FCFA</strong>
+                            <span className="ml-2 text-gray-400">{payment.method}</span>
+                            {payment.reference_externe && (
+                              <span className="mt-1 block text-gray-400">Réf. {payment.reference_externe}</span>
+                            )}
+                          </div>
+                          <span className={payment.status === 'SUCCESS' ? 'font-bold text-green-600' : 'font-bold text-amber-600'}>
+                            {payment.status}
+                          </span>
+                        </div>
+                        {payment.status === 'PENDING' && (
+                          <RoleGuard permission="payments:manage" fallback={null}>
+                            <button
+                              type="button"
+                              disabled={validatePaymentMutation.isPending}
+                              onClick={() => validatePaymentMutation.mutate(payment.id)}
+                              className="mt-3 w-full rounded-lg bg-emerald-600 px-3 py-2 font-semibold text-white disabled:opacity-50"
+                            >
+                              Valider ce versement
+                            </button>
+                          </RoleGuard>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+
                 {contract?.status === 'PAYE' ? (
                   <div className="flex items-start gap-2.5 p-4 bg-green-50 border border-green-100 rounded-2xl text-green-700 text-xs font-medium">
                     <CheckCircle className="h-4.5 w-4.5 text-green-600 shrink-0 mt-0.5" />
@@ -326,18 +419,8 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    <div className="p-3 border border-amber-100 bg-amber-50/50 rounded-2xl text-xs text-amber-700 font-medium">
-                      ⌛ En attente de règlement de la prime totale.
-                    </div>
-                    {/* Add a direct simulation of validation */}
-                    <button
-                      onClick={() => validatePaymentMutation.mutate('mock-payment-id')}
-                      className="w-full flex items-center justify-center gap-2 h-11 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold cursor-pointer border-0 shadow-md shadow-emerald-500/10 active:scale-[0.98] transition-all"
-                    >
-                      <CheckCircle className="h-4 w-4" />
-                      Forcer la validation (V1)
-                    </button>
+                  <div className="p-3 border border-amber-100 bg-amber-50/50 rounded-2xl text-xs text-amber-700 font-medium">
+                    ⌛ Versements partiels acceptés jusqu’au règlement du solde.
                   </div>
                 )}
               </CardContent>

@@ -1,9 +1,18 @@
+import type { Role } from '@/lib/auth/roles'
+import { validateUploadFile } from '@/lib/files/validation'
+
 /**
  * MOBI-ASSUR API Client
- * Client centralisé avec gestion JWT automatique, refresh token et erreurs
+ * Client centralisé vers le BFF Next.js. Les JWT restent exclusivement en cookie HttpOnly.
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://gestion-d-assurance-v1-ten.vercel.app'
+const BFF_BASE = '/api/backend'
+
+export function proxiedAssetUrl(value: string): string {
+  if (!value.startsWith('http')) return `${BFF_BASE}${value.startsWith('/') ? value : `/${value}`}`
+  const url = new URL(value)
+  return `${BFF_BASE}${url.pathname}${url.search}`
+}
 
 export class MobiAssurApiError extends Error {
   constructor(
@@ -16,61 +25,23 @@ export class MobiAssurApiError extends Error {
   }
 }
 
-function getToken(): string | null {
-  if (typeof window === 'undefined') return null
-  return localStorage.getItem('mobi_access_token')
-}
-
-function getRefreshToken(): string | null {
-  if (typeof window === 'undefined') return null
-  return localStorage.getItem('mobi_refresh_token')
-}
-
-async function refreshAccessToken(): Promise<string | null> {
-  const refresh = getRefreshToken()
-  if (!refresh) return null
-  try {
-    const res = await fetch(`${API_BASE}/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: refresh }),
-    })
-    if (!res.ok) {
-      localStorage.removeItem('mobi_access_token')
-      localStorage.removeItem('mobi_refresh_token')
-      return null
-    }
-    const data = await res.json()
-    const newToken = data?.data?.access_token || data?.access_token
-    if (newToken) localStorage.setItem('mobi_access_token', newToken)
-    return newToken
-  } catch {
-    return null
-  }
-}
-
-
 async function mobiRequest<T>(
   path: string,
   options: RequestInit = {},
-  retry = true
 ): Promise<T> {
-  const token = getToken()
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string>),
+  const headers = new Headers(options.headers)
+  if (!(options.body instanceof FormData) && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
   }
-  if (token) headers['Authorization'] = `Bearer ${token}`
+  const res = await fetch(`${BFF_BASE}${path}`, {
+    ...options,
+    headers,
+    credentials: 'include',
+    cache: 'no-store',
+  })
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers })
-
-  if (res.status === 401 && retry) {
-    const newToken = await refreshAccessToken()
-    if (newToken) return mobiRequest<T>(path, options, false)
-    // Force logout
+  if (res.status === 401) {
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('mobi_access_token')
-      localStorage.removeItem('mobi_refresh_token')
       window.location.href = '/fr/login'
     }
     throw new MobiAssurApiError('Session expirée', 401)
@@ -100,11 +71,7 @@ async function mobiRequest<T>(
 }
 
 export async function downloadFileWithAuth(path: string, filename: string): Promise<void> {
-  const token = getToken()
-  const headers: Record<string, string> = {}
-  if (token) headers['Authorization'] = `Bearer ${token}`
-
-  const res = await fetch(`${API_BASE}${path}`, { headers })
+  const res = await fetch(`${BFF_BASE}${path}`, { credentials: 'include' })
   if (!res.ok) throw new Error('Erreur lors du téléchargement du document')
   
   const blob = await res.blob()
@@ -116,6 +83,13 @@ export async function downloadFileWithAuth(path: string, filename: string): Prom
   a.click()
   window.URL.revokeObjectURL(url)
   document.body.removeChild(a)
+}
+
+export async function previewFileWithAuth(path: string): Promise<string> {
+  const res = await fetch(`${BFF_BASE}${path}`, { credentials: 'include' })
+  if (!res.ok) throw new Error('Erreur lors de l\'aperçu du document')
+  const blob = await res.blob()
+  return window.URL.createObjectURL(blob)
 }
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
@@ -151,23 +125,29 @@ export interface UserProfile {
   email?: string
   phone?: string
   full_name?: string
-  role: string
+  role: Role
   agency_id?: string
   is_active: boolean
 }
 
 export const authApi = {
-  login: (data: LoginRequest) =>
-    mobiRequest<AuthResponse>('/auth/login', {
+  login: async (data: LoginRequest) => {
+    const response = await fetch('/api/auth/login', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
-    }),
-  logout: () => mobiRequest<unknown>('/auth/logout', { method: 'POST' }),
-  refresh: (refresh_token: string) =>
-    mobiRequest<AuthResponse>('/auth/refresh', {
-      method: 'POST',
-      body: JSON.stringify({ refresh_token }),
-    }),
+      credentials: 'include',
+    })
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) throw new MobiAssurApiError(payload.detail || 'Connexion refusée', response.status)
+    return payload as AuthResponse
+  },
+  logout: () => fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }),
+  session: async () => {
+    const response = await fetch('/api/auth/session', { credentials: 'include', cache: 'no-store' })
+    if (!response.ok) throw new MobiAssurApiError('Session absente', response.status)
+    return response.json() as Promise<{ user: UserProfile }>
+  },
 }
 
 // ─── Users ───────────────────────────────────────────────────────────────────
@@ -186,10 +166,11 @@ export interface User {
 
 export interface CreateUserRequest {
   full_name: string
-  email?: string
-  phone?: string
-  country_code?: string
-  role: string
+  email: string
+  phone: string
+  country_code: string
+  role: Role
+  agent_code?: string
   password?: string
 }
 
@@ -259,13 +240,18 @@ export interface Client {
   id: string
   full_name: string
   phone: string
-  country_code: string
+  country_code?: string
   email?: string
   address?: string
   city?: string
   profession?: string
   att_number?: string
+  att_num?: string
   cni_number?: string
+  date_naissance?: string
+  sexe?: string
+  cni_photo_url?: string
+  permis_photo_url?: string
   created_at?: string
 }
 
@@ -276,6 +262,13 @@ export interface Vehicle {
   immatriculation?: string
   chassis_num: string
   puissance_fiscale?: number
+  puissance_cv?: number
+  energie?: string
+  nb_places?: number
+  date_mise_circulation?: string
+  usage?: string
+  genre?: string
+  zone_circulation?: string
 }
 
 export interface CreateClientRequest {
@@ -289,6 +282,21 @@ export interface CreateClientRequest {
   cni_number?: string
   date_naissance?: string
   sexe?: 'MASCULIN' | 'FEMININ'
+  cni_photo_url?: string
+  permis_photo_url?: string
+  vehicle?: {
+    marque: string
+    modele?: string
+    chassis_num: string
+    immatriculation?: string
+    energie?: string
+    puissance_cv?: number
+    nb_places?: number
+    date_mise_circulation?: string
+    usage?: string
+    genre?: string
+    zone_circulation?: string
+  }
 }
 
 export const clientsApi = {
@@ -303,11 +311,31 @@ export const clientsApi = {
     mobiRequest<Client>(`/clients/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   listVehicles: (clientId: string) =>
     mobiRequest<Vehicle[]>(`/clients/${clientId}/vehicles`),
-  addVehicle: (clientId: string, data: Omit<Vehicle, 'id'>) =>
+  addVehicle: (clientId: string, data: Omit<Vehicle, 'id'> & { puissance_cv?: number }) =>
     mobiRequest<Vehicle>(`/clients/${clientId}/vehicles`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+  uploadDoc: async (file: File): Promise<{ url: string }> => {
+    validateUploadFile(file)
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await fetch(`${BFF_BASE}/clients/upload-doc`, {
+      method: 'POST',
+      body: formData,
+      credentials: 'include',
+    })
+    if (!res.ok) {
+      let detail = ''
+      try {
+        const err = await res.json()
+        detail = err.detail || err.message || JSON.stringify(err)
+      } catch {}
+      throw new MobiAssurApiError(detail || res.statusText, res.status, detail)
+    }
+    const json = await res.json()
+    return (json?.data || json) as { url: string }
+  },
 }
 
 // ─── Contracts ───────────────────────────────────────────────────────────────
@@ -324,6 +352,7 @@ export interface Contract {
   duree_jours: number
   prime_nette?: number
   prime_ttc?: number
+  pttc?: number
   created_at?: string
   client?: Client
 }
@@ -332,19 +361,28 @@ export interface Payment {
   id: string
   contract_id: string
   amount: number
+  method: PaymentMethod
+  reference_externe?: string
   status: string
   created_at?: string
+  validated_at?: string
 }
+
+export type PaymentMethod = 'ESPECES' | 'ORANGE_MONEY' | 'MTN_MOMO' | 'CHEQUE' | 'VIREMENT'
 
 export interface CreateContractRequest {
   client_id: string
   agent_id?: string
-  product_type: 'CAT1' | 'CAT11'
+  product_type: 'CAT1'
   subscription_type?: string
   zone_circulation?: string
   date_effet: string
   duree_jours?: number
   conducteur_nom?: string
+  conducteur_date_naissance?: string
+  conducteur_permis_cat?: string
+  conducteur_permis_num?: string
+  conducteur_permis_date?: string
   vehicles: Array<{
     vehicle_id?: string
     vehicle?: Partial<Vehicle>
@@ -364,11 +402,16 @@ export const contractsApi = {
     mobiRequest<Contract>('/contracts', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Partial<CreateContractRequest>) =>
     mobiRequest<Contract>(`/contracts/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-  addPayment: (contractId: string, data: { amount: number; mode?: string }) =>
+  addPayment: (
+    contractId: string,
+    data: { amount: number; method: PaymentMethod; reference_externe?: string },
+  ) =>
     mobiRequest<Payment>(`/contracts/${contractId}/payments`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+  listPayments: (contractId: string) =>
+    mobiRequest<Payment[]>(`/contracts/${contractId}/payments`),
   validatePayment: (contractId: string, paymentId: string) =>
     mobiRequest<Payment>(`/contracts/${contractId}/payments/${paymentId}/validate`, {
       method: 'POST',
@@ -383,6 +426,8 @@ export const contractsApi = {
     mobiRequest<unknown>(`/contracts/${contractId}/documents/generate`, { method: 'POST' }),
   downloadDoc: (contractId: string, docId: string) =>
     downloadFileWithAuth(`/contracts/${contractId}/documents/${docId}/download`, `document_${docId}.pdf`),
+  previewDoc: (contractId: string, docId: string) =>
+    previewFileWithAuth(`/contracts/${contractId}/documents/${docId}/download`),
   estimateContract: (data: any) =>
     mobiRequest<unknown>('/contracts/estimate', { method: 'POST', body: JSON.stringify(data) }),
 }
@@ -416,10 +461,10 @@ export const prospectsApi = {
     mobiRequest<ConversionRequest>(`/prospects/conversions/${id}`),
   approveConversion: (id: string) =>
     mobiRequest<unknown>(`/prospects/conversions/${id}/approve`, { method: 'POST' }),
-  rejectConversion: (id: string, motif: string) =>
+  rejectConversion: (id: string, rejectionReason: string) =>
     mobiRequest<unknown>(`/prospects/conversions/${id}/reject`, {
       method: 'POST',
-      body: JSON.stringify({ motif }),
+      body: JSON.stringify({ rejection_reason: rejectionReason }),
     }),
   create: (data: any) =>
     mobiRequest<Prospect>('/prospects', { method: 'POST', body: JSON.stringify(data) }),
@@ -457,10 +502,10 @@ export const walletApi = {
     mobiRequest<WithdrawalRequest[]>('/wallet/withdrawals/pending'),
   getWithdrawal: (id: string) =>
     mobiRequest<WithdrawalRequest>(`/wallet/withdrawals/${id}`),
-  rejectWithdrawal: (id: string, motif: string) =>
+  rejectWithdrawal: (id: string, rejectionReason: string) =>
     mobiRequest<unknown>(`/wallet/withdrawals/${id}/reject`, {
       method: 'POST',
-      body: JSON.stringify({ motif }),
+      body: JSON.stringify({ rejection_reason: rejectionReason }),
     }),
   listWithdrawals: () => mobiRequest<WithdrawalRequest[]>('/wallet/withdrawals'),
   createWithdrawal: (data: { amount: number; motif?: string }) =>
@@ -469,6 +514,11 @@ export const walletApi = {
     mobiRequest<unknown>(`/wallet/withdrawals/${id}`, { method: 'DELETE' }),
   approveWithdrawal: (id: string) =>
     mobiRequest<unknown>(`/wallet/withdrawals/${id}/approve`, { method: 'POST' }),
+  approveWithdrawalWithProofs: (id: string, data: FormData) =>
+    mobiRequest<unknown>(`/wallet/withdrawals/${id}/approve`, {
+      method: 'POST',
+      body: data,
+    }),
   getMe: () => mobiRequest<unknown>('/wallet/me'),
   getCommissions: () => mobiRequest<unknown>('/wallet/commissions'),
   listAgentWallets: () => mobiRequest<AgentWallet[]>('/wallet/agents'),
@@ -484,9 +534,9 @@ export const walletApi = {
 export interface PricingSettings {
   accessoires?: number
   asac?: number
-  fga?: number
-  cr?: number
-  tva?: number
+  dta?: number
+  carte_rose_fee?: number
+  tva_rate?: number
   commission_rate?: number
   bareme?: unknown
 }

@@ -2,13 +2,14 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect, useRef } from 'react'
-import { supportApi, SupportTicket, ChatMessage } from '@/lib/api/mobi-assur'
+import { proxiedAssetUrl, supportApi } from '@/lib/api/mobi-assur'
 import Header from '@/components/dashboard/Header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { MessageSquare, Send, Play, Pause, User, Shield, Volume2, Clock, CheckCircle } from 'lucide-react'
+import { RoleGuard } from '@/components/auth/RoleGuard'
 
 export default function SupportPage() {
   const queryClient = useQueryClient()
@@ -47,12 +48,7 @@ export default function SupportPage() {
   // Real-time SSE Connection for new messages
   useEffect(() => {
     if (!selectedTicketId) return
-    const token = localStorage.getItem('mobi_access_token')
-    if (!token) return
-
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'https://gestion-d-assurance-v1-ten.vercel.app'
-    const sseUrl = `${apiBase}/agents/notifications/stream?token=${token}`
-    const eventSource = new EventSource(sseUrl)
+    const eventSource = new EventSource('/api/sse', { withCredentials: true })
 
     eventSource.addEventListener('new_message', (e: MessageEvent) => {
       try {
@@ -82,8 +78,7 @@ export default function SupportPage() {
   }
 
   const togglePlayAudio = (url: string) => {
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'https://gestion-d-assurance-v1-ten.vercel.app'
-    const fullUrl = url.startsWith('http') ? url : `${apiBase}${url}`
+    const fullUrl = proxiedAssetUrl(url)
 
     if (playingAudioUrl === url) {
       audioRef.current?.pause()
@@ -258,6 +253,7 @@ export default function SupportPage() {
               </div>
 
               {/* Chat Input Bar */}
+              <RoleGuard permission="agency:mutate" fallback={null}>
               <form onSubmit={handleSend} className="p-4 border-t border-slate-100 flex gap-3 bg-slate-50/50">
                 <Input
                   placeholder="Tapez votre réponse ici..."
@@ -274,6 +270,7 @@ export default function SupportPage() {
                   <Send className="h-4 w-4" />
                 </button>
               </form>
+              </RoleGuard>
             </>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-center text-slate-400 p-8">

@@ -45,7 +45,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const handleClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
       if (!onClick) return
 
-      const result = onClick(e)
+      const result = onClick(e) as unknown
       
       // If the onClick handler returns a Promise, automatically show a spinner
       if (result instanceof Promise) {

@@ -10,18 +10,27 @@ import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { Users, Plus, Shield, Check, X, Loader2, Pencil, UserCheck, UserX, KeyRound, Trash2 } from 'lucide-react'
 import { parsePhoneNumberFromString, CountryCode } from 'libphonenumber-js'
+import { RoleGuard } from '@/components/auth/RoleGuard'
+import { ROLES, type Role } from '@/lib/auth/roles'
+import { can } from '@/lib/auth/roles'
+import { useAuthStore } from '@/lib/stores/auth-store'
 
-export default function UsersPage() {
+function UsersContent() {
   const queryClient = useQueryClient()
+  const currentRole = useAuthStore((state) => state.user?.role)
+  const canManage = can(currentRole, 'users:manage')
   const [showAddForm, setShowAddForm] = useState(false)
+  const [roleFilter, setRoleFilter] = useState<Role | ''>('')
+  const [search, setSearch] = useState('')
 
   // Form states
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [countryCode, setCountryCode] = useState('CM')
   const [phone, setPhone] = useState('')
+  const [agentCode, setAgentCode] = useState('')
   const [password, setPassword] = useState('')
-  const [role, setRole] = useState('AGENT_TERRAIN')
+  const [role, setRole] = useState<Role>(ROLES.AGENT)
 
   const [editingUser, setEditingUser] = useState<any>(null)
   const [tempPassword, setTempPassword] = useState<string | null>(null)
@@ -29,8 +38,8 @@ export default function UsersPage() {
 
   // Query users
   const { data: users = [], isLoading } = useQuery({
-    queryKey: ['users'],
-    queryFn: () => usersApi.list(),
+    queryKey: ['users', roleFilter, search],
+    queryFn: () => usersApi.list({ role: roleFilter || undefined, search: search || undefined }),
   })
 
   // Create user
@@ -45,8 +54,9 @@ export default function UsersPage() {
       setEmail('')
       setCountryCode('CM')
       setPhone('')
+      setAgentCode('')
       setPassword('')
-      setRole('AGENT_TERRAIN')
+      setRole(ROLES.AGENT)
     },
     onError: (err: any) => {
       toast.error(err.message || 'Erreur lors de la création')
@@ -107,8 +117,8 @@ export default function UsersPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!fullName || !role) {
-      toast.error('Nom et rôle requis')
+    if (!fullName || !email || !phone || !countryCode || (role === ROLES.AGENT && !agentCode)) {
+      toast.error('Nom, e-mail, téléphone et code agent (pour un agent terrain) sont requis')
       return
     }
 
@@ -127,9 +137,10 @@ export default function UsersPage() {
 
     createUserMutation.mutate({
       full_name: fullName,
-      email: email || undefined,
-      phone: phone || undefined,
-      country_code: phone ? countryCode.toUpperCase() : undefined,
+      email,
+      phone,
+      country_code: countryCode.toUpperCase(),
+      agent_code: role === ROLES.AGENT ? agentCode : undefined,
       password: password || undefined,
       role: role,
     })
@@ -148,16 +159,36 @@ export default function UsersPage() {
       <div className="p-8 space-y-6 flex-1">
         <div className="flex justify-between items-center">
           <h3 className="text-base font-bold text-gray-950">Membres de l'Agence</h3>
-          <button
+          {canManage && <button
             onClick={() => setShowAddForm(!showAddForm)}
             className="flex items-center gap-2 px-5 py-3 text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-xl active:scale-95 transition-all shadow-md shadow-blue-500/10 cursor-pointer border-0"
           >
             <Plus className="h-4 w-4" />
             Nouveau Membre
-          </button>
+          </button>}
         </div>
 
-        {showAddForm && (
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Input
+            type="search"
+            placeholder="Rechercher un collaborateur"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            className="max-w-sm"
+          />
+          <select
+            value={roleFilter}
+            onChange={(event) => setRoleFilter(event.target.value as Role | '')}
+            className="h-10 rounded-xl border border-gray-200 bg-white px-4 text-xs"
+          >
+            <option value="">Tous les rôles</option>
+            <option value={ROLES.ADMIN}>Administrateurs</option>
+            <option value={ROLES.RESPONSABLE}>Responsables</option>
+            <option value={ROLES.AGENT}>Agents terrain</option>
+          </select>
+        </div>
+
+        {canManage && showAddForm && (
           <Card className="border-gray-100 shadow-sm bg-white max-w-2xl">
             <CardContent className="pt-6">
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -184,11 +215,11 @@ export default function UsersPage() {
                     </label>
                     <select
                       value={role}
-                      onChange={(e) => setRole(e.target.value)}
+                      onChange={(e) => setRole(e.target.value as Role)}
                       className="flex h-10 w-full rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs transition-colors focus-visible:outline-none"
                     >
                       <option value="AGENT_TERRAIN">Agent Terrain (RBAC)</option>
-                      <option value="BACKOFFICE">Back-Office (Gestionnaire)</option>
+                      <option value="RESPONSABLE_AGENCE">Responsable Agence (Lecture / préparation)</option>
                       <option value="ADMIN_AGENCE">Admin Agence (Complet)</option>
                     </select>
                   </div>
@@ -231,6 +262,20 @@ export default function UsersPage() {
                         className="flex-1 h-10 text-xs border-gray-200 rounded-l-none rounded-r-xl"
                       />
                     </div>
+                  </div>
+
+                  <div className="space-y-1 sm:col-span-2">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                      Code agent {role === ROLES.AGENT ? '*' : ''}
+                    </label>
+                    <Input
+                      placeholder="Ex: AGT-001"
+                      value={agentCode}
+                      onChange={(e) => setAgentCode(e.target.value)}
+                      disabled={role !== ROLES.AGENT}
+                      required={role === ROLES.AGENT}
+                      className="h-10 text-xs border-gray-200"
+                    />
                   </div>
 
                   <div className="space-y-1 sm:col-span-2">
@@ -332,7 +377,7 @@ export default function UsersPage() {
                         </span>
                       </td>
                       <td className="py-4 text-right">
-                        <div className="flex gap-2 justify-end">
+                        {canManage ? <div className="flex gap-2 justify-end">
                           <button
                             onClick={() => setEditingUser(u)}
                             className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all cursor-pointer border-0 flex items-center justify-center active:scale-95"
@@ -382,7 +427,7 @@ export default function UsersPage() {
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
-                        </div>
+                        </div> : <span className="text-xs text-gray-400">Lecture seule</span>}
                       </td>
                     </tr>
                   ))}
@@ -551,5 +596,13 @@ export default function UsersPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function UsersPage() {
+  return (
+    <RoleGuard permission="agency:read">
+      <UsersContent />
+    </RoleGuard>
   )
 }
