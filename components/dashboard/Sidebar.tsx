@@ -29,6 +29,7 @@ export default function Sidebar() {
   const { isMobileOpen, setIsMobileOpen } = useSidebarStore()
   const [isCollapsed, setIsCollapsed] = useState(true)
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   // Collapse sidebar and clear loading state when pathname changes
   useEffect(() => {
@@ -38,9 +39,15 @@ export default function Sidebar() {
   }, [pathname])
 
   const handleLogout = async () => {
-    await authApi.logout().catch(() => undefined)
-    logout()
-    router.replace('/login')
+    if (isLoggingOut) return
+    setIsLoggingOut(true)
+    try {
+      await authApi.logout().catch(() => undefined)
+      logout()
+      router.replace('/login')
+    } catch {
+      setIsLoggingOut(false)
+    }
   }
 
   const handleNavigation = (path: string, e: React.MouseEvent) => {
@@ -112,8 +119,17 @@ export default function Sidebar() {
 
   return (
     <>
+      {isLoggingOut && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3 rounded-2xl bg-white px-8 py-6 shadow-xl">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            <p className="text-sm font-semibold text-slate-700">Déconnexion en cours...</p>
+          </div>
+        </div>
+      )}
+
       {/* Blur Overlay when expanded or mobile open */}
-      {(!isCollapsed || isMobileOpen) && (
+      {(!isCollapsed || isMobileOpen) && !isLoggingOut && (
         <div 
           className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40 transition-opacity md:block"
           onClick={() => { setIsCollapsed(true); setIsMobileOpen(false) }}
@@ -213,10 +229,15 @@ export default function Sidebar() {
 
           <button
             onClick={handleLogout}
+            disabled={isLoggingOut}
             title={isCollapsed && !isMobileOpen ? 'Déconnexion' : undefined}
-            className={`w-full min-h-12 flex items-center ${isCollapsed && !isMobileOpen ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-xl text-[15px] font-bold tracking-[-0.01em] opacity-75 hover:bg-red-50 hover:text-red-700 hover:opacity-100 transition-all text-slate-700 cursor-pointer`}
+            className={`w-full min-h-12 flex items-center ${isCollapsed && !isMobileOpen ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-xl text-[15px] font-bold tracking-[-0.01em] opacity-75 hover:bg-red-50 hover:text-red-700 hover:opacity-100 transition-all text-slate-700 cursor-pointer disabled:cursor-wait disabled:opacity-50`}
           >
-            <LogOut className="h-[21px] w-[21px] shrink-0" strokeWidth={2.25} />
+            {isLoggingOut ? (
+              <Loader2 className="h-[21px] w-[21px] shrink-0 animate-spin" strokeWidth={2.25} />
+            ) : (
+              <LogOut className="h-[21px] w-[21px] shrink-0" strokeWidth={2.25} />
+            )}
             {(!isCollapsed || isMobileOpen) && <span>Déconnexion</span>}
           </button>
         </div>
