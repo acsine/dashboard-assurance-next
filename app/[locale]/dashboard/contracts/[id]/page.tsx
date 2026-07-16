@@ -2,7 +2,12 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, use } from 'react'
-import { contractsApi, clientsApi, type PaymentMethod } from '@/lib/api/mobi-assur'
+import {
+  contractsApi,
+  clientsApi,
+  suggestCarteRoseSerial,
+  type PaymentMethod,
+} from '@/lib/api/mobi-assur'
 import { RoleGuard } from '@/components/auth/RoleGuard'
 import { paymentSummary } from '@/lib/payments'
 import Header from '@/components/dashboard/Header'
@@ -29,6 +34,8 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('ESPECES')
   const [paymentReference, setPaymentReference] = useState('')
+  const [carteRoseSerial, setCarteRoseSerial] = useState(() => suggestCarteRoseSerial(id))
+  const [carteRoseAssigned, setCarteRoseAssigned] = useState(false)
 
   // Query Contract profile
   const { data: contract, isLoading: loadingContract } = useQuery({
@@ -88,6 +95,21 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
     },
     onError: (err: any) => {
       toast.error(err.message || 'Erreur lors de la validation du paiement')
+    },
+  })
+
+  const assignCarteRoseMutation = useMutation({
+    mutationFn: () =>
+      contractsApi.addPhysicalDocs(id, {
+        doc_type: 'CARTE_ROSE',
+        serial_number: carteRoseSerial.trim(),
+      }),
+    onSuccess: () => {
+      setCarteRoseAssigned(true)
+      toast.success('Numéro de série de la Carte Rose attribué')
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Erreur lors de l’attribution de la Carte Rose')
     },
   })
 
@@ -248,7 +270,58 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
                     être générés qu'après encaissement effectif de la prime totale (Statut: PAYE).
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-5">
+                    <form
+                      className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4"
+                      onSubmit={(event) => {
+                        event.preventDefault()
+                        if (carteRoseSerial.trim().length < 3) {
+                          toast.error('Le numéro de série doit contenir au moins 3 caractères')
+                          return
+                        }
+                        assignCarteRoseMutation.mutate()
+                      }}
+                    >
+                      <div className="mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-slate-900">
+                            N° série Carte Rose
+                          </span>
+                          {carteRoseAssigned && (
+                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                              Attribué
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-1 text-xs text-slate-600">
+                          Ce numéro est obligatoire avant de générer le pack de documents.
+                        </p>
+                      </div>
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <Input
+                          value={carteRoseSerial}
+                          onChange={(event) => {
+                            setCarteRoseSerial(event.target.value)
+                            setCarteRoseAssigned(false)
+                          }}
+                          minLength={3}
+                          maxLength={50}
+                          placeholder="Ex. CR-2026-001234"
+                          className="h-10 flex-1 border-blue-200 bg-white text-sm"
+                          required
+                        />
+                        <Button
+                          type="submit"
+                          variant="primary"
+                          size="sm"
+                          disabled={assignCarteRoseMutation.isPending || carteRoseAssigned}
+                          className="h-10 text-white"
+                        >
+                          {assignCarteRoseMutation.isPending ? 'Attribution...' : 'Attribuer'}
+                        </Button>
+                      </div>
+                    </form>
+
                     {documents.length === 0 ? (
                       <div className="p-4 border border-dashed border-gray-200 rounded-2xl text-center">
                         <span className="text-xs text-gray-500">Aucun document généré pour le moment.</span>

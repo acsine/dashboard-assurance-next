@@ -4,8 +4,7 @@ import { getMessages } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { routing } from "@/i18n/routing";
 import { CulturalProvider } from "@/contexts/CulturalContext";
-import { culturalThemes, defaultCulturalTheme } from "@/i18n/cultural-themes";
-import "../globals.css";
+import { SetHtmlLocale } from "@/components/SetHtmlLocale";
 import { Providers } from "@/lib/providers";
 
 export const metadata: Metadata = {
@@ -30,29 +29,14 @@ export default async function LocaleLayout({
 
   // Providing all messages to the client side
   const messages = await getMessages();
-  const isRTL = locale === "ar";
-  const culturalTheme = culturalThemes[locale] || defaultCulturalTheme;
 
   return (
-    <html
-      lang={locale}
-      dir={isRTL ? "rtl" : "ltr"}
-      data-cultural-theme={locale}
-    >
-      <head>
-        <title content={metadata.title?.toString() || "App Title"}></title>
-        <meta name="description" content={metadata.description?.toString() || "App Description"} />
-      </head>
-      <body className={(isRTL ? "rtl" : "ltr") + " antialiased"}>
-        <NextIntlClientProvider messages={messages}>
-          <CulturalProvider>
-            <Providers>
-              {children}
-            </Providers>
-          </CulturalProvider>
-        </NextIntlClientProvider>
-      </body>
-    </html>
+    <NextIntlClientProvider messages={messages}>
+      <SetHtmlLocale locale={locale} />
+      <CulturalProvider>
+        <Providers>{children}</Providers>
+      </CulturalProvider>
+    </NextIntlClientProvider>
   );
 }
 

@@ -46,9 +46,12 @@ export function canProxy(role: Role, method: string, path: string): boolean {
   if (role === ROLES.ADMIN) return true
 
   // Le responsable prépare les dossiers, sans effectuer d'acte administratif/financier.
+  // Exception : réponses chat support (assistance agents).
   return (
     can(role, 'agency:prepare') &&
     ((verb === 'POST' && path === '/contracts') ||
-      (verb === 'PATCH' && /^\/contracts\/[^/]+$/.test(path)))
+      (verb === 'PATCH' && /^\/contracts\/[^/]+$/.test(path)) ||
+      (verb === 'POST' && /^\/support\/tickets\/[^/]+\/messages$/.test(path)) ||
+      (verb === 'POST' && /^\/support\/tickets\/[^/]+\/voice$/.test(path)))
   )
 }

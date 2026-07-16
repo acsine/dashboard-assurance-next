@@ -159,7 +159,7 @@ export default function Sidebar() {
           </div>
 
           {/* Navigation Items */}
-          <nav className="p-4 space-y-2 overflow-y-auto max-h-[calc(100vh-160px)] custom-scrollbar">
+          <nav className="p-4 space-y-2.5 overflow-y-auto max-h-[calc(100vh-160px)] custom-scrollbar">
             {filteredMenuItems.map((item) => {
               const isActive =
                 pathname === item.path ||
@@ -173,17 +173,17 @@ export default function Sidebar() {
                   href={item.path}
                   onClick={(e) => handleNavigation(item.path, e)}
                   title={isCollapsed && !isMobileOpen ? item.name : undefined}
-                  className={`flex items-center ${isCollapsed && !isMobileOpen ? 'justify-center' : 'justify-between'} px-4 py-3 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
+                  className={`flex min-h-12 items-center ${isCollapsed && !isMobileOpen ? 'justify-center' : 'justify-between'} px-4 py-3 rounded-xl text-[15px] font-bold tracking-[-0.01em] transition-all whitespace-nowrap ${
                     isActive
-                      ? 'bg-blue-50 text-blue-700 shadow-sm shadow-blue-100'
-                      : 'hover:bg-slate-50 hover:text-slate-900 text-slate-600'
+                      ? 'bg-blue-50 text-blue-700 shadow-sm shadow-blue-100 ring-1 ring-blue-100'
+                      : 'text-slate-700 opacity-75 hover:bg-slate-100 hover:text-slate-950 hover:opacity-100'
                   }`}
                 >
                   <div className={`flex items-center ${isCollapsed && !isMobileOpen ? 'justify-center' : 'gap-3'}`}>
                     {isNavigatingThis ? (
-                      <Loader2 className={`h-5 w-5 shrink-0 animate-spin ${isActive ? 'text-blue-600' : 'text-blue-500'}`} />
+                      <Loader2 className={`h-[21px] w-[21px] shrink-0 animate-spin ${isActive ? 'text-blue-600' : 'text-blue-500'}`} strokeWidth={2.25} />
                     ) : (
-                      <item.icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
+                      <item.icon className={`h-[21px] w-[21px] shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-500'}`} strokeWidth={2.25} />
                     )}
                     {(!isCollapsed || isMobileOpen) && <span>{item.name}</span>}
                   </div>
@@ -214,9 +214,9 @@ export default function Sidebar() {
           <button
             onClick={handleLogout}
             title={isCollapsed && !isMobileOpen ? 'Déconnexion' : undefined}
-            className={`w-full flex items-center ${isCollapsed && !isMobileOpen ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-xl text-sm font-semibold hover:bg-red-50 hover:text-red-600 transition-all text-slate-500 cursor-pointer`}
+            className={`w-full min-h-12 flex items-center ${isCollapsed && !isMobileOpen ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-xl text-[15px] font-bold tracking-[-0.01em] opacity-75 hover:bg-red-50 hover:text-red-700 hover:opacity-100 transition-all text-slate-700 cursor-pointer`}
           >
-            <LogOut className="h-5 w-5 shrink-0" />
+            <LogOut className="h-[21px] w-[21px] shrink-0" strokeWidth={2.25} />
             {(!isCollapsed || isMobileOpen) && <span>Déconnexion</span>}
           </button>
         </div>

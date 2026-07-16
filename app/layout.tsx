@@ -1,10 +1,13 @@
-import "./globals.css";
+import './globals.css'
 
-// This is a required root layout but won't be used for locale routes
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
-  return children;
+  return (
+    <html lang="fr" suppressHydrationWarning>
+      <body className="antialiased">{children}</body>
+    </html>
+  )
 }

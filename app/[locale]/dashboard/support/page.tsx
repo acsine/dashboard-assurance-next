@@ -2,71 +2,78 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { proxiedAssetUrl, supportApi } from '@/lib/api/mobi-assur'
 import Header from '@/components/dashboard/Header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
-import { MessageSquare, Send, Play, Pause, User, Shield, Volume2, Clock, CheckCircle } from 'lucide-react'
-import { RoleGuard } from '@/components/auth/RoleGuard'
+import { MessageSquare, Send, Play, Pause, Volume2, Clock, CheckCircle } from 'lucide-react'
+import { useAuthStore } from '@/lib/stores/auth-store'
+import { useSupportNotificationsStore } from '@/lib/stores/support-notifications-store'
+import { can } from '@/lib/auth/roles'
+
+function formatAgentReference(agentId?: string, agentEmail?: string): string {
+  if (agentEmail) return agentEmail
+  if (!agentId) return 'Non renseigné'
+  return agentId.length > 8 ? agentId.substring(0, 8).toUpperCase() : agentId.toUpperCase()
+}
 
 export default function SupportPage() {
   const queryClient = useQueryClient()
+  const searchParams = useSearchParams()
+  const currentUserId = useAuthStore((s) => s.user?.id)
+  const currentRole = useAuthStore((s) => s.user?.role)
+  const canReply =
+    can(currentRole, 'agency:mutate') || can(currentRole, 'agency:prepare')
+  const markTicketRead = useSupportNotificationsStore((s) => s.markTicketRead)
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null)
   const [messageText, setMessageText] = useState('')
   const [playingAudioUrl, setPlayingAudioUrl] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
 
-  // Query tickets
   const { data: tickets = [], isLoading: ticketsLoading } = useQuery({
     queryKey: ['tickets'],
     queryFn: () => supportApi.listTickets(),
+    refetchInterval: 20_000,
   })
 
-  // Query messages for selected ticket
   const { data: messages = [], isLoading: messagesLoading } = useQuery({
     queryKey: ['messages', selectedTicketId],
-    queryFn: () => (selectedTicketId ? supportApi.getMessages(selectedTicketId) : Promise.resolve([])),
+    queryFn: () =>
+      selectedTicketId ? supportApi.getMessages(selectedTicketId) : Promise.resolve([]),
     enabled: !!selectedTicketId,
+    refetchInterval: selectedTicketId ? 12_000 : false,
   })
 
-  // Send message mutation
   const sendMessageMutation = useMutation({
     mutationFn: ({ ticketId, content }: { ticketId: string; content: string }) =>
       supportApi.sendMessage(ticketId, content),
     onSuccess: () => {
       setMessageText('')
       queryClient.invalidateQueries({ queryKey: ['messages', selectedTicketId] })
+      queryClient.invalidateQueries({ queryKey: ['tickets'] })
     },
     onError: (err: any) => {
       toast.error(err.message || "Erreur d'envoi")
     },
   })
 
-  // Real-time SSE Connection for new messages
+  // Deep-link ?ticket=...
   useEffect(() => {
-    if (!selectedTicketId) return
-    const eventSource = new EventSource('/api/sse', { withCredentials: true })
-
-    eventSource.addEventListener('new_message', (e: MessageEvent) => {
-      try {
-        const data = JSON.parse(e.data)
-        if (data.ticket_id === selectedTicketId) {
-          queryClient.invalidateQueries({ queryKey: ['messages', selectedTicketId] })
-        }
-      } catch (err) {
-        console.error('Failed to parse SSE new_message:', err)
-      }
-    })
-
-    return () => {
-      eventSource.close()
+    const ticketFromUrl = searchParams.get('ticket')
+    if (ticketFromUrl) {
+      setSelectedTicketId(ticketFromUrl)
+      markTicketRead(ticketFromUrl)
     }
-  }, [selectedTicketId, queryClient])
+  }, [searchParams, markTicketRead])
 
-  // Scroll to bottom when messages load/change
+  useEffect(() => {
+    if (selectedTicketId) markTicketRead(selectedTicketId)
+  }, [selectedTicketId, markTicketRead])
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
@@ -88,7 +95,7 @@ export default function SupportPage() {
         audioRef.current.pause()
       }
       const audio = new Audio(fullUrl)
-      audio.play()
+      audio.play().catch(() => toast.error('Lecture audio impossible'))
       audio.onended = () => setPlayingAudioUrl(null)
       audioRef.current = audio
       setPlayingAudioUrl(url)
@@ -105,7 +112,6 @@ export default function SupportPage() {
       />
 
       <div className="flex-1 flex overflow-hidden p-6 gap-6">
-        {/* Ticket List Sidebar */}
         <Card className="w-80 border-slate-200 shadow-sm flex flex-col bg-white">
           <div className="p-4 border-b border-slate-100 bg-slate-50/50">
             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
@@ -141,15 +147,15 @@ export default function SupportPage() {
                     </span>
                   </div>
                   {t.description && (
-                    <p className="text-[11px] text-slate-500 truncate w-full">
-                      {t.description}
-                    </p>
+                    <p className="text-[11px] text-slate-500 truncate w-full">{t.description}</p>
                   )}
                   <div className="flex items-center gap-1.5 mt-2 text-[10px] text-slate-400">
                     <Clock className="h-3 w-3" />
                     <span>{new Date(t.created_at).toLocaleDateString()}</span>
                     <span>•</span>
-                    <span className="font-mono">ID: {t.agent_id.substring(0, 8).toUpperCase()}</span>
+                    <span className="font-mono">
+                      {formatAgentReference(t.agent_id, t.agent_email)}
+                    </span>
                   </div>
                 </button>
               ))
@@ -157,43 +163,55 @@ export default function SupportPage() {
           </div>
         </Card>
 
-        {/* Chat / Detail View */}
         <Card className="flex-1 border-slate-200 shadow-sm flex flex-col bg-white overflow-hidden">
           {selectedTicket ? (
             <>
-              {/* Ticket Header Info */}
               <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/30">
                 <div>
                   <h4 className="text-sm font-bold text-slate-950">{selectedTicket.subject}</h4>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Canal : <span className="font-semibold text-blue-600">{selectedTicket.channel}</span> • Agent :{' '}
-                    <span className="font-semibold font-mono">{selectedTicket.agent_id}</span>
+                    Canal :{' '}
+                    <span className="font-semibold text-blue-600">{selectedTicket.channel}</span> •
+                    Agent :{' '}
+                    <span className="font-semibold font-mono">
+                      {formatAgentReference(selectedTicket.agent_id, selectedTicket.agent_email)}
+                    </span>
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1 text-[11px] text-slate-500">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    Support Actif
-                  </span>
-                </div>
+                <span className="inline-flex items-center gap-1 text-[11px] text-slate-500">
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                  Support Actif
+                </span>
               </div>
 
-              {/* Chat Message Window */}
               <div className="flex-1 p-6 overflow-y-auto bg-slate-55 space-y-4">
                 {selectedTicket.description && (
                   <div className="flex justify-start">
                     <div className="max-w-[70%] bg-slate-100 border border-slate-200 text-slate-800 p-3 rounded-2xl rounded-tl-none">
-                      <span className="text-[9px] font-bold text-slate-400 block mb-1">DESCRIPTION TICKET</span>
+                      <span className="text-[9px] font-bold text-slate-400 block mb-1">
+                        DESCRIPTION TICKET
+                      </span>
                       <p className="text-xs leading-relaxed">{selectedTicket.description}</p>
                     </div>
                   </div>
                 )}
 
                 {messagesLoading ? (
-                  <div className="py-20 text-center text-xs text-slate-400">Chargement de la discussion...</div>
+                  <div className="py-20 text-center text-xs text-slate-400">
+                    Chargement de la discussion...
+                  </div>
+                ) : messages.length === 0 ? (
+                  <div className="py-16 text-center text-xs text-slate-400">
+                    Aucun message pour l&apos;instant. Répondez à l&apos;agent ci-dessous.
+                  </div>
                 ) : (
                   messages.map((m) => {
-                    const isMe = m.sender_id !== selectedTicket.agent_id
+                    const isMe = currentUserId
+                      ? m.sender_id?.toString() === currentUserId.toString()
+                      : selectedTicket.agent_id
+                        ? m.sender_id?.toString() !== selectedTicket.agent_id.toString()
+                        : false
+                    const audioUrl = m.voice_playback_url || m.voice_url
                     return (
                       <div
                         key={m.id}
@@ -219,19 +237,26 @@ export default function SupportPage() {
                                 isMe ? 'text-blue-300' : 'text-slate-400'
                               }`}
                             >
-                              {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              {new Date(m.created_at).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
                             </span>
                           </div>
 
-                          {m.content && <p className="text-xs leading-relaxed">{m.content}</p>}
+                          {m.content &&
+                            m.content !== '[Message Vocal]' &&
+                            m.content !== '[Signalement vocal]' && (
+                              <p className="text-xs leading-relaxed">{m.content}</p>
+                            )}
 
-                          {m.voice_url && (
-                            <div className="mt-2 flex items-center gap-2 bg-black/5 dark:bg-white/5 p-2 rounded-xl border border-black/10">
+                          {audioUrl && (
+                            <div className="mt-2 flex items-center gap-2 bg-black/5 p-2 rounded-xl border border-black/10">
                               <button
-                                onClick={() => togglePlayAudio(m.voice_url!)}
+                                onClick={() => togglePlayAudio(audioUrl)}
                                 className="h-8 w-8 rounded-full bg-blue-500 hover:bg-blue-400 text-white flex items-center justify-center cursor-pointer border-0 active:scale-95 transition-all"
                               >
-                                {playingAudioUrl === m.voice_url ? (
+                                {playingAudioUrl === audioUrl ? (
                                   <Pause className="h-3.5 w-3.5 fill-current" />
                                 ) : (
                                   <Play className="h-3.5 w-3.5 fill-current ml-0.5" />
@@ -239,7 +264,9 @@ export default function SupportPage() {
                               </button>
                               <div className="flex-1">
                                 <span className="text-[10px] font-bold block">Message Vocal</span>
-                                <span className="text-[8px] opacity-70 block">Cliquez pour écouter</span>
+                                <span className="text-[8px] opacity-70 block">
+                                  Cliquez pour écouter
+                                </span>
                               </div>
                               <Volume2 className="h-4 w-4 text-blue-500 opacity-80" />
                             </div>
@@ -252,32 +279,35 @@ export default function SupportPage() {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Chat Input Bar */}
-              <RoleGuard permission="agency:mutate" fallback={null}>
-              <form onSubmit={handleSend} className="p-4 border-t border-slate-100 flex gap-3 bg-slate-50/50">
-                <Input
-                  placeholder="Tapez votre réponse ici..."
-                  value={messageText}
-                  onChange={(e) => setMessageText(e.target.value)}
-                  className="flex-1 h-11 text-xs border-slate-200 rounded-xl bg-white"
-                  disabled={sendMessageMutation.isPending}
-                />
-                <button
-                  type="submit"
-                  disabled={sendMessageMutation.isPending || !messageText.trim()}
-                  className="h-11 px-5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl active:scale-95 transition-all shadow-md shadow-blue-500/10 cursor-pointer border-0 flex items-center justify-center disabled:opacity-50"
+              {canReply && (
+                <form
+                  onSubmit={handleSend}
+                  className="p-4 border-t border-slate-100 flex gap-3 bg-slate-50/50"
                 >
-                  <Send className="h-4 w-4" />
-                </button>
-              </form>
-              </RoleGuard>
+                  <Input
+                    placeholder="Tapez votre réponse ici..."
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
+                    className="flex-1 h-11 text-xs border-slate-200 rounded-xl bg-white"
+                    disabled={sendMessageMutation.isPending}
+                  />
+                  <button
+                    type="submit"
+                    disabled={sendMessageMutation.isPending || !messageText.trim()}
+                    className="h-11 px-5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl active:scale-95 transition-all shadow-md shadow-blue-500/10 cursor-pointer border-0 flex items-center justify-center disabled:opacity-50"
+                  >
+                    <Send className="h-4 w-4" />
+                  </button>
+                </form>
+              )}
             </>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-center text-slate-400 p-8">
               <MessageSquare className="h-16 w-16 text-slate-200 mb-4" />
               <h4 className="text-sm font-bold text-slate-700">Aucune conversation sélectionnée</h4>
               <p className="text-xs text-slate-500 mt-1 max-w-xs">
-                Sélectionnez un ticket dans la liste latérale pour débuter l'assistance en direct.
+                Sélectionnez un ticket dans la liste latérale pour débuter l&apos;assistance en
+                direct.
               </p>
             </div>
           )}

@@ -1,8 +1,8 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState, use } from 'react'
-import { clientsApi, contractsApi } from '@/lib/api/mobi-assur'
+import { useEffect, useState, use } from 'react'
+import { clientsApi, contractsApi, suggestCarteRoseSerial } from '@/lib/api/mobi-assur'
 import Header from '@/components/dashboard/Header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -593,8 +593,20 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
 
 function ClientDocumentsPanel({ contracts }: { contracts: Array<{ id: string; status: string }> }) {
   const paidContracts = contracts.filter((c) => c.status === 'PAYE')
+  const firstPaidContractId = paidContracts[0]?.id || ''
   const [selectedContractId, setSelectedContractId] = useState(paidContracts[0]?.id || '')
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [carteRoseSerial, setCarteRoseSerial] = useState(() =>
+    suggestCarteRoseSerial(paidContracts[0]?.id || ''),
+  )
+  const [carteRoseAssigned, setCarteRoseAssigned] = useState(false)
+
+  useEffect(() => {
+    if (!selectedContractId && firstPaidContractId) {
+      setSelectedContractId(firstPaidContractId)
+      setCarteRoseSerial(suggestCarteRoseSerial(firstPaidContractId))
+    }
+  }, [firstPaidContractId, selectedContractId])
 
   const { data: documents = [], isFetching, refetch } = useQuery({
     queryKey: ['client-contract-docs', selectedContractId],
@@ -609,6 +621,20 @@ function ClientDocumentsPanel({ contracts }: { contracts: Array<{ id: string; st
       refetch()
     },
     onError: (err: any) => toast.error(err.message || 'Erreur de génération'),
+  })
+
+  const assignCarteRoseMutation = useMutation({
+    mutationFn: () =>
+      contractsApi.addPhysicalDocs(selectedContractId, {
+        doc_type: 'CARTE_ROSE',
+        serial_number: carteRoseSerial.trim(),
+      }),
+    onSuccess: () => {
+      setCarteRoseAssigned(true)
+      toast.success('Numéro de série de la Carte Rose attribué')
+    },
+    onError: (err: any) =>
+      toast.error(err.message || 'Erreur lors de l’attribution de la Carte Rose'),
   })
 
   if (paidContracts.length === 0) {
@@ -640,7 +666,11 @@ function ClientDocumentsPanel({ contracts }: { contracts: Array<{ id: string; st
         <div className="flex items-center gap-2">
           <select
             value={selectedContractId}
-            onChange={(e) => setSelectedContractId(e.target.value)}
+            onChange={(e) => {
+              setSelectedContractId(e.target.value)
+              setCarteRoseSerial(suggestCarteRoseSerial(e.target.value))
+              setCarteRoseAssigned(false)
+            }}
             className="h-9 rounded-xl border border-gray-200 bg-white px-3 text-xs"
           >
             {paidContracts.map((c) => (
@@ -660,7 +690,58 @@ function ClientDocumentsPanel({ contracts }: { contracts: Array<{ id: string; st
           </RoleGuard>
         </div>
       </CardHeader>
-      <CardContent className="pt-6 space-y-3">
+      <CardContent className="pt-6 space-y-5">
+        <form
+          className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4"
+          onSubmit={(event) => {
+            event.preventDefault()
+            if (carteRoseSerial.trim().length < 3) {
+              toast.error('Le numéro de série doit contenir au moins 3 caractères')
+              return
+            }
+            assignCarteRoseMutation.mutate()
+          }}
+        >
+          <div className="mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-slate-900">N° série Carte Rose</span>
+              {carteRoseAssigned && (
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                  Attribué
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-xs text-slate-600">
+              Attribuez le numéro au contrat sélectionné avant de générer son pack.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input
+              value={carteRoseSerial}
+              onChange={(event) => {
+                setCarteRoseSerial(event.target.value)
+                setCarteRoseAssigned(false)
+              }}
+              minLength={3}
+              maxLength={50}
+              placeholder="Ex. CR-2026-001234"
+              className="h-10 flex-1 border-blue-200 bg-white text-sm"
+              required
+            />
+            <Button
+              type="submit"
+              variant="primary"
+              size="sm"
+              disabled={
+                assignCarteRoseMutation.isPending || carteRoseAssigned || !selectedContractId
+              }
+              className="h-10 text-white"
+            >
+              {assignCarteRoseMutation.isPending ? 'Attribution...' : 'Attribuer'}
+            </Button>
+          </div>
+        </form>
+
         {isFetching ? (
           <div className="text-center text-gray-400 py-6 text-sm">Chargement des documents...</div>
         ) : docs.length === 0 ? (

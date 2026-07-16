@@ -9,9 +9,24 @@ import { validateUploadFile } from '@/lib/files/validation'
 const BFF_BASE = '/api/backend'
 
 export function proxiedAssetUrl(value: string): string {
-  if (!value.startsWith('http')) return `${BFF_BASE}${value.startsWith('/') ? value : `/${value}`}`
-  const url = new URL(value)
-  return `${BFF_BASE}${url.pathname}${url.search}`
+  if (value.startsWith('http://') || value.startsWith('https://')) {
+    // URLs signées externes (Supabase / CDN) : lecture directe
+    try {
+      const host = new URL(value).hostname
+      if (
+        host.includes('supabase') ||
+        host.includes('imagekit') ||
+        host.includes('ik.imagekit')
+      ) {
+        return value
+      }
+    } catch {
+      return value
+    }
+    const url = new URL(value)
+    return `${BFF_BASE}${url.pathname}${url.search}`
+  }
+  return `${BFF_BASE}${value.startsWith('/') ? value : `/${value}`}`
 }
 
 export class MobiAssurApiError extends Error {
@@ -203,7 +218,8 @@ export const usersApi = {
 
 export interface SupportTicket {
   id: string
-  agent_id: string
+  agent_id?: string
+  agent_email?: string
   subject: string
   description?: string
   channel: string
@@ -218,6 +234,7 @@ export interface ChatMessage {
   sender_name: string
   content?: string
   voice_url?: string
+  voice_playback_url?: string
   is_notification: boolean
   created_at: string
 }
@@ -370,6 +387,12 @@ export interface Payment {
 
 export type PaymentMethod = 'ESPECES' | 'ORANGE_MONEY' | 'MTN_MOMO' | 'CHEQUE' | 'VIREMENT'
 
+export function suggestCarteRoseSerial(contractId: string): string {
+  const year = new Date().getUTCFullYear()
+  const contractReference = contractId.replace(/-/g, '').slice(0, 10).toUpperCase()
+  return `CR-${year}-${contractReference}`
+}
+
 export interface CreateContractRequest {
   client_id: string
   agent_id?: string
@@ -420,7 +443,13 @@ export const contractsApi = {
     mobiRequest<unknown[]>(`/contracts/${contractId}/documents`),
   generatePack: (contractId: string) =>
     mobiRequest<unknown>(`/contracts/${contractId}/documents/generate-pack`, { method: 'POST' }),
-  addPhysicalDocs: (contractId: string, data: any) =>
+  addPhysicalDocs: (
+    contractId: string,
+    data: {
+      doc_type: 'CARTE_ROSE' | 'VIGNETTE_ASAC' | 'ATTESTATION'
+      serial_number: string
+    },
+  ) =>
     mobiRequest<unknown>(`/contracts/${contractId}/physical-docs`, { method: 'POST', body: JSON.stringify(data) }),
   generateDoc: (contractId: string) =>
     mobiRequest<unknown>(`/contracts/${contractId}/documents/generate`, { method: 'POST' }),
@@ -439,16 +468,21 @@ export interface Prospect {
   full_name?: string
   phone?: string
   email?: string
+  profession?: string
   status: string
   agent_id?: string
   created_at?: string
+  updated_at?: string
 }
 
 export interface ConversionRequest {
   id: string
   prospect_id: string
+  agent_id?: string
   status: string
   created_at?: string
+  requested_at?: string
+  payload?: Record<string, unknown>
   prospect?: Prospect
 }
 
@@ -531,19 +565,33 @@ export const walletApi = {
 
 // ─── Settings ────────────────────────────────────────────────────────────────
 
+export interface BaremeField {
+  mode: 'fixed' | 'percent'
+  value: number
+}
+
+export interface BaremeConfig {
+  base_rate: BaremeField
+  cv_multiplier: BaremeField
+  brand_factors: Record<string, BaremeField>
+}
+
 export interface PricingSettings {
+  agency_id?: string | null
   accessoires?: number
   asac?: number
   dta?: number
   carte_rose_fee?: number
   tva_rate?: number
   commission_rate?: number
-  bareme?: unknown
+  bareme_config?: BaremeConfig
+  guide_content?: string
+  is_default?: boolean
 }
 
 export const settingsApi = {
   getPricing: () => mobiRequest<PricingSettings>('/settings/pricing'),
-  createPricing: (data: PricingSettings) =>
+  createPricing: (data: Partial<PricingSettings>) =>
     mobiRequest<PricingSettings>('/settings/pricing', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -555,13 +603,16 @@ export const settingsApi = {
     }),
   deletePricing: () =>
     mobiRequest<unknown>('/settings/pricing', { method: 'DELETE' }),
-  addBrand: (data: { marque: string }) =>
-    mobiRequest<unknown>('/settings/pricing/bareme/brands', {
+  addBrand: (data: { marque: string; mode: 'fixed' | 'percent'; value: number }) =>
+    mobiRequest<PricingSettings>('/settings/pricing/bareme/brands', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
   deleteBrand: (marque: string) =>
-    mobiRequest<unknown>(`/settings/pricing/bareme/brands/${encodeURIComponent(marque)}`, { method: 'DELETE' }),
+    mobiRequest<PricingSettings>(
+      `/settings/pricing/bareme/brands/${encodeURIComponent(marque)}`,
+      { method: 'DELETE' },
+    ),
 }
 
 // ─── Sync ────────────────────────────────────────────────────────────────────

@@ -52,6 +52,10 @@ export default function DashboardOverview() {
   const paidContracts = safeContracts.filter((c) => c.status?.toUpperCase() === 'PAYE')
   const pendingContracts = safeContracts.filter((c) => c.status?.toUpperCase() === 'DEVIS')
 
+  const pendingConversions = safeProspects.filter(
+    (p) => p.status === 'EN_ATTENTE_VALIDATION',
+  ).length
+
   const kpis = [
     {
       title: 'Clients Actifs',
@@ -70,11 +74,14 @@ export default function DashboardOverview() {
       link: '/dashboard/contracts',
     },
     {
-      title: 'Prospects en attente',
-      value: safeProspects.filter(p => p.status === 'EN_ATTENTE_VALIDATION').length || 0,
+      title: 'Prospects (agence)',
+      value: safeProspects.length || 0,
       icon: Clock,
       color: 'amber',
-      description: 'Conversions à valider',
+      description:
+        pendingConversions > 0
+          ? `${pendingConversions} conversion(s) à valider`
+          : 'Tous les prospects synchronisés',
       link: '/dashboard/prospects',
     },
     {

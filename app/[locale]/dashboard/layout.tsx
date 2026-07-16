@@ -2,6 +2,7 @@
 
 import { useAuth } from '@/lib/hooks/use-auth'
 import Sidebar from '@/components/dashboard/Sidebar'
+import { SupportSseListener } from '@/components/dashboard/SupportSseListener'
 import { Loader2 } from 'lucide-react'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -20,15 +21,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen flex bg-slate-50">
-
-      {/* Sidebar */}
       <Sidebar />
-
-      {/* Main Content Pane */}
       <div className="flex-1 flex flex-col min-w-0">
-        <main className="flex-1 flex flex-col overflow-y-auto">
-          {children}
-        </main>
+        <SupportSseListener />
+        <main className="flex-1 flex flex-col overflow-y-auto">{children}</main>
       </div>
     </div>
   )
