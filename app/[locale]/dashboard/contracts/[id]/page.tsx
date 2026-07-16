@@ -6,10 +6,13 @@ import {
   contractsApi,
   clientsApi,
   suggestCarteRoseSerial,
+  proxiedAssetUrl,
+  type Payment,
   type PaymentMethod,
 } from '@/lib/api/mobi-assur'
 import { RoleGuard } from '@/components/auth/RoleGuard'
 import { paymentSummary } from '@/lib/payments'
+import { validateUploadFile } from '@/lib/files/validation'
 import Header from '@/components/dashboard/Header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,14 +21,23 @@ import { toast } from 'sonner'
 import {
   FileText,
   User,
-  Plus,
   Loader2,
   Calendar,
   DollarSign,
   CheckCircle,
   FileSpreadsheet,
   Download,
+  ExternalLink,
+  Upload,
 } from 'lucide-react'
+
+function paymentProofUrls(payment: Payment): string[] {
+  if (Array.isArray(payment.proof_urls) && payment.proof_urls.length > 0) {
+    return payment.proof_urls.filter(Boolean)
+  }
+  if (payment.proof_url) return [payment.proof_url]
+  return []
+}
 
 export default function ContractDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -34,6 +46,9 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('ESPECES')
   const [paymentReference, setPaymentReference] = useState('')
+  const [proofUrlsText, setProofUrlsText] = useState('')
+  const [uploadedProofUrls, setUploadedProofUrls] = useState<string[]>([])
+  const [uploadingProof, setUploadingProof] = useState(false)
   const [carteRoseSerial, setCarteRoseSerial] = useState(() => suggestCarteRoseSerial(id))
   const [carteRoseAssigned, setCarteRoseAssigned] = useState(false)
 
@@ -61,14 +76,25 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
     queryFn: () => contractsApi.listPayments(id),
   })
 
+  const collectProofUrls = (): string[] => {
+    const fromText = proofUrlsText
+      .split(/[\n,;]+/)
+      .map((u) => u.trim())
+      .filter(Boolean)
+    return Array.from(new Set([...uploadedProofUrls, ...fromText]))
+  }
+
   // Add Payment Mutation
   const addPaymentMutation = useMutation({
-    mutationFn: (amount: number) =>
-      contractsApi.addPayment(id, {
+    mutationFn: (amount: number) => {
+      const proofs = collectProofUrls()
+      return contractsApi.addPayment(id, {
         amount,
         method: paymentMethod,
         reference_externe: paymentReference.trim() || undefined,
-      }),
+        proof_urls: proofs.length > 0 ? proofs : undefined,
+      })
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contract', id] })
       queryClient.invalidateQueries({ queryKey: ['contract-payments', id] })
@@ -76,6 +102,8 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
       setShowAddPayment(false)
       setPaymentAmount('')
       setPaymentReference('')
+      setProofUrlsText('')
+      setUploadedProofUrls([])
     },
     onError: (err: any) => {
       toast.error(err.message || 'Erreur lors de l\'ajout du paiement')
@@ -125,6 +153,25 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
     },
   })
 
+  const handleProofUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    setUploadingProof(true)
+    try {
+      const urls: string[] = []
+      for (const file of Array.from(files)) {
+        validateUploadFile(file)
+        const { url } = await clientsApi.uploadDoc(file)
+        urls.push(url)
+      }
+      setUploadedProofUrls((prev) => [...prev, ...urls])
+      toast.success(`${urls.length} preuve(s) téléversée(s)`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Échec du téléversement')
+    } finally {
+      setUploadingProof(false)
+    }
+  }
+
   const handleAddPayment = (e: React.FormEvent) => {
     e.preventDefault()
     if (!paymentAmount || isNaN(Number(paymentAmount)) || Number(paymentAmount) <= 0) {
@@ -133,6 +180,10 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
     }
     if (balance > 0 && Number(paymentAmount) > balance) {
       toast.error('Le versement dépasse le solde restant')
+      return
+    }
+    if (collectProofUrls().length === 0) {
+      toast.error('Ajoutez au moins une preuve de paiement (URL ou fichier)')
       return
     }
     addPaymentMutation.mutate(Number(paymentAmount))
@@ -412,12 +463,59 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
                       onChange={(event) => setPaymentReference(event.target.value)}
                       className="h-10 text-xs border-gray-200"
                     />
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                        Preuves de paiement (obligatoire)
+                      </span>
+                      <Input
+                        placeholder="URL(s) séparées par virgule ou ligne"
+                        value={proofUrlsText}
+                        onChange={(event) => setProofUrlsText(event.target.value)}
+                        className="h-10 text-xs border-gray-200"
+                      />
+                      <label className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 cursor-pointer hover:text-blue-700">
+                        <Upload className="h-3.5 w-3.5" />
+                        {uploadingProof ? 'Téléversement…' : 'Joindre un fichier'}
+                        <input
+                          type="file"
+                          accept="image/*,.pdf"
+                          multiple
+                          className="hidden"
+                          disabled={uploadingProof}
+                          onChange={(e) => {
+                            void handleProofUpload(e.target.files)
+                            e.target.value = ''
+                          }}
+                        />
+                      </label>
+                      {uploadedProofUrls.length > 0 && (
+                        <ul className="space-y-1">
+                          {uploadedProofUrls.map((url) => (
+                            <li key={url}>
+                              <a
+                                href={proxiedAssetUrl(url)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:underline"
+                              >
+                                Preuve jointe
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                     <div className="flex gap-2 justify-end pt-1">
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
-                        onClick={() => setShowAddPayment(false)}
+                        onClick={() => {
+                          setShowAddPayment(false)
+                          setProofUrlsText('')
+                          setUploadedProofUrls([])
+                        }}
                       >
                         Annuler
                       </Button>
@@ -425,7 +523,7 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
                         type="submit"
                         variant="primary"
                         size="sm"
-                        disabled={addPaymentMutation.isPending}
+                        disabled={addPaymentMutation.isPending || uploadingProof}
                         className="text-white"
                       >
                         Enregistrer
@@ -449,7 +547,10 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
                   {payments.length === 0 ? (
                     <p className="text-xs text-gray-400">Aucun versement enregistré.</p>
                   ) : (
-                    payments.map((payment) => (
+                    payments.map((payment) => {
+                      const proofs = paymentProofUrls(payment)
+                      const canValidate = proofs.length > 0
+                      return (
                       <div key={payment.id} className="rounded-xl border border-gray-100 p-3 text-xs">
                         <div className="flex items-start justify-between gap-2">
                           <div>
@@ -463,12 +564,43 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
                             {payment.status}
                           </span>
                         </div>
+                        <div className="mt-2 space-y-1">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                            Preuves
+                          </span>
+                          {proofs.length === 0 ? (
+                            <span className="text-[11px] text-red-500 font-medium">
+                              Aucune preuve jointe — validation impossible
+                            </span>
+                          ) : (
+                            <ul className="space-y-1">
+                              {proofs.map((url, idx) => (
+                                <li key={`${payment.id}-proof-${idx}`}>
+                                  <a
+                                    href={proxiedAssetUrl(url)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:underline"
+                                  >
+                                    Preuve {idx + 1}
+                                    <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
                         {payment.status === 'PENDING' && (
                           <RoleGuard permission="payments:manage" fallback={null}>
                             <button
                               type="button"
-                              disabled={validatePaymentMutation.isPending}
+                              disabled={validatePaymentMutation.isPending || !canValidate}
                               onClick={() => validatePaymentMutation.mutate(payment.id)}
+                              title={
+                                !canValidate
+                                  ? 'Preuves de paiement requises'
+                                  : 'Valider ce versement'
+                              }
                               className="mt-3 w-full rounded-lg bg-emerald-600 px-3 py-2 font-semibold text-white disabled:opacity-50"
                             >
                               Valider ce versement
@@ -476,7 +608,8 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
                           </RoleGuard>
                         )}
                       </div>
-                    ))
+                      )
+                    })
                   )}
                 </div>
 
@@ -486,14 +619,15 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
                     <div>
                       <span className="font-bold block">Contrat Entièrement Réglé</span>
                       <p className="mt-1 leading-relaxed">
-                        La prime d'assurance a été créditée. La commission est débloquée dans le
-                        wallet de l'agent.
+                        La prime d&apos;assurance a été créditée. La commission est débloquée pour
+                        l&apos;agent qui a prospecté le client.
                       </p>
                     </div>
                   </div>
                 ) : (
                   <div className="p-3 border border-amber-100 bg-amber-50/50 rounded-2xl text-xs text-amber-700 font-medium">
-                    ⌛ Versements partiels acceptés jusqu’au règlement du solde.
+                    Versements partiels acceptés jusqu’au règlement du solde. La commission de
+                    l&apos;agent prospecteur sera débloquée à la validation du paiement.
                   </div>
                 )}
               </CardContent>

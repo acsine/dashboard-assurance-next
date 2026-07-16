@@ -380,9 +380,21 @@ export interface Payment {
   amount: number
   method: PaymentMethod
   reference_externe?: string
+  /** Preuves de paiement (URLs) — requis avant validation admin */
+  proof_urls?: string[]
+  /** Alias legacy / entrée unique normalisée côté API */
+  proof_url?: string
   status: string
   created_at?: string
   validated_at?: string
+}
+
+export interface AddPaymentRequest {
+  amount: number
+  method: PaymentMethod
+  reference_externe?: string
+  proof_url?: string
+  proof_urls?: string[]
 }
 
 export type PaymentMethod = 'ESPECES' | 'ORANGE_MONEY' | 'MTN_MOMO' | 'CHEQUE' | 'VIREMENT'
@@ -425,10 +437,7 @@ export const contractsApi = {
     mobiRequest<Contract>('/contracts', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Partial<CreateContractRequest>) =>
     mobiRequest<Contract>(`/contracts/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-  addPayment: (
-    contractId: string,
-    data: { amount: number; method: PaymentMethod; reference_externe?: string },
-  ) =>
+  addPayment: (contractId: string, data: AddPaymentRequest) =>
     mobiRequest<Payment>(`/contracts/${contractId}/payments`, {
       method: 'POST',
       body: JSON.stringify(data),
@@ -471,8 +480,34 @@ export interface Prospect {
   profession?: string
   status: string
   agent_id?: string
+  client_id?: string
+  vehicle_id?: string
+  cni_photo_url?: string
+  permis_photo_url?: string
   created_at?: string
   updated_at?: string
+}
+
+export interface ConversionPayload {
+  full_name?: string
+  country_code?: string
+  phone?: string
+  email?: string
+  address?: string
+  city?: string
+  profession?: string
+  cni_number?: string
+  cni_photo_url?: string
+  permis_photo_url?: string
+  vehicle?: {
+    marque?: string
+    modele?: string
+    chassis_num?: string
+    immatriculation?: string
+    puissance_cv?: number
+    energie?: string
+    nb_places?: number
+  }
 }
 
 export interface ConversionRequest {
@@ -482,7 +517,7 @@ export interface ConversionRequest {
   status: string
   created_at?: string
   requested_at?: string
-  payload?: Record<string, unknown>
+  payload?: ConversionPayload & Record<string, unknown>
   prospect?: Prospect
 }
 
@@ -499,6 +534,12 @@ export const prospectsApi = {
     mobiRequest<unknown>(`/prospects/conversions/${id}/reject`, {
       method: 'POST',
       body: JSON.stringify({ rejection_reason: rejectionReason }),
+    }),
+  /** Conversion directe admin (sans demande agent) — commission → prospect.agent_id */
+  convertDirect: (prospectId: string, body: ConversionPayload) =>
+    mobiRequest<unknown>(`/prospects/${prospectId}/convert`, {
+      method: 'POST',
+      body: JSON.stringify(body),
     }),
   create: (data: any) =>
     mobiRequest<Prospect>('/prospects', { method: 'POST', body: JSON.stringify(data) }),
@@ -519,13 +560,22 @@ export interface WithdrawalRequest {
   created_at?: string
 }
 
+export interface PendingBreakdown {
+  /** Potentiel commissions sur prospects non encore convertis / payés */
+  pipeline: number
+  /** Commissions en attente de validation de paiement contrat */
+  awaiting_payment: number
+}
+
 export interface AgentWallet {
   agent_id: string
   agent_name: string
   agent_email?: string
   agent_phone?: string
   available_balance: number
+  /** pending_breakdown.pipeline + pending_breakdown.awaiting_payment */
   pending_balance: number
+  pending_breakdown?: PendingBreakdown
   monthly_objective: number
   monthly_progress_pct: number
   current_month_commissions: number

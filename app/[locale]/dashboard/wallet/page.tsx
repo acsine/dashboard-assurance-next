@@ -156,7 +156,7 @@ export default function WalletPage() {
     <div className="flex-1 flex flex-col bg-white">
       <Header
         title="Gestion Financière et Objectifs"
-        subtitle="Validez les décaissements de commissions et fixez les objectifs mensuels des agents terrain."
+        subtitle="Validez les décaissements, suivez le solde pending (pipeline prospects + paiements en attente) et fixez les objectifs des agents."
       />
 
       <div className="p-8 space-y-6 flex-1">
@@ -412,13 +412,22 @@ export default function WalletPage() {
                         Agent Apporteur
                       </th>
                       <th className="pb-4 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                        Disponible
+                      </th>
+                      <th className="pb-4 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                        En attente (pending_balance)
+                      </th>
+                      <th className="pb-4 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                        Détail (pending_breakdown)
+                      </th>
+                      <th className="pb-4 text-xs font-bold text-gray-400 uppercase tracking-wider">
                         Commissions ce mois
                       </th>
                       <th className="pb-4 text-xs font-bold text-gray-400 uppercase tracking-wider">
                         Objectif minimum
                       </th>
                       <th className="pb-4 text-xs font-bold text-gray-400 uppercase tracking-wider">
-                        Niveau d'accomplissement
+                        Niveau d&apos;accomplissement
                       </th>
                       <th className="pb-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">
                         Actions
@@ -433,6 +442,8 @@ export default function WalletPage() {
                         : w.monthly_progress_pct >= 50
                         ? 'bg-amber-500 shadow-amber-500/20'
                         : 'bg-blue-500 shadow-blue-500/20'
+                      const pipeline = w.pending_breakdown?.pipeline ?? 0
+                      const awaiting = w.pending_breakdown?.awaiting_payment ?? 0
 
                       return (
                         <tr
@@ -449,6 +460,38 @@ export default function WalletPage() {
                             <span className="text-[11px] text-gray-500 block mt-0.5">
                               {w.agent_phone || 'Pas de téléphone'}
                             </span>
+                          </td>
+                          <td className="py-5">
+                            <span className="font-extrabold text-sm text-emerald-700 block">
+                              {(w.available_balance ?? 0).toLocaleString('fr-FR')} FCFA
+                            </span>
+                            <span className="text-[10px] text-gray-400">available_balance</span>
+                          </td>
+                          <td className="py-5">
+                            <span className="font-extrabold text-sm text-amber-700 block">
+                              {(w.pending_balance ?? 0).toLocaleString('fr-FR')} FCFA
+                            </span>
+                            <span className="text-[10px] text-gray-400">pending_balance</span>
+                          </td>
+                          <td className="py-5">
+                            <div className="space-y-1 text-[11px]">
+                              <div>
+                                <span className="text-gray-400 block">
+                                  pipeline — potentiel prospects
+                                </span>
+                                <strong className="text-slate-800">
+                                  {pipeline.toLocaleString('fr-FR')} FCFA
+                                </strong>
+                              </div>
+                              <div>
+                                <span className="text-gray-400 block">
+                                  awaiting_payment — paiements à valider
+                                </span>
+                                <strong className="text-slate-800">
+                                  {awaiting.toLocaleString('fr-FR')} FCFA
+                                </strong>
+                              </div>
+                            </div>
                           </td>
                           <td className="py-5">
                             <span className="font-extrabold text-sm text-slate-800 block">
