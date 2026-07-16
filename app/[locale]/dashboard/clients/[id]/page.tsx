@@ -596,6 +596,7 @@ function ClientDocumentsPanel({ contracts }: { contracts: Array<{ id: string; st
   const firstPaidContractId = paidContracts[0]?.id || ''
   const [selectedContractId, setSelectedContractId] = useState(paidContracts[0]?.id || '')
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [previewingDocId, setPreviewingDocId] = useState<string | null>(null)
   const [carteRoseSerial, setCarteRoseSerial] = useState(() =>
     suggestCarteRoseSerial(paidContracts[0]?.id || ''),
   )
@@ -658,7 +659,15 @@ function ClientDocumentsPanel({ contracts }: { contracts: Array<{ id: string; st
   const docs = Array.isArray(documents) ? documents : []
 
   return (
-    <Card className="border-gray-100 shadow-sm bg-white">
+    <Card className="border-gray-100 shadow-sm bg-white relative">
+      {previewingDocId && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3 rounded-2xl bg-white px-8 py-6 shadow-xl">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            <p className="text-sm font-semibold text-slate-700">Ouverture du document...</p>
+          </div>
+        </div>
+      )}
       <CardHeader className="pb-4 border-b border-gray-50 flex flex-row items-center justify-between gap-3 flex-wrap">
         <CardTitle className="text-sm font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
           <FileText className="h-4 w-4 text-blue-500" /> Documents assurance
@@ -767,19 +776,28 @@ function ClientDocumentsPanel({ contracts }: { contracts: Array<{ id: string; st
               <div className="flex items-center gap-2">
                 <button
                   type="button"
+                  disabled={!!previewingDocId}
                   onClick={async () => {
+                    if (previewingDocId) return
+                    setPreviewingDocId(doc.id)
                     try {
                       const url = await contractsApi.previewDoc(selectedContractId, doc.id)
                       setPreviewUrl(url)
                       window.open(url, '_blank', 'noopener,noreferrer')
                     } catch {
                       toast.error('Impossible d\'ouvrir l\'aperçu')
+                    } finally {
+                      setPreviewingDocId(null)
                     }
                   }}
-                  className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl cursor-pointer border-0"
+                  className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl cursor-pointer border-0 disabled:cursor-wait disabled:opacity-60"
                   title="Aperçu"
                 >
-                  <Eye className="h-4 w-4" />
+                  {previewingDocId === doc.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
                 </button>
                 <button
                   type="button"
