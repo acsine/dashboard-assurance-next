@@ -237,6 +237,7 @@ export interface ChatMessage {
   voice_playback_url?: string
   is_notification: boolean
   created_at: string
+  read_at?: string | null
 }
 
 export const supportApi = {
@@ -247,6 +248,11 @@ export const supportApi = {
       method: 'POST',
       body: JSON.stringify({ content }),
     }),
+  markMessagesRead: (ticketId: string) =>
+    mobiRequest<{ message_ids: string[]; read_at: string }>(
+      `/support/tickets/${ticketId}/messages/read`,
+      { method: 'POST' },
+    ),
   createTicket: (data: any) => mobiRequest<unknown>('/support/tickets', { method: 'POST', body: JSON.stringify(data) }),
   submitVoiceReport: (data: any) => mobiRequest<unknown>('/support/voice-reports', { method: 'POST', body: JSON.stringify(data) }),
 }

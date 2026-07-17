@@ -511,7 +511,7 @@ export function RcTariffPanel() {
   const [powerMin, setPowerMin] = useState('1')
   const [powerMax, setPowerMax] = useState('99')
   const [trailer, setTrailer] = useState(false)
-  const [rcAmount, setRcAmount] = useState('0')
+  const [rcAmount, setRcAmount] = useState('')
 
   const { data: lines = [], isLoading } = useQuery({
     queryKey: ['tariff-lines'],
@@ -530,9 +530,20 @@ export function RcTariffPanel() {
 
   const catList = Array.isArray(categories) ? categories : []
   const zoneList = Array.isArray(zones) ? zones : []
-  const catName = (id: string) => catList.find((c) => c.id === id)?.code || id.slice(0, 8)
-  const zoneName = (id?: string | null) =>
-    id ? zoneList.find((z) => z.id === id)?.name || id.slice(0, 8) : 'Toutes'
+
+  const resolveCategory = (id: string) => {
+    const cat = catList.find((c) => c.id === id)
+    if (!cat) return { code: id.slice(0, 8), name: 'Catégorie inconnue' }
+    return { code: cat.code, name: cat.name }
+  }
+
+  const resolveZone = (id?: string | null) => {
+    if (!id) return { name: 'Toutes zones', regions: 'Toutes les régions' }
+    const zone = zoneList.find((z) => z.id === id)
+    if (!zone) return { name: id.slice(0, 8), regions: '—' }
+    const regions = (zone.cities || []).length > 0 ? zone.cities.join(', ') : 'Aucune région'
+    return { name: zone.name, regions }
+  }
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -548,6 +559,7 @@ export function RcTariffPanel() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tariff-lines'] })
+      setRcAmount('')
       toast.success('Ligne RC créée')
     },
     onError: (e: Error) => toast.error(e.message),
@@ -563,6 +575,8 @@ export function RcTariffPanel() {
   })
 
   const list = Array.isArray(lines) ? lines : []
+  const selectedCategory = categoryId ? resolveCategory(categoryId) : null
+  const selectedZone = resolveZone(zoneId || null)
 
   return (
     <Card className="border-gray-100 shadow-sm">
@@ -571,116 +585,206 @@ export function RcTariffPanel() {
           Barème RC (lignes tarifaires)
         </CardTitle>
       </CardHeader>
-      <CardContent className="pt-6 space-y-4">
-        {isLoading ? (
-          <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-[11px]">
-              <thead>
-                <tr className="text-slate-500 uppercase">
-                  <th className="py-2 pr-2">Cat.</th>
-                  <th className="py-2 pr-2">Zone</th>
-                  <th className="py-2 pr-2">Carburant</th>
-                  <th className="py-2 pr-2">CV</th>
-                  <th className="py-2 pr-2">Remorque</th>
-                  <th className="py-2 pr-2">RC annuel</th>
-                  <th className="py-2" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {list.map((r: RcRate) => (
-                  <tr key={r.id}>
-                    <td className="py-2 pr-2 font-semibold">{catName(r.category_id)}</td>
-                    <td className="py-2 pr-2">{zoneName(r.zone_id)}</td>
-                    <td className="py-2 pr-2">{r.fuel}</td>
-                    <td className="py-2 pr-2">
-                      {r.power_min}–{r.power_max}
-                    </td>
-                    <td className="py-2 pr-2">{r.trailer ? 'Oui' : 'Non'}</td>
-                    <td className="py-2 pr-2 font-mono">{r.rc_amount.toLocaleString('fr-FR')} F</td>
-                    <td className="py-2 text-right">
-                      {r.is_active && (
-                        <Button type="button" variant="ghost" size="sm" onClick={() => deleteMutation.mutate(r.id)}>
-                          <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
+      <CardContent className="pt-6 space-y-6">
+        {/* Formulaire clair */}
+        <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-4 space-y-4">
+          <p className="text-xs font-bold text-slate-800">Nouvelle ligne tarifaire</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <FieldLabel>Catégorie véhicule (nom)</FieldLabel>
+              <select
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                className="w-full h-10 text-xs border border-gray-200 rounded-md px-2 bg-white"
+              >
+                <option value="">Choisir une catégorie…</option>
+                {catList.filter((c) => c.is_active).map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.code} — {c.name}
+                  </option>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+              </select>
+              {selectedCategory && (
+                <p className="text-[11px] text-slate-500">
+                  Nom enregistré : <strong>{selectedCategory.name}</strong> ({selectedCategory.code})
+                </p>
+              )}
+            </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t border-gray-50">
-          <div className="space-y-1">
-            <FieldLabel>Catégorie</FieldLabel>
-            <select
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full h-10 text-xs border border-gray-200 rounded-md px-2"
-            >
-              <option value="">—</option>
-              {catList.filter((c) => c.is_active).map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.code} — {c.name}
-                </option>
-              ))}
-            </select>
+            <div className="space-y-1">
+              <FieldLabel>Zone / région</FieldLabel>
+              <select
+                value={zoneId}
+                onChange={(e) => setZoneId(e.target.value)}
+                className="w-full h-10 text-xs border border-gray-200 rounded-md px-2 bg-white"
+              >
+                <option value="">Toutes zones</option>
+                {zoneList.filter((z) => z.is_active).map((z) => (
+                  <option key={z.id} value={z.id}>
+                    {z.name}
+                    {(z.cities || []).length > 0 ? ` — ${(z.cities || []).join(', ')}` : ''}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-slate-500">
+                Région(s) : <strong>{selectedZone.regions}</strong>
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <FieldLabel>Carburant</FieldLabel>
+              <select
+                value={fuel}
+                onChange={(e) => setFuel(e.target.value)}
+                className="w-full h-10 text-xs border border-gray-200 rounded-md px-2 bg-white"
+              >
+                {FUEL_OPTIONS.map((f) => (
+                  <option key={f} value={f}>
+                    {f}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <FieldLabel>Prime RC annuelle (FCFA)</FieldLabel>
+              <Input
+                type="number"
+                min="0"
+                placeholder="Ex. 58473"
+                value={rcAmount}
+                onChange={(e) => setRcAmount(e.target.value)}
+                className="h-10 text-xs bg-white"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <FieldLabel>Puissance min (CV)</FieldLabel>
+              <Input
+                type="number"
+                min="1"
+                value={powerMin}
+                onChange={(e) => setPowerMin(e.target.value)}
+                className="h-10 text-xs bg-white"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <FieldLabel>Puissance max (CV)</FieldLabel>
+              <Input
+                type="number"
+                min="1"
+                value={powerMax}
+                onChange={(e) => setPowerMax(e.target.value)}
+                className="h-10 text-xs bg-white"
+              />
+            </div>
           </div>
-          <div className="space-y-1">
-            <FieldLabel>Zone (optionnel)</FieldLabel>
-            <select
-              value={zoneId}
-              onChange={(e) => setZoneId(e.target.value)}
-              className="w-full h-10 text-xs border border-gray-200 rounded-md px-2"
-            >
-              <option value="">Toutes zones</option>
-              {zoneList.filter((z) => z.is_active).map((z) => (
-                <option key={z.id} value={z.id}>
-                  {z.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-1">
-            <FieldLabel>Carburant</FieldLabel>
-            <select
-              value={fuel}
-              onChange={(e) => setFuel(e.target.value)}
-              className="w-full h-10 text-xs border border-gray-200 rounded-md px-2"
-            >
-              {FUEL_OPTIONS.map((f) => (
-                <option key={f} value={f}>
-                  {f}
-                </option>
-              ))}
-            </select>
-          </div>
-          <Input type="number" placeholder="CV min" value={powerMin} onChange={(e) => setPowerMin(e.target.value)} className="h-10 text-xs" />
-          <Input type="number" placeholder="CV max" value={powerMax} onChange={(e) => setPowerMax(e.target.value)} className="h-10 text-xs" />
-          <Input type="number" placeholder="Montant RC annuel" value={rcAmount} onChange={(e) => setRcAmount(e.target.value)} className="h-10 text-xs" />
+
+          <label className="inline-flex items-center gap-2 text-xs text-slate-700">
+            <input type="checkbox" checked={trailer} onChange={(e) => setTrailer(e.target.checked)} />
+            Avec remorque
+          </label>
+
+          <Button
+            type="button"
+            variant="primary"
+            className="text-white"
+            onClick={() => {
+              if (!categoryId) {
+                toast.error('Choisissez une catégorie (nom)')
+                return
+              }
+              if (!rcAmount || Number(rcAmount) < 0) {
+                toast.error('Saisissez le montant RC annuel')
+                return
+              }
+              if (Number(powerMin) > Number(powerMax)) {
+                toast.error('La puissance min ne peut pas dépasser la puissance max')
+                return
+              }
+              createMutation.mutate()
+            }}
+            disabled={createMutation.isPending}
+          >
+            {createMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-1" />
+            ) : (
+              <Plus className="h-4 w-4 mr-1" />
+            )}
+            Ajouter la ligne RC
+          </Button>
         </div>
-        <label className="inline-flex items-center gap-2 text-xs text-slate-600">
-          <input type="checkbox" checked={trailer} onChange={(e) => setTrailer(e.target.checked)} />
-          Avec remorque
-        </label>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => {
-            if (!categoryId) {
-              toast.error('Catégorie requise')
-              return
-            }
-            createMutation.mutate()
-          }}
-          disabled={createMutation.isPending}
-        >
-          <Plus className="h-4 w-4 mr-1" />
-          Ajouter ligne RC
-        </Button>
+
+        {/* Tableau lisible */}
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-3">
+            Lignes enregistrées
+          </p>
+          {isLoading ? (
+            <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+          ) : list.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400">
+              Aucune ligne tarifaire. Remplissez le formulaire ci-dessus pour en ajouter une.
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-slate-100">
+              <table className="w-full text-left text-[11px]">
+                <thead className="bg-slate-50">
+                  <tr className="text-slate-500 uppercase">
+                    <th className="py-3 px-3">Catégorie (nom)</th>
+                    <th className="py-3 px-3">Zone / région</th>
+                    <th className="py-3 px-3">Carburant</th>
+                    <th className="py-3 px-3">Puissance CV</th>
+                    <th className="py-3 px-3">Remorque</th>
+                    <th className="py-3 px-3">RC annuel</th>
+                    <th className="py-3 px-3" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {list.map((r: RcRate) => {
+                    const cat = resolveCategory(r.category_id)
+                    const zone = resolveZone(r.zone_id)
+                    return (
+                      <tr key={r.id} className="align-top">
+                        <td className="py-3 px-3">
+                          <p className="font-bold text-slate-900">{cat.name}</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">{cat.code}</p>
+                        </td>
+                        <td className="py-3 px-3">
+                          <p className="font-semibold text-slate-800">{zone.name}</p>
+                          <p className="text-[10px] text-slate-500 mt-0.5 max-w-[180px]">
+                            {zone.regions}
+                          </p>
+                        </td>
+                        <td className="py-3 px-3 font-medium">{r.fuel}</td>
+                        <td className="py-3 px-3">
+                          {r.power_min} – {r.power_max} CV
+                        </td>
+                        <td className="py-3 px-3">{r.trailer ? 'Oui' : 'Non'}</td>
+                        <td className="py-3 px-3 font-mono font-semibold text-blue-700">
+                          {Number(r.rc_amount).toLocaleString('fr-FR')} F
+                        </td>
+                        <td className="py-3 px-3 text-right">
+                          {r.is_active && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => deleteMutation.mutate(r.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                            </Button>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   )

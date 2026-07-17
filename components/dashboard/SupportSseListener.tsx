@@ -16,6 +16,9 @@ export function SupportSseListener() {
   const pathname = usePathname()
   const userId = useAuthStore((s) => s.user?.id)
   const push = useSupportNotificationsStore((s) => s.push)
+  const pushInboundFromMessage = useSupportNotificationsStore(
+    (s) => s.pushInboundFromMessage,
+  )
 
   useEffect(() => {
     const eventSource = new EventSource('/api/sse', { withCredentials: true })
@@ -39,20 +42,14 @@ export function SupportSseListener() {
         // Ignorer ses propres messages
         if (userId && data.sender_id?.toString() === userId.toString()) return
 
+        pushInboundFromMessage(data, { currentUserId: userId })
+
         const preview =
           data.content && data.content !== '[Message Vocal]'
             ? data.content
             : data.content === '[Message Vocal]'
               ? 'Message vocal reçu'
               : 'Nouveau message support'
-
-        push({
-          id: data.id?.toString() || `${ticketId}-${Date.now()}`,
-          ticketId,
-          title: data.sender_name || 'Support',
-          body: preview,
-          createdAt: data.created_at || new Date().toISOString(),
-        })
 
         // Toast seulement hors page support (évite le spam)
         if (!pathname?.includes('/support')) {
@@ -101,6 +98,17 @@ export function SupportSseListener() {
 
     eventSource.addEventListener('new_message', onNewMessage)
     eventSource.addEventListener('support_ticket_created', onTicketCreated)
+    const onMessageRead = (e: MessageEvent) => {
+      try {
+        const data = JSON.parse(e.data) as { ticket_id?: string }
+        const ticketId = data.ticket_id?.toString()
+        if (!ticketId) return
+        queryClient.invalidateQueries({ queryKey: ['messages', ticketId] })
+      } catch (err) {
+        console.error('SSE message_read parse error', err)
+      }
+    }
+    eventSource.addEventListener('message_read', onMessageRead)
     eventSource.onerror = () => {
       // Le navigateur reconnecte EventSource automatiquement
     }
@@ -108,9 +116,10 @@ export function SupportSseListener() {
     return () => {
       eventSource.removeEventListener('new_message', onNewMessage)
       eventSource.removeEventListener('support_ticket_created', onTicketCreated)
+      eventSource.removeEventListener('message_read', onMessageRead)
       eventSource.close()
     }
-  }, [queryClient, push, userId, pathname, router])
+  }, [queryClient, push, pushInboundFromMessage, userId, pathname, router])
 
   return null
 }

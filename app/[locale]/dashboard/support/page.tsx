@@ -28,6 +28,9 @@ export default function SupportPage() {
   const canReply =
     can(currentRole, 'agency:mutate') || can(currentRole, 'agency:prepare')
   const markTicketRead = useSupportNotificationsStore((s) => s.markTicketRead)
+  const pushInboundFromMessage = useSupportNotificationsStore(
+    (s) => s.pushInboundFromMessage,
+  )
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null)
   const [messageText, setMessageText] = useState('')
   const [playingAudioUrl, setPlayingAudioUrl] = useState<string | null>(null)
@@ -73,6 +76,62 @@ export default function SupportPage() {
   useEffect(() => {
     if (selectedTicketId) markTicketRead(selectedTicketId)
   }, [selectedTicketId, markTicketRead])
+
+  // Accusé de lecture serveur dès que le fil est affiché.
+  useEffect(() => {
+    if (!selectedTicketId || !currentUserId || messages.length === 0) return
+    const hasUnreadInbound = messages.some(
+      (m) =>
+        !m.read_at &&
+        m.sender_id?.toString() !== currentUserId.toString(),
+    )
+    if (!hasUnreadInbound) return
+    void supportApi.markMessagesRead(selectedTicketId).catch(() => undefined)
+  }, [selectedTicketId, currentUserId, messages])
+
+  // Filet cloche : poll messages des tickets non sélectionnés (si SSE KO).
+  // Premier passage = amorçage (pas de badge), puis uniquement les nouveaux ids.
+  const seenMessageIdsRef = useRef<Set<string>>(new Set())
+  const bellPrimedRef = useRef(false)
+  useEffect(() => {
+    if (tickets.length === 0) return
+    let cancelled = false
+    const syncOtherTickets = async () => {
+      const others = tickets.filter((t) => t.id !== selectedTicketId)
+      for (const ticket of others.slice(0, 12)) {
+        try {
+          const msgs = await supportApi.getMessages(ticket.id)
+          if (cancelled) return
+          for (const m of msgs) {
+            const id = m.id?.toString()
+            if (!id) continue
+            if (!bellPrimedRef.current) {
+              seenMessageIdsRef.current.add(id)
+              continue
+            }
+            if (seenMessageIdsRef.current.has(id)) continue
+            seenMessageIdsRef.current.add(id)
+            pushInboundFromMessage(
+              { ...m, ticket_id: m.ticket_id || ticket.id },
+              {
+                currentUserId: currentUserId,
+                skipTicketId: selectedTicketId,
+              },
+            )
+          }
+        } catch {
+          // ignore per-ticket errors
+        }
+      }
+      bellPrimedRef.current = true
+    }
+    void syncOtherTickets()
+    const timer = setInterval(() => void syncOtherTickets(), 15_000)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+    }
+  }, [tickets, selectedTicketId, currentUserId, pushInboundFromMessage])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -249,6 +308,12 @@ export default function SupportPage() {
                             m.content !== '[Signalement vocal]' && (
                               <p className="text-xs leading-relaxed">{m.content}</p>
                             )}
+
+                          {isMe && m.read_at && (
+                            <p className="mt-1 text-[10px] font-semibold text-green-400 text-right">
+                              Lu
+                            </p>
+                          )}
 
                           {audioUrl && (
                             <div className="mt-2 flex items-center gap-2 bg-black/5 p-2 rounded-xl border border-black/10">
