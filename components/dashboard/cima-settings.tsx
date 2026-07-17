@@ -586,9 +586,26 @@ export function RcTariffPanel() {
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-6 space-y-6">
-        {/* Formulaire clair */}
-        <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-4 space-y-4">
-          <p className="text-xs font-bold text-slate-800">Nouvelle ligne tarifaire</p>
+        <div className="rounded-xl border border-amber-100 bg-amber-50/70 p-4 text-xs text-amber-900 space-y-1.5">
+          <p className="font-bold">Comment remplir les valeurs numériques ?</p>
+          <ul className="list-disc pl-4 space-y-1 text-amber-800">
+            <li>
+              <strong>Puissance min / max (CV)</strong> : plage de chevaux fiscaux couverte
+              (ex. de <strong>1</strong> à <strong>7</strong> CV pour les petites voitures).
+            </li>
+            <li>
+              <strong>Prime RC annuelle</strong> : montant en <strong>FCFA</strong> pour 12 mois
+              (ex. <strong>58&nbsp;473</strong>). C’est le seul montant monétaire à saisir.
+            </li>
+            <li>
+              La case <strong>Avec remorque</strong> n’est pas un montant : cochez-la seulement
+              si la ligne s’applique aux véhicules avec remorque.
+            </li>
+          </ul>
+        </div>
+
+        <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-4 space-y-5">
+          <p className="text-xs font-bold text-slate-800">1. Choix catégorie & région</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <FieldLabel>Catégorie véhicule (nom)</FieldLabel>
@@ -631,12 +648,12 @@ export function RcTariffPanel() {
               </p>
             </div>
 
-            <div className="space-y-1">
+            <div className="space-y-1 sm:col-span-2">
               <FieldLabel>Carburant</FieldLabel>
               <select
                 value={fuel}
                 onChange={(e) => setFuel(e.target.value)}
-                className="w-full h-10 text-xs border border-gray-200 rounded-md px-2 bg-white"
+                className="w-full h-10 text-xs border border-gray-200 rounded-md px-2 bg-white max-w-xs"
               >
                 {FUEL_OPTIONS.map((f) => (
                   <option key={f} value={f}>
@@ -645,45 +662,80 @@ export function RcTariffPanel() {
                 ))}
               </select>
             </div>
+          </div>
 
-            <div className="space-y-1">
-              <FieldLabel>Prime RC annuelle (FCFA)</FieldLabel>
-              <Input
-                type="number"
-                min="0"
-                placeholder="Ex. 58473"
-                value={rcAmount}
-                onChange={(e) => setRcAmount(e.target.value)}
-                className="h-10 text-xs bg-white"
-              />
-            </div>
+          <div className="border-t border-blue-100 pt-4 space-y-4">
+            <p className="text-xs font-bold text-slate-800">2. Valeurs numériques à saisir</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="rounded-lg border border-white bg-white p-3 space-y-2 shadow-sm">
+                <FieldLabel>Puissance minimale</FieldLabel>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min="1"
+                    max="99"
+                    value={powerMin}
+                    onChange={(e) => setPowerMin(e.target.value)}
+                    className="h-11 text-sm font-semibold"
+                    aria-label="Puissance minimale en CV"
+                  />
+                  <span className="text-xs font-bold text-slate-500 shrink-0">CV</span>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-snug">
+                  Plus petit nombre de chevaux fiscaux pour cette ligne.
+                  <br />
+                  Exemple : <strong>1</strong>
+                </p>
+              </div>
 
-            <div className="space-y-1">
-              <FieldLabel>Puissance min (CV)</FieldLabel>
-              <Input
-                type="number"
-                min="1"
-                value={powerMin}
-                onChange={(e) => setPowerMin(e.target.value)}
-                className="h-10 text-xs bg-white"
-              />
-            </div>
+              <div className="rounded-lg border border-white bg-white p-3 space-y-2 shadow-sm">
+                <FieldLabel>Puissance maximale</FieldLabel>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min="1"
+                    max="99"
+                    value={powerMax}
+                    onChange={(e) => setPowerMax(e.target.value)}
+                    className="h-11 text-sm font-semibold"
+                    aria-label="Puissance maximale en CV"
+                  />
+                  <span className="text-xs font-bold text-slate-500 shrink-0">CV</span>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-snug">
+                  Plus grand nombre de chevaux fiscaux pour cette ligne.
+                  <br />
+                  Exemple : <strong>7</strong> ou <strong>11</strong>
+                </p>
+              </div>
 
-            <div className="space-y-1">
-              <FieldLabel>Puissance max (CV)</FieldLabel>
-              <Input
-                type="number"
-                min="1"
-                value={powerMax}
-                onChange={(e) => setPowerMax(e.target.value)}
-                className="h-10 text-xs bg-white"
-              />
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-2 shadow-sm">
+                <FieldLabel>Prime RC annuelle</FieldLabel>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="58473"
+                    value={rcAmount}
+                    onChange={(e) => setRcAmount(e.target.value)}
+                    className="h-11 text-sm font-semibold border-blue-200"
+                    aria-label="Prime RC annuelle en FCFA"
+                  />
+                  <span className="text-xs font-bold text-blue-700 shrink-0">FCFA</span>
+                </div>
+                <p className="text-[11px] text-blue-800/80 leading-snug">
+                  Montant de la responsabilité civile pour 12 mois.
+                  <br />
+                  Exemple : <strong>58&nbsp;473</strong>
+                </p>
+              </div>
             </div>
           </div>
 
           <label className="inline-flex items-center gap-2 text-xs text-slate-700">
             <input type="checkbox" checked={trailer} onChange={(e) => setTrailer(e.target.checked)} />
-            Avec remorque
+            Avec remorque (cochez seulement si cette ligne concerne les véhicules avec remorque)
           </label>
 
           <Button
@@ -695,8 +747,12 @@ export function RcTariffPanel() {
                 toast.error('Choisissez une catégorie (nom)')
                 return
               }
-              if (!rcAmount || Number(rcAmount) < 0) {
-                toast.error('Saisissez le montant RC annuel')
+              if (!rcAmount || Number(rcAmount) <= 0) {
+                toast.error('Saisissez la prime RC annuelle en FCFA (ex. 58473)')
+                return
+              }
+              if (!powerMin || !powerMax) {
+                toast.error('Indiquez la puissance min et max en CV')
                 return
               }
               if (Number(powerMin) > Number(powerMax)) {
