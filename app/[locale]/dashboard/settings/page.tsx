@@ -228,7 +228,7 @@ function SettingsContent() {
         </div>
       </div>
 
-      <div className="p-8 space-y-6 max-w-4xl flex-1">
+      <div className="p-8 space-y-6 max-w-5xl flex-1">
         {activeTab === 'pricing' && (
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Guide */}

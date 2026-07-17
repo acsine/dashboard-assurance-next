@@ -1,5 +1,6 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import {
@@ -15,7 +16,16 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
-import { Loader2, Plus, Save, Trash2, RefreshCw, KeyRound } from 'lucide-react'
+import { Loader2, Plus, Save, Trash2, RefreshCw, KeyRound, Pencil, X } from 'lucide-react'
+
+const CameroonZonesMap = dynamic(() => import('./CameroonZonesMap'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-72 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-400">
+      Chargement de la carte…
+    </div>
+  ),
+})
 
 const FUEL_OPTIONS = ['ESSENCE', 'DIESEL', 'ELECTRIQUE', 'HYBRIDE']
 
@@ -44,6 +54,11 @@ export function CategoriesPanel() {
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editCode, setEditCode] = useState('')
+  const [editName, setEditName] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [editActive, setEditActive] = useState(true)
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ['tariff-categories'],
@@ -68,6 +83,22 @@ export function CategoriesPanel() {
     onError: (e: Error) => toast.error(e.message),
   })
 
+  const updateMutation = useMutation({
+    mutationFn: () =>
+      tariffApi.updateCategory(editingId!, {
+        code: editCode.trim().toUpperCase(),
+        name: editName.trim(),
+        description: editDescription.trim() || null,
+        is_active: editActive,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tariff-categories'] })
+      setEditingId(null)
+      toast.success('Catégorie mise à jour')
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => tariffApi.deleteCategory(id),
     onSuccess: () => {
@@ -76,6 +107,14 @@ export function CategoriesPanel() {
     },
     onError: (e: Error) => toast.error(e.message),
   })
+
+  const startEdit = (c: VehicleCategory) => {
+    setEditingId(c.id)
+    setEditCode(c.code)
+    setEditName(c.name)
+    setEditDescription(c.description || '')
+    setEditActive(c.is_active)
+  }
 
   const list = Array.isArray(rows) ? rows : []
 
@@ -94,27 +133,104 @@ export function CategoriesPanel() {
             {list.map((c: VehicleCategory) => (
               <div
                 key={c.id}
-                className="flex items-start gap-3 border border-gray-100 rounded-lg px-3 py-2"
+                className="border border-gray-100 rounded-lg px-3 py-2 space-y-2"
               >
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-slate-900">
-                    {c.code} — {c.name}
-                  </p>
-                  {c.description && (
-                    <p className="text-[11px] text-slate-500 mt-0.5">{c.description}</p>
-                  )}
-                </div>
-                <ActiveBadge active={c.is_active} />
-                {c.is_active && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => deleteMutation.mutate(c.id)}
-                    disabled={deleteMutation.isPending}
-                  >
-                    <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                  </Button>
+                {editingId === c.id ? (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <Input
+                        value={editCode}
+                        onChange={(e) => setEditCode(e.target.value)}
+                        className="h-10 text-xs"
+                        placeholder="Code"
+                      />
+                      <Input
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="h-10 text-xs"
+                        placeholder="Nom"
+                      />
+                      <Input
+                        value={editDescription}
+                        onChange={(e) => setEditDescription(e.target.value)}
+                        className="h-10 text-xs"
+                        placeholder="Description"
+                      />
+                    </div>
+                    <label className="inline-flex items-center gap-2 text-xs text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={editActive}
+                        onChange={(e) => setEditActive(e.target.checked)}
+                      />
+                      Catégorie active
+                    </label>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="primary"
+                        size="sm"
+                        className="text-white"
+                        disabled={updateMutation.isPending}
+                        onClick={() => {
+                          if (!editCode.trim() || !editName.trim()) {
+                            toast.error('Code et nom requis')
+                            return
+                          }
+                          updateMutation.mutate()
+                        }}
+                      >
+                        {updateMutation.isPending ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                        ) : (
+                          <Save className="h-3.5 w-3.5 mr-1" />
+                        )}
+                        Enregistrer
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setEditingId(null)}
+                      >
+                        <X className="h-3.5 w-3.5 mr-1" />
+                        Annuler
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-slate-900">
+                        {c.code} — {c.name}
+                      </p>
+                      {c.description && (
+                        <p className="text-[11px] text-slate-500 mt-0.5">{c.description}</p>
+                      )}
+                    </div>
+                    <ActiveBadge active={c.is_active} />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => startEdit(c)}
+                      title="Modifier"
+                    >
+                      <Pencil className="h-3.5 w-3.5 text-blue-600" />
+                    </Button>
+                    {c.is_active && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => deleteMutation.mutate(c.id)}
+                        disabled={deleteMutation.isPending}
+                        title="Désactiver"
+                      >
+                        <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                      </Button>
+                    )}
+                  </div>
                 )}
               </div>
             ))}
@@ -240,7 +356,14 @@ export function ZonesPanel() {
           <FieldLabel>Nom de la zone</FieldLabel>
           <Input value={name} onChange={(e) => setName(e.target.value)} className="h-10 text-xs" />
 
-          <FieldLabel>Villes / régions (GeoDB Cameroun)</FieldLabel>
+          <FieldLabel>Carte du Cameroun</FieldLabel>
+          <CameroonZonesMap
+            regions={Array.isArray(regions) ? regions : []}
+            selectedCities={selectedCities}
+            onToggleCity={toggleCity}
+          />
+
+          <FieldLabel>Villes / régions (liste)</FieldLabel>
           <Input
             placeholder="Filtrer les régions…"
             value={citySearch}
