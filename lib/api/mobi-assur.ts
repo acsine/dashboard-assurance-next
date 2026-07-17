@@ -472,6 +472,27 @@ export const contractsApi = {
 
 // ─── Prospects ───────────────────────────────────────────────────────────────
 
+export type PaymentMode = 'UNPAID' | 'MANUAL_PAYMENT'
+
+export interface QuoteBreakdown {
+  months?: number
+  rc_annual?: number
+  rc_prorata?: number
+  remise_pct?: number
+  remise_amount?: number
+  rc_net?: number
+  dr?: number
+  ipt?: number
+  acc?: number
+  fc?: number
+  cr?: number
+  vignette?: number
+  vignette_tva?: number
+  tax_assurance?: number
+  tva_accessoires?: number
+  total?: number
+}
+
 export interface Prospect {
   id: string
   full_name?: string
@@ -484,8 +505,34 @@ export interface Prospect {
   vehicle_id?: string
   cni_photo_url?: string
   permis_photo_url?: string
+  cni_number?: string
+  category_id?: string
+  zone_id?: string
+  duration_id?: string
+  fuel?: string
+  power_cv?: number
+  trailer?: boolean
+  include_dr?: boolean
+  include_ipt?: boolean
+  remise_pct?: number
+  quote_id?: string
+  quote_total?: number
+  quote_breakdown?: QuoteBreakdown
   created_at?: string
   updated_at?: string
+}
+
+export interface MarkInterestedRequest {
+  cni_number: string
+  category_id: string
+  zone_id?: string
+  duration_id: string
+  fuel?: string
+  power_cv: number
+  trailer?: boolean
+  include_dr?: boolean
+  include_ipt?: boolean
+  remise_pct?: number
 }
 
 export interface ConversionPayload {
@@ -499,6 +546,11 @@ export interface ConversionPayload {
   cni_number?: string
   cni_photo_url?: string
   permis_photo_url?: string
+  payment_mode?: PaymentMode
+  payment_reference?: string
+  payment_amount?: number
+  payment_date?: string
+  validation_code?: string
   vehicle?: {
     marque?: string
     modele?: string
@@ -517,8 +569,17 @@ export interface ConversionRequest {
   status: string
   created_at?: string
   requested_at?: string
+  payment_mode?: PaymentMode
+  payment_reference?: string
+  payment_amount?: number
+  payment_date?: string
   payload?: ConversionPayload & Record<string, unknown>
   prospect?: Prospect
+}
+
+export interface ApproveConversionBody {
+  validation_code: string
+  received_payment_reference?: string
 }
 
 export const prospectsApi = {
@@ -528,16 +589,24 @@ export const prospectsApi = {
     mobiRequest<ConversionRequest[]>('/prospects/conversions/pending'),
   getConversion: (id: string) =>
     mobiRequest<ConversionRequest>(`/prospects/conversions/${id}`),
-  approveConversion: (id: string) =>
-    mobiRequest<unknown>(`/prospects/conversions/${id}/approve`, { method: 'POST' }),
+  approveConversion: (id: string, body: ApproveConversionBody) =>
+    mobiRequest<unknown>(`/prospects/conversions/${id}/approve`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   rejectConversion: (id: string, rejectionReason: string) =>
     mobiRequest<unknown>(`/prospects/conversions/${id}/reject`, {
       method: 'POST',
       body: JSON.stringify({ rejection_reason: rejectionReason }),
     }),
   /** Conversion directe admin (sans demande agent) — commission → prospect.agent_id */
-  convertDirect: (prospectId: string, body: ConversionPayload) =>
+  convertDirect: (prospectId: string, body: ConversionPayload & { validation_code: string }) =>
     mobiRequest<unknown>(`/prospects/${prospectId}/convert`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  markInterested: (id: string, body: MarkInterestedRequest) =>
+    mobiRequest<Prospect>(`/prospects/${id}/mark-interested`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
@@ -663,6 +732,192 @@ export const settingsApi = {
       `/settings/pricing/bareme/brands/${encodeURIComponent(marque)}`,
       { method: 'DELETE' },
     ),
+}
+
+// ─── Tarification CIMA ───────────────────────────────────────────────────────
+
+export interface VehicleCategory {
+  id: string
+  agency_id?: string
+  code: string
+  name: string
+  description?: string | null
+  is_active: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+export interface CirculationZone {
+  id: string
+  agency_id?: string
+  name: string
+  cities: string[]
+  is_active: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+export interface ContractDuration {
+  id: string
+  agency_id?: string
+  label: string
+  months: number
+  is_active: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+export interface RcRate {
+  id: string
+  agency_id?: string
+  category_id: string
+  zone_id?: string | null
+  fuel: string
+  power_min: number
+  power_max: number
+  trailer: boolean
+  rc_amount: number
+  is_active: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+export interface FeeSchedule {
+  agency_id?: string
+  dr_amount: number
+  ipt_amount: number
+  acc_amount: number
+  fc_amount: number
+  cr_amount: number
+  vignette_amount: number
+  tax_rate_assurance: number
+  tva_rate: number
+  remise_max_pct: number
+  updated_at?: string | null
+  updated_by?: string | null
+}
+
+export interface TariffBootstrap {
+  categories: VehicleCategory[]
+  zones: CirculationZone[]
+  durations: ContractDuration[]
+  rc_rates: RcRate[]
+  fees: FeeSchedule
+}
+
+export interface GeoRegion {
+  name: string
+  code?: string
+}
+
+export interface QuoteComputeRequest {
+  category_id: string
+  zone_id?: string
+  duration_id: string
+  fuel?: string
+  power_cv: number
+  trailer?: boolean
+  include_dr?: boolean
+  include_ipt?: boolean
+  remise_pct?: number
+  prospect_id?: string
+  cni_number?: string
+}
+
+export interface QuoteComputeResult {
+  quote_id: string
+  total: number
+  breakdown: QuoteBreakdown
+  inputs?: Record<string, unknown>
+}
+
+export const tariffApi = {
+  bootstrap: () => mobiRequest<TariffBootstrap>('/settings/tariff/bootstrap'),
+
+  listCategories: () => mobiRequest<VehicleCategory[]>('/settings/vehicle-categories'),
+  createCategory: (data: Omit<VehicleCategory, 'id' | 'agency_id' | 'created_at' | 'updated_at'>) =>
+    mobiRequest<VehicleCategory>('/settings/vehicle-categories', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateCategory: (id: string, data: Partial<VehicleCategory>) =>
+    mobiRequest<VehicleCategory>(`/settings/vehicle-categories/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  deleteCategory: (id: string) =>
+    mobiRequest<unknown>(`/settings/vehicle-categories/${id}`, { method: 'DELETE' }),
+
+  listZones: () => mobiRequest<CirculationZone[]>('/settings/zones'),
+  geoRegions: () => mobiRequest<GeoRegion[]>('/settings/zones/geo/regions'),
+  createZone: (data: Omit<CirculationZone, 'id' | 'agency_id' | 'created_at' | 'updated_at'>) =>
+    mobiRequest<CirculationZone>('/settings/zones', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateZone: (id: string, data: Partial<CirculationZone>) =>
+    mobiRequest<CirculationZone>(`/settings/zones/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  deleteZone: (id: string) =>
+    mobiRequest<unknown>(`/settings/zones/${id}`, { method: 'DELETE' }),
+
+  listDurations: () => mobiRequest<ContractDuration[]>('/settings/contract-durations'),
+  createDuration: (data: Omit<ContractDuration, 'id' | 'agency_id' | 'created_at' | 'updated_at'>) =>
+    mobiRequest<ContractDuration>('/settings/contract-durations', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateDuration: (id: string, data: Partial<ContractDuration>) =>
+    mobiRequest<ContractDuration>(`/settings/contract-durations/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  deleteDuration: (id: string) =>
+    mobiRequest<unknown>(`/settings/contract-durations/${id}`, { method: 'DELETE' }),
+
+  listTariffLines: () => mobiRequest<RcRate[]>('/settings/tariff-lines'),
+  createTariffLine: (data: Omit<RcRate, 'id' | 'agency_id' | 'created_at' | 'updated_at'>) =>
+    mobiRequest<RcRate>('/settings/tariff-lines', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateTariffLine: (id: string, data: Partial<RcRate>) =>
+    mobiRequest<RcRate>(`/settings/tariff-lines/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  deleteTariffLine: (id: string) =>
+    mobiRequest<unknown>(`/settings/tariff-lines/${id}`, { method: 'DELETE' }),
+
+  getFeeSchedule: () => mobiRequest<FeeSchedule>('/settings/fee-schedule'),
+  setFeeSchedule: (data: Partial<FeeSchedule>) =>
+    mobiRequest<FeeSchedule>('/settings/fee-schedule', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  computeQuote: (data: QuoteComputeRequest) =>
+    mobiRequest<QuoteComputeResult>('/quotes/compute', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  setValidationCode: (userId: string, code: string) =>
+    mobiRequest<unknown>(`/users/${userId}/validation-code`, {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    }),
+  generateValidationCode: (userId: string) =>
+    mobiRequest<{ code: string }>(`/users/${userId}/validation-code/generate`, {
+      method: 'POST',
+    }),
+  verifyValidationCode: (code: string) =>
+    mobiRequest<unknown>('/auth/verify-validation-code', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    }),
 }
 
 // ─── Sync ────────────────────────────────────────────────────────────────────

@@ -8,6 +8,14 @@ import {
   type BaremeField,
   type PricingSettings,
 } from '@/lib/api/mobi-assur'
+import {
+  CategoriesPanel,
+  DurationsPanel,
+  FeeSchedulePanel,
+  RcTariffPanel,
+  ValidationCodePanel,
+  ZonesPanel,
+} from '@/components/dashboard/cima-settings'
 import Header from '@/components/dashboard/Header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,6 +23,25 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { Settings, Save, Loader2, Plus, Trash2, RotateCcw } from 'lucide-react'
 import { RoleGuard } from '@/components/auth/RoleGuard'
+
+type SettingsTab =
+  | 'pricing'
+  | 'categories'
+  | 'zones'
+  | 'durations'
+  | 'rc'
+  | 'fees'
+  | 'validation'
+
+const TABS: { id: SettingsTab; label: string }[] = [
+  { id: 'pricing', label: 'Tarification agent' },
+  { id: 'categories', label: 'Catégories CIMA' },
+  { id: 'zones', label: 'Zones' },
+  { id: 'durations', label: 'Durées' },
+  { id: 'rc', label: 'Barème RC' },
+  { id: 'fees', label: 'Frais légaux' },
+  { id: 'validation', label: 'Code validation' },
+]
 
 const DEFAULT_GUIDE =
   '1. Identifiez le type de véhicule et son usage.\n' +
@@ -35,6 +62,7 @@ const DEFAULT_BAREME: BaremeConfig = {
 
 function SettingsContent() {
   const queryClient = useQueryClient()
+  const [activeTab, setActiveTab] = useState<SettingsTab>('pricing')
 
   const [accessoires, setAccessoires] = useState('2500')
   const [asac, setAsac] = useState('1000')
@@ -177,11 +205,31 @@ function SettingsContent() {
   return (
     <div className="flex-1 flex flex-col bg-white">
       <Header
-        title="Paramètres de Tarification & Commissions"
-        subtitle="Guide agent, barème indicatif, frais et commissions de l’agence."
+        title="Paramètres de tarification"
+        subtitle="Guide agent, barème CIMA, frais légaux et code de validation."
       />
 
-      <div className="p-8 space-y-6 max-w-3xl flex-1">
+      <div className="px-8 pt-6">
+        <div className="flex flex-wrap gap-2">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-3 py-2 rounded-xl text-[11px] font-bold border transition-colors ${
+                activeTab === tab.id
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="p-8 space-y-6 max-w-4xl flex-1">
+        {activeTab === 'pricing' && (
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Guide */}
           <Card className="border-gray-100 shadow-sm bg-white">
@@ -440,6 +488,14 @@ function SettingsContent() {
             </Button>
           </div>
         </form>
+        )}
+
+        {activeTab === 'categories' && <CategoriesPanel />}
+        {activeTab === 'zones' && <ZonesPanel />}
+        {activeTab === 'durations' && <DurationsPanel />}
+        {activeTab === 'rc' && <RcTariffPanel />}
+        {activeTab === 'fees' && <FeeSchedulePanel />}
+        {activeTab === 'validation' && <ValidationCodePanel />}
       </div>
     </div>
   )

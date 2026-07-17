@@ -1,26 +1,38 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect, useCallback } from 'react'
 import {
   prospectsApi,
+  tariffApi,
   usersApi,
-  proxiedAssetUrl,
   type ConversionPayload,
   type ConversionRequest,
   type Prospect,
+  type QuoteBreakdown,
+  type QuoteComputeResult,
 } from '@/lib/api/mobi-assur'
 import Header from '@/components/dashboard/Header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
-import { UserCheck, Check, X, Users, Clock, ExternalLink, ArrowRightLeft } from 'lucide-react'
+import {
+  UserCheck,
+  Check,
+  X,
+  Users,
+  Clock,
+  ArrowRightLeft,
+  Sparkles,
+  Loader2,
+} from 'lucide-react'
 import { RoleGuard } from '@/components/auth/RoleGuard'
 
 type Tab = 'all' | 'pending'
 
 const BLOCKED_CONVERT_STATUSES = new Set(['CONVERTI', 'EN_ATTENTE_VALIDATION'])
+const FUEL_OPTIONS = ['ESSENCE', 'DIESEL', 'ELECTRIQUE', 'HYBRIDE']
 
 function payloadOf(req: ConversionRequest): Record<string, unknown> {
   return (req.payload || {}) as Record<string, unknown>
@@ -40,39 +52,15 @@ function conversionDisplayName(req: ConversionRequest): string {
 
 function conversionPhone(req: ConversionRequest): string {
   const payload = payloadOf(req)
-  return (
-    req.prospect?.phone ||
-    (payload.phone as string | undefined) ||
-    'N/A'
-  )
+  return req.prospect?.phone || (payload.phone as string | undefined) || 'N/A'
 }
 
-function conversionEmail(req: ConversionRequest): string {
+function conversionCni(req: ConversionRequest): string | undefined {
   const payload = payloadOf(req)
   return (
-    req.prospect?.email ||
-    (payload.email as string | undefined) ||
-    'N/A'
+    req.prospect?.cni_number ||
+    (payload.cni_number as string | undefined)
   )
-}
-
-function identityDocsFromConversion(req: ConversionRequest): {
-  cni: string | undefined
-  permis: string | undefined
-} {
-  const payload = payloadOf(req)
-  return {
-    cni:
-      (payload.cni_photo_url as string | undefined) ||
-      req.prospect?.cni_photo_url,
-    permis:
-      (payload.permis_photo_url as string | undefined) ||
-      req.prospect?.permis_photo_url,
-  }
-}
-
-function hasIdentityDocs(cni?: string, permis?: string): boolean {
-  return Boolean(cni?.trim() && permis?.trim())
 }
 
 function statusBadgeClass(status: string): string {
@@ -95,62 +83,232 @@ function statusBadgeClass(status: string): string {
   }
 }
 
-function DocLink({ label, url }: { label: string; url?: string }) {
-  if (!url?.trim()) {
-    return (
-      <span className="inline-flex items-center gap-1 text-[11px] text-red-500 font-medium">
-        {label} manquant
-      </span>
-    )
+function formatFcfa(value?: number | null): string {
+  if (value == null) return '—'
+  return `${Math.round(value).toLocaleString('fr-FR')} FCFA`
+}
+
+interface TariffFormState {
+  cni_number: string
+  category_id: string
+  zone_id: string
+  duration_id: string
+  fuel: string
+  power_cv: string
+  trailer: boolean
+  include_dr: boolean
+  include_ipt: boolean
+  remise_pct: string
+}
+
+function emptyTariffForm(p?: Prospect): TariffFormState {
+  return {
+    cni_number: p?.cni_number || '',
+    category_id: p?.category_id || '',
+    zone_id: p?.zone_id || '',
+    duration_id: p?.duration_id || '',
+    fuel: p?.fuel || 'ESSENCE',
+    power_cv: p?.power_cv ? String(p.power_cv) : '',
+    trailer: p?.trailer ?? false,
+    include_dr: p?.include_dr ?? false,
+    include_ipt: p?.include_ipt ?? false,
+    remise_pct: p?.remise_pct != null ? String(p.remise_pct) : '0',
   }
-  return (
-    <a
-      href={proxiedAssetUrl(url)}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-700 hover:underline"
-    >
-      {label}
-      <ExternalLink className="h-3 w-3" />
-    </a>
-  )
 }
 
 interface ConvertFormState {
   full_name: string
   phone: string
+  cni_number: string
+  validation_code: string
   marque: string
   immatriculation: string
   chassis_num: string
   puissance_cv: string
-  cni_photo_url: string
-  permis_photo_url: string
 }
 
-function emptyConvertForm(): ConvertFormState {
+function emptyConvertForm(p?: Prospect): ConvertFormState {
   return {
-    full_name: '',
-    phone: '',
+    full_name: p?.full_name || '',
+    phone: p?.phone || '',
+    cni_number: p?.cni_number || '',
+    validation_code: '',
     marque: '',
     immatriculation: '',
     chassis_num: '',
-    puissance_cv: '',
-    cni_photo_url: '',
-    permis_photo_url: '',
+    puissance_cv: p?.power_cv ? String(p.power_cv) : '',
   }
 }
 
-function formFromProspect(p: Prospect): ConvertFormState {
-  return {
-    full_name: p.full_name || '',
-    phone: p.phone || '',
-    marque: '',
-    immatriculation: '',
-    chassis_num: '',
-    puissance_cv: '',
-    cni_photo_url: p.cni_photo_url || '',
-    permis_photo_url: p.permis_photo_url || '',
-  }
+function QuoteBreakdownView({ breakdown, total }: { breakdown?: QuoteBreakdown; total?: number }) {
+  if (!breakdown && total == null) return null
+  return (
+    <div className="rounded-lg border border-emerald-100 bg-emerald-50/50 p-3 text-[11px] space-y-1">
+      <p className="font-bold text-emerald-800 uppercase tracking-wider">Devis estimé</p>
+      {breakdown?.rc_net != null && (
+        <p>RC nette : {formatFcfa(breakdown.rc_net)}</p>
+      )}
+      {breakdown?.dr != null && breakdown.dr > 0 && <p>DR : {formatFcfa(breakdown.dr)}</p>}
+      {breakdown?.ipt != null && breakdown.ipt > 0 && <p>IPT : {formatFcfa(breakdown.ipt)}</p>}
+      {breakdown?.acc != null && <p>Accessoires : {formatFcfa(breakdown.acc)}</p>}
+      {breakdown?.vignette != null && breakdown.vignette > 0 && (
+        <p>Vignette : {formatFcfa(breakdown.vignette)}</p>
+      )}
+      <p className="font-bold text-emerald-900 pt-1 border-t border-emerald-100">
+        Total : {formatFcfa(total ?? breakdown?.total)}
+      </p>
+    </div>
+  )
+}
+
+function TariffFields({
+  form,
+  setForm,
+  categories,
+  zones,
+  durations,
+}: {
+  form: TariffFormState
+  setForm: React.Dispatch<React.SetStateAction<TariffFormState>>
+  categories: Array<{ id: string; code: string; name: string; is_active: boolean }>
+  zones: Array<{ id: string; name: string; is_active: boolean }>
+  durations: Array<{ id: string; label: string; months: number; is_active: boolean }>
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="space-y-1">
+        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+          N° CNI *
+        </label>
+        <Input
+          value={form.cni_number}
+          onChange={(e) => setForm({ ...form, cni_number: e.target.value })}
+          className="h-10 text-xs border-gray-200"
+          required
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+            Catégorie *
+          </label>
+          <select
+            value={form.category_id}
+            onChange={(e) => setForm({ ...form, category_id: e.target.value })}
+            className="w-full h-10 text-xs border border-gray-200 rounded-md px-2"
+            required
+          >
+            <option value="">—</option>
+            {categories.filter((c) => c.is_active).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.code} — {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+            Zone
+          </label>
+          <select
+            value={form.zone_id}
+            onChange={(e) => setForm({ ...form, zone_id: e.target.value })}
+            className="w-full h-10 text-xs border border-gray-200 rounded-md px-2"
+          >
+            <option value="">—</option>
+            {zones.filter((z) => z.is_active).map((z) => (
+              <option key={z.id} value={z.id}>
+                {z.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+            Durée *
+          </label>
+          <select
+            value={form.duration_id}
+            onChange={(e) => setForm({ ...form, duration_id: e.target.value })}
+            className="w-full h-10 text-xs border border-gray-200 rounded-md px-2"
+            required
+          >
+            <option value="">—</option>
+            {durations.filter((d) => d.is_active).map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.label} ({d.months} mois)
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+            Carburant
+          </label>
+          <select
+            value={form.fuel}
+            onChange={(e) => setForm({ ...form, fuel: e.target.value })}
+            className="w-full h-10 text-xs border border-gray-200 rounded-md px-2"
+          >
+            {FUEL_OPTIONS.map((f) => (
+              <option key={f} value={f}>
+                {f}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+            Puissance (CV) *
+          </label>
+          <Input
+            type="number"
+            value={form.power_cv}
+            onChange={(e) => setForm({ ...form, power_cv: e.target.value })}
+            className="h-10 text-xs border-gray-200"
+            required
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+            Remise (%)
+          </label>
+          <Input
+            type="number"
+            value={form.remise_pct}
+            onChange={(e) => setForm({ ...form, remise_pct: e.target.value })}
+            className="h-10 text-xs border-gray-200"
+          />
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-4 text-xs text-slate-600">
+        <label className="inline-flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={form.trailer}
+            onChange={(e) => setForm({ ...form, trailer: e.target.checked })}
+          />
+          Remorque
+        </label>
+        <label className="inline-flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={form.include_dr}
+            onChange={(e) => setForm({ ...form, include_dr: e.target.checked })}
+          />
+          Inclure DR
+        </label>
+        <label className="inline-flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={form.include_ipt}
+            onChange={(e) => setForm({ ...form, include_ipt: e.target.checked })}
+          />
+          Inclure IPT
+        </label>
+      </div>
+    </div>
+  )
 }
 
 export default function ProspectsPage() {
@@ -161,6 +319,12 @@ export default function ProspectsPage() {
   const [search, setSearch] = useState('')
   const [convertingProspect, setConvertingProspect] = useState<Prospect | null>(null)
   const [convertForm, setConvertForm] = useState<ConvertFormState>(emptyConvertForm())
+  const [interestedProspect, setInterestedProspect] = useState<Prospect | null>(null)
+  const [tariffForm, setTariffForm] = useState<TariffFormState>(emptyTariffForm())
+  const [liveQuote, setLiveQuote] = useState<QuoteComputeResult | null>(null)
+  const [approvingRequest, setApprovingRequest] = useState<ConversionRequest | null>(null)
+  const [approvalCode, setApprovalCode] = useState('')
+  const [approvalPaymentRef, setApprovalPaymentRef] = useState('')
 
   const { data: prospects = [], isLoading: loadingProspects } = useQuery({
     queryKey: ['prospects'],
@@ -177,6 +341,15 @@ export default function ProspectsPage() {
     queryFn: () => usersApi.list({ role: 'AGENT_TERRAIN' }),
   })
 
+  const { data: bootstrap } = useQuery({
+    queryKey: ['tariff-bootstrap'],
+    queryFn: () => tariffApi.bootstrap(),
+  })
+
+  const categories = bootstrap?.categories ?? []
+  const zones = bootstrap?.zones ?? []
+  const durations = bootstrap?.durations ?? []
+
   const agentNameById = useMemo(() => {
     const map = new Map<string, string>()
     for (const a of Array.isArray(agents) ? agents : []) {
@@ -192,14 +365,75 @@ export default function ProspectsPage() {
     return name ? `${name} (${shortId})` : shortId
   }
 
+  const canComputeQuote = useCallback(
+    (form: TariffFormState) =>
+      Boolean(
+        form.category_id &&
+          form.duration_id &&
+          form.power_cv &&
+          Number(form.power_cv) >= 1,
+      ),
+    [],
+  )
+
+  const buildQuotePayload = useCallback(
+    (form: TariffFormState, prospectId?: string) => ({
+      category_id: form.category_id,
+      zone_id: form.zone_id || undefined,
+      duration_id: form.duration_id,
+      fuel: form.fuel,
+      power_cv: Number(form.power_cv),
+      trailer: form.trailer,
+      include_dr: form.include_dr,
+      include_ipt: form.include_ipt,
+      remise_pct: Number(form.remise_pct || 0),
+      prospect_id: prospectId,
+      cni_number: form.cni_number.trim() || undefined,
+    }),
+    [],
+  )
+
+  useEffect(() => {
+    if (!interestedProspect || !canComputeQuote(tariffForm)) {
+      setLiveQuote(null)
+      return
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const result = await tariffApi.computeQuote(
+          buildQuotePayload(tariffForm, interestedProspect.id),
+        )
+        setLiveQuote(result)
+      } catch {
+        setLiveQuote(null)
+      }
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [interestedProspect, tariffForm, canComputeQuote, buildQuotePayload])
+
   const approveMutation = useMutation({
-    mutationFn: (id: string) => prospectsApi.approveConversion(id),
+    mutationFn: ({
+      id,
+      validation_code,
+      received_payment_reference,
+    }: {
+      id: string
+      validation_code: string
+      received_payment_reference?: string
+    }) =>
+      prospectsApi.approveConversion(id, {
+        validation_code,
+        received_payment_reference,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pending-conversions'] })
       queryClient.invalidateQueries({ queryKey: ['prospects'] })
       toast.success('Demande approuvée. Client créé et prospect converti.')
+      setApprovingRequest(null)
+      setApprovalCode('')
+      setApprovalPaymentRef('')
     },
-    onError: (err: any) => {
+    onError: (err: Error) => {
       toast.error(err.message || "Erreur lors de l'approbation")
     },
   })
@@ -214,13 +448,13 @@ export default function ProspectsPage() {
       setRejectingId(null)
       setRejectMotif('')
     },
-    onError: (err: any) => {
+    onError: (err: Error) => {
       toast.error(err.message || 'Erreur lors du rejet')
     },
   })
 
   const convertMutation = useMutation({
-    mutationFn: ({ id, body }: { id: string; body: ConversionPayload }) =>
+    mutationFn: ({ id, body }: { id: string; body: ConversionPayload & { validation_code: string } }) =>
       prospectsApi.convertDirect(id, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pending-conversions'] })
@@ -229,9 +463,33 @@ export default function ProspectsPage() {
       setConvertingProspect(null)
       setConvertForm(emptyConvertForm())
     },
-    onError: (err: any) => {
+    onError: (err: Error) => {
       toast.error(err.message || 'Erreur lors de la conversion')
     },
+  })
+
+  const markInterestedMutation = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: ReturnType<typeof buildQuotePayload> & { cni_number: string } }) =>
+      prospectsApi.markInterested(id, {
+        cni_number: body.cni_number,
+        category_id: body.category_id,
+        zone_id: body.zone_id,
+        duration_id: body.duration_id,
+        fuel: body.fuel,
+        power_cv: body.power_cv,
+        trailer: body.trailer,
+        include_dr: body.include_dr,
+        include_ipt: body.include_ipt,
+        remise_pct: body.remise_pct,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['prospects'] })
+      toast.success('Prospect marqué comme intéressé avec devis enregistré.')
+      setInterestedProspect(null)
+      setTariffForm(emptyTariffForm())
+      setLiveQuote(null)
+    },
+    onError: (err: Error) => toast.error(err.message),
   })
 
   const handleRejectSubmit = (e: React.FormEvent, id: string) => {
@@ -245,7 +503,13 @@ export default function ProspectsPage() {
 
   const openConvertDialog = (p: Prospect) => {
     setConvertingProspect(p)
-    setConvertForm(formFromProspect(p))
+    setConvertForm(emptyConvertForm(p))
+  }
+
+  const openInterestedDialog = (p: Prospect) => {
+    setInterestedProspect(p)
+    setTariffForm(emptyTariffForm(p))
+    setLiveQuote(null)
   }
 
   const handleConvertSubmit = (e: React.FormEvent) => {
@@ -255,17 +519,21 @@ export default function ProspectsPage() {
       toast.error('Nom et téléphone sont requis')
       return
     }
-    if (!hasIdentityDocs(convertForm.cni_photo_url, convertForm.permis_photo_url)) {
-      toast.error('CNI et permis sont requis pour convertir')
+    if (!convertForm.cni_number.trim()) {
+      toast.error('Numéro CNI requis')
+      return
+    }
+    if (convertForm.validation_code.length !== 6) {
+      toast.error('Code de validation à 6 chiffres requis')
       return
     }
 
-    const body: ConversionPayload = {
+    const body: ConversionPayload & { validation_code: string } = {
       full_name: convertForm.full_name.trim(),
       phone: convertForm.phone.trim(),
       country_code: 'CM',
-      cni_photo_url: convertForm.cni_photo_url.trim() || undefined,
-      permis_photo_url: convertForm.permis_photo_url.trim() || undefined,
+      cni_number: convertForm.cni_number.trim(),
+      validation_code: convertForm.validation_code,
     }
 
     const hasVehicle =
@@ -290,6 +558,47 @@ export default function ProspectsPage() {
     convertMutation.mutate({ id: convertingProspect.id, body })
   }
 
+  const handleMarkInterestedSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!interestedProspect) return
+    if (!tariffForm.cni_number.trim()) {
+      toast.error('Numéro CNI requis')
+      return
+    }
+    if (!canComputeQuote(tariffForm)) {
+      toast.error('Paramètres tarifaires incomplets')
+      return
+    }
+    markInterestedMutation.mutate({
+      id: interestedProspect.id,
+      body: {
+        ...buildQuotePayload(tariffForm, interestedProspect.id),
+        cni_number: tariffForm.cni_number.trim(),
+      },
+    })
+  }
+
+  const handleApproveSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!approvingRequest) return
+    if (approvalCode.length !== 6) {
+      toast.error('Code de validation à 6 chiffres requis')
+      return
+    }
+    const needsPaymentRef = approvingRequest.payment_mode === 'MANUAL_PAYMENT'
+    if (needsPaymentRef && !approvalPaymentRef.trim()) {
+      toast.error('Référence de paiement requise')
+      return
+    }
+    approveMutation.mutate({
+      id: approvingRequest.id,
+      validation_code: approvalCode,
+      received_payment_reference: needsPaymentRef
+        ? approvalPaymentRef.trim()
+        : undefined,
+    })
+  }
+
   const safeProspects = Array.isArray(prospects) ? prospects : []
   const safePendingRequests = Array.isArray(pendingRequests) ? pendingRequests : []
 
@@ -298,7 +607,7 @@ export default function ProspectsPage() {
     if (!q) return safeProspects
     return safeProspects.filter((p: Prospect) => {
       const agentLabel = p.agent_id ? resolveAgentLabel(p.agent_id).toLowerCase() : ''
-      const hay = `${p.full_name || ''} ${p.phone || ''} ${p.status || ''} ${p.agent_id || ''} ${agentLabel}`.toLowerCase()
+      const hay = `${p.full_name || ''} ${p.phone || ''} ${p.status || ''} ${p.cni_number || ''} ${p.agent_id || ''} ${agentLabel}`.toLowerCase()
       return hay.includes(q)
     })
   }, [safeProspects, search, agentNameById])
@@ -307,7 +616,7 @@ export default function ProspectsPage() {
     <div className="flex-1 flex flex-col bg-white">
       <Header
         title="Prospects & Conversions"
-        subtitle="Consultez les prospects synchronisés par les agents et validez les demandes de conversion."
+        subtitle="Consultez les prospects, marquez les intéressés avec devis CIMA et validez les conversions."
       />
 
       <div className="p-8 space-y-6 flex-1">
@@ -343,7 +652,7 @@ export default function ProspectsPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <h3 className="text-sm font-bold text-slate-900">Prospects de l&apos;agence</h3>
               <Input
-                placeholder="Rechercher nom, téléphone, statut…"
+                placeholder="Rechercher nom, téléphone, CNI, statut…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="h-10 text-xs border-gray-200 w-full sm:w-72"
@@ -358,9 +667,6 @@ export default function ProspectsPage() {
               <div className="py-20 text-center text-gray-400">
                 <Users className="h-12 w-12 mx-auto text-gray-300 mb-3" />
                 <p className="text-sm font-semibold">Aucun prospect trouvé</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Les prospects apparaîtront ici après synchronisation mobile des agents.
-                </p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -369,8 +675,10 @@ export default function ProspectsPage() {
                     <tr className="border-b border-slate-100 text-slate-500 uppercase tracking-wider">
                       <th className="py-3 pr-4 font-bold">Nom</th>
                       <th className="py-3 pr-4 font-bold">Téléphone</th>
+                      <th className="py-3 pr-4 font-bold">CNI</th>
+                      <th className="py-3 pr-4 font-bold">Devis</th>
                       <th className="py-3 pr-4 font-bold">Statut</th>
-                      <th className="py-3 pr-4 font-bold">Agent prospecteur</th>
+                      <th className="py-3 pr-4 font-bold">Agent</th>
                       <th className="py-3 pr-4 font-bold">Créé le</th>
                       <th className="py-3 font-bold text-right">Actions</th>
                     </tr>
@@ -378,13 +686,20 @@ export default function ProspectsPage() {
                   <tbody className="divide-y divide-slate-50">
                     {filteredProspects.map((p) => {
                       const canConvert = !BLOCKED_CONVERT_STATUSES.has(p.status)
+                      const canMarkInterested = !['CONVERTI', 'INTERESSE', 'EN_ATTENTE_VALIDATION'].includes(
+                        p.status,
+                      )
                       return (
                         <tr key={p.id} className="hover:bg-slate-50/80">
                           <td className="py-3 pr-4 font-semibold text-slate-900">
                             {p.full_name || 'Sans nom'}
                           </td>
+                          <td className="py-3 pr-4 text-slate-600 font-mono">{p.phone || '—'}</td>
                           <td className="py-3 pr-4 text-slate-600 font-mono">
-                            {p.phone || '—'}
+                            {p.cni_number || '—'}
+                          </td>
+                          <td className="py-3 pr-4 text-emerald-700 font-semibold">
+                            {p.quote_total != null ? formatFcfa(p.quote_total) : '—'}
                           </td>
                           <td className="py-3 pr-4">
                             <span
@@ -396,12 +711,7 @@ export default function ProspectsPage() {
                             </span>
                           </td>
                           <td className="py-3 pr-4 text-slate-600">
-                            <span className="font-medium block">
-                              {resolveAgentLabel(p.agent_id)}
-                            </span>
-                            <span className="text-[10px] text-slate-400">
-                              Commission → cet agent
-                            </span>
+                            {resolveAgentLabel(p.agent_id)}
                           </td>
                           <td className="py-3 pr-4 text-slate-500">
                             {p.created_at
@@ -409,24 +719,34 @@ export default function ProspectsPage() {
                               : '—'}
                           </td>
                           <td className="py-3 text-right">
-                            {canConvert ? (
-                              <RoleGuard permission="agency:mutate" fallback={null}>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className="text-xs"
-                                  onClick={() => openConvertDialog(p)}
-                                >
-                                  <ArrowRightLeft className="h-3.5 w-3.5 mr-1.5" />
-                                  Valider / convertir
-                                </Button>
-                              </RoleGuard>
-                            ) : (
-                              <span className="text-[10px] text-slate-400 font-medium">
-                                —
-                              </span>
-                            )}
+                            <RoleGuard permission="agency:mutate" fallback={null}>
+                              <div className="flex flex-wrap justify-end gap-1.5">
+                                {canMarkInterested && (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-xs"
+                                    onClick={() => openInterestedDialog(p)}
+                                  >
+                                    <Sparkles className="h-3.5 w-3.5 mr-1" />
+                                    Intéressé
+                                  </Button>
+                                )}
+                                {canConvert && (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-xs"
+                                    onClick={() => openConvertDialog(p)}
+                                  >
+                                    <ArrowRightLeft className="h-3.5 w-3.5 mr-1" />
+                                    Convertir
+                                  </Button>
+                                )}
+                              </div>
+                            </RoleGuard>
                           </td>
                         </tr>
                       )
@@ -446,16 +766,13 @@ export default function ProspectsPage() {
               <div className="py-20 text-center text-gray-400">
                 <UserCheck className="h-12 w-12 mx-auto text-gray-300 mb-3" />
                 <p className="text-sm font-semibold">Aucune demande en attente</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Toutes les conversions prospects de l&apos;agence ont été validées.
-                </p>
               </div>
             ) : (
               <div className="space-y-4">
                 {safePendingRequests.map((req) => {
-                  const docs = identityDocsFromConversion(req)
-                  const docsOk = hasIdentityDocs(docs.cni, docs.permis)
                   const agentId = req.agent_id || req.prospect?.agent_id
+                  const cni = conversionCni(req)
+                  const quoteTotal = req.prospect?.quote_total
                   return (
                     <div
                       key={req.id}
@@ -465,30 +782,31 @@ export default function ProspectsPage() {
                         <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
                           Demande #{req.id.substring(0, 8).toUpperCase()}
                         </span>
-                        <h4 className="font-bold text-sm text-gray-900 mt-1">
+                        <h4 className="font-bold text-sm text-gray-900">
                           {conversionDisplayName(req)}
                         </h4>
                         <span className="text-xs text-gray-500 block">
-                          Téléphone: {conversionPhone(req)} | Email: {conversionEmail(req)}
+                          Tél. {conversionPhone(req)}
+                          {cni ? ` | CNI ${cni}` : ''}
                         </span>
-                        <span className="text-xs text-slate-700 font-semibold block">
-                          Agent prospecteur: {resolveAgentLabel(agentId)}
-                        </span>
-                        <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-2 py-1 inline-block">
-                          La commission sera créditée à cet agent (prospecteur), pas à l&apos;admin.
-                        </span>
-                        <div className="flex flex-wrap items-center gap-3 pt-1">
-                          <DocLink label="CNI" url={docs.cni} />
-                          <DocLink label="Permis" url={docs.permis} />
-                        </div>
-                        {!docsOk && (
-                          <span className="text-[11px] text-red-600 font-medium block">
-                            Documents d&apos;identité incomplets — approbation désactivée.
+                        {quoteTotal != null && (
+                          <span className="text-xs text-emerald-700 font-semibold block">
+                            Devis : {formatFcfa(quoteTotal)}
                           </span>
                         )}
-                        <span className="text-xs text-blue-600 font-semibold block mt-1">
-                          Statut Demande: {req.status || 'EN_ATTENTE'}
+                        <span className="text-xs text-slate-700 font-semibold block">
+                          Agent : {resolveAgentLabel(agentId)}
                         </span>
+                        {req.payment_mode === 'MANUAL_PAYMENT' && (
+                          <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-2 py-1 inline-block">
+                            Paiement manuel — ref. attendue : {req.payment_reference || '—'}
+                            {req.payment_amount != null && ` (${formatFcfa(req.payment_amount)})`}
+                          </span>
+                        )}
+                        <QuoteBreakdownView
+                          breakdown={req.prospect?.quote_breakdown}
+                          total={quoteTotal}
+                        />
                       </div>
 
                       {rejectingId === req.id ? (
@@ -510,7 +828,7 @@ export default function ProspectsPage() {
                             disabled={rejectMutation.isPending}
                             isLoading={rejectMutation.isPending}
                           >
-                            Valider Rejet
+                            Valider rejet
                           </Button>
                           <Button
                             type="button"
@@ -525,16 +843,14 @@ export default function ProspectsPage() {
                         <RoleGuard permission="agency:mutate" fallback={null}>
                           <div className="flex gap-2 shrink-0">
                             <Button
-                              onClick={() => approveMutation.mutate(req.id)}
-                              disabled={approveMutation.isPending || !docsOk}
-                              isLoading={approveMutation.isPending}
+                              onClick={() => {
+                                setApprovingRequest(req)
+                                setApprovalCode('')
+                                setApprovalPaymentRef('')
+                              }}
+                              disabled={approveMutation.isPending}
                               variant="success"
                               size="sm"
-                              title={
-                                !docsOk
-                                  ? 'CNI et permis requis'
-                                  : 'Approuver la conversion'
-                              }
                             >
                               <Check className="h-4 w-4 mr-1.5" />
                               Approuver
@@ -560,25 +876,84 @@ export default function ProspectsPage() {
         )}
       </div>
 
+      {/* Modal marquer intéressé */}
+      {interestedProspect && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-lg bg-white border border-gray-100 shadow-2xl rounded-2xl max-h-[90vh] overflow-y-auto">
+            <CardContent className="pt-6 space-y-4">
+              <div className="pb-2 border-b border-gray-50">
+                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
+                  Marquer intéressé — {interestedProspect.full_name}
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  CNI + paramètres tarifaires CIMA. Le devis se calcule automatiquement.
+                </p>
+              </div>
+              <form onSubmit={handleMarkInterestedSubmit} className="space-y-4">
+                <TariffFields
+                  form={tariffForm}
+                  setForm={setTariffForm}
+                  categories={categories}
+                  zones={zones}
+                  durations={durations}
+                />
+                {canComputeQuote(tariffForm) && !liveQuote && (
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Calcul du devis…
+                  </div>
+                )}
+                <QuoteBreakdownView breakdown={liveQuote?.breakdown} total={liveQuote?.total} />
+                <div className="flex gap-2 justify-end pt-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      setInterestedProspect(null)
+                      setTariffForm(emptyTariffForm())
+                      setLiveQuote(null)
+                    }}
+                  >
+                    Annuler
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    disabled={markInterestedMutation.isPending || !liveQuote}
+                    isLoading={markInterestedMutation.isPending}
+                  >
+                    Enregistrer INTERESSE
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Modal conversion directe */}
       {convertingProspect && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <Card className="w-full max-w-lg bg-white border border-gray-100 shadow-2xl rounded-2xl max-h-[90vh] overflow-y-auto">
             <CardContent className="pt-6 space-y-4">
               <div className="pb-2 border-b border-gray-50">
                 <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
-                  Valider / convertir le prospect
+                  Convertir le prospect
                 </h3>
                 <p className="text-xs text-slate-500 mt-1">
-                  Agent prospecteur:{' '}
-                  <strong>{resolveAgentLabel(convertingProspect.agent_id)}</strong>
-                  {' — '}la commission ira à cet agent.
+                  Agent : <strong>{resolveAgentLabel(convertingProspect.agent_id)}</strong>
                 </p>
+                {convertingProspect.quote_total != null && (
+                  <p className="text-xs text-emerald-700 font-semibold mt-1">
+                    Devis enregistré : {formatFcfa(convertingProspect.quote_total)}
+                  </p>
+                )}
               </div>
 
               <form onSubmit={handleConvertSubmit} className="space-y-3">
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                    Nom complet
+                    Nom complet *
                   </label>
                   <Input
                     value={convertForm.full_name}
@@ -591,7 +966,7 @@ export default function ProspectsPage() {
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                    Téléphone
+                    Téléphone *
                   </label>
                   <Input
                     value={convertForm.phone}
@@ -602,43 +977,35 @@ export default function ProspectsPage() {
                     required
                   />
                 </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                      URL photo CNI
-                    </label>
-                    <Input
-                      value={convertForm.cni_photo_url}
-                      onChange={(e) =>
-                        setConvertForm({ ...convertForm, cni_photo_url: e.target.value })
-                      }
-                      placeholder="https://…"
-                      className="h-10 text-xs border-gray-200"
-                    />
-                    {convertForm.cni_photo_url && (
-                      <DocLink label="Aperçu CNI" url={convertForm.cni_photo_url} />
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                      URL photo permis
-                    </label>
-                    <Input
-                      value={convertForm.permis_photo_url}
-                      onChange={(e) =>
-                        setConvertForm({
-                          ...convertForm,
-                          permis_photo_url: e.target.value,
-                        })
-                      }
-                      placeholder="https://…"
-                      className="h-10 text-xs border-gray-200"
-                    />
-                    {convertForm.permis_photo_url && (
-                      <DocLink label="Aperçu permis" url={convertForm.permis_photo_url} />
-                    )}
-                  </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                    N° CNI *
+                  </label>
+                  <Input
+                    value={convertForm.cni_number}
+                    onChange={(e) =>
+                      setConvertForm({ ...convertForm, cni_number: e.target.value })
+                    }
+                    className="h-10 text-xs border-gray-200 font-mono"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                    Code validation admin (6 chiffres) *
+                  </label>
+                  <Input
+                    value={convertForm.validation_code}
+                    onChange={(e) =>
+                      setConvertForm({
+                        ...convertForm,
+                        validation_code: e.target.value.replace(/\D/g, '').slice(0, 6),
+                      })
+                    }
+                    maxLength={6}
+                    className="h-10 text-xs border-gray-200 font-mono tracking-widest"
+                    required
+                  />
                 </div>
 
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pt-1">
@@ -694,16 +1061,82 @@ export default function ProspectsPage() {
                   <Button
                     type="submit"
                     variant="primary"
-                    disabled={
-                      convertMutation.isPending ||
-                      !hasIdentityDocs(
-                        convertForm.cni_photo_url,
-                        convertForm.permis_photo_url,
-                      )
-                    }
+                    disabled={convertMutation.isPending}
                     isLoading={convertMutation.isPending}
                   >
                     Convertir
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Modal approbation conversion */}
+      {approvingRequest && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-md bg-white border border-gray-100 shadow-2xl rounded-2xl">
+            <CardContent className="pt-6 space-y-4">
+              <div className="pb-2 border-b border-gray-50">
+                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
+                  Approuver la conversion
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  {conversionDisplayName(approvingRequest)}
+                </p>
+              </div>
+              <form onSubmit={handleApproveSubmit} className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                    Code validation (6 chiffres) *
+                  </label>
+                  <Input
+                    value={approvalCode}
+                    onChange={(e) =>
+                      setApprovalCode(e.target.value.replace(/\D/g, '').slice(0, 6))
+                    }
+                    maxLength={6}
+                    className="h-10 text-xs font-mono tracking-widest"
+                    required
+                  />
+                </div>
+                {approvingRequest.payment_mode === 'MANUAL_PAYMENT' && (
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                      Référence paiement reçue *
+                    </label>
+                    <Input
+                      value={approvalPaymentRef}
+                      onChange={(e) => setApprovalPaymentRef(e.target.value)}
+                      placeholder={approvingRequest.payment_reference || ''}
+                      className="h-10 text-xs"
+                      required
+                    />
+                    <p className="text-[10px] text-amber-600">
+                      Doit correspondre à la référence déclarée par l&apos;agent.
+                    </p>
+                  </div>
+                )}
+                <div className="flex gap-2 justify-end pt-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      setApprovingRequest(null)
+                      setApprovalCode('')
+                      setApprovalPaymentRef('')
+                    }}
+                  >
+                    Annuler
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="success"
+                    disabled={approveMutation.isPending}
+                    isLoading={approveMutation.isPending}
+                  >
+                    Confirmer
                   </Button>
                 </div>
               </form>
