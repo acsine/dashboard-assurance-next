@@ -9,6 +9,9 @@ import {
 } from '@/lib/auth/session'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+/** Limite Hobby = 60s ; monter à 300 sur Pro si besoin. */
+export const maxDuration = 60
 
 export async function GET() {
   const cookieStore = await cookies()
@@ -21,10 +24,16 @@ export async function GET() {
       session,
       { method: 'GET', headers: { Accept: 'text/event-stream' } },
     )
+
+    if (!backend.ok || !backend.body) {
+      const detail = backend.status === 401 ? 'Non authentifié' : 'Flux indisponible'
+      return NextResponse.json({ detail }, { status: backend.status || 502 })
+    }
+
     const response = new NextResponse(backend.body, {
       status: backend.status,
       headers: {
-        'Content-Type': backend.headers.get('content-type') ?? 'text/event-stream',
+        'Content-Type': 'text/event-stream; charset=utf-8',
         'Cache-Control': 'no-cache, no-transform',
         Connection: 'keep-alive',
         'X-Accel-Buffering': 'no',

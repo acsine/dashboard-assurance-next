@@ -227,6 +227,18 @@ export interface SupportTicket {
   created_at: string
 }
 
+export interface SupportContact {
+  id: string
+  agency_id?: string
+  label: string
+  description?: string | null
+  phone: string
+  is_active: boolean
+  sort_order?: number
+  created_at?: string
+  updated_at?: string
+}
+
 export interface ChatMessage {
   id: string
   ticket_id?: string
@@ -253,8 +265,47 @@ export const supportApi = {
       `/support/tickets/${ticketId}/messages/read`,
       { method: 'POST' },
     ),
-  createTicket: (data: any) => mobiRequest<unknown>('/support/tickets', { method: 'POST', body: JSON.stringify(data) }),
-  submitVoiceReport: (data: any) => mobiRequest<unknown>('/support/voice-reports', { method: 'POST', body: JSON.stringify(data) }),
+  createTicket: (data: {
+    subject: string
+    description?: string
+    channel?: 'LIVE_CHAT' | 'APPEL' | 'VOCAL'
+  }) =>
+    mobiRequest<SupportTicket>('/support/tickets', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  submitVoiceReport: (data: any) =>
+    mobiRequest<unknown>('/support/voice-reports', { method: 'POST', body: JSON.stringify(data) }),
+
+  listActiveContacts: () => mobiRequest<SupportContact[]>('/support/contacts'),
+  listAdminContacts: () => mobiRequest<SupportContact[]>('/admin/support-contacts'),
+  createContact: (data: {
+    label: string
+    phone: string
+    description?: string
+    is_active?: boolean
+    sort_order?: number
+  }) =>
+    mobiRequest<SupportContact>('/admin/support-contacts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateContact: (
+    id: string,
+    data: Partial<{
+      label: string
+      phone: string
+      description: string | null
+      is_active: boolean
+      sort_order: number
+    }>,
+  ) =>
+    mobiRequest<SupportContact>(`/admin/support-contacts/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  deleteContact: (id: string) =>
+    mobiRequest<unknown>(`/admin/support-contacts/${id}`, { method: 'DELETE' }),
 }
 
 // ─── Clients ─────────────────────────────────────────────────────────────────

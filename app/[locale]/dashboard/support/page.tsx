@@ -9,10 +9,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
-import { MessageSquare, Send, Play, Pause, Volume2, Clock, CheckCircle } from 'lucide-react'
+import { MessageSquare, Send, Play, Pause, Volume2, Clock, CheckCircle, Phone } from 'lucide-react'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { useSupportNotificationsStore } from '@/lib/stores/support-notifications-store'
-import { can } from '@/lib/auth/roles'
+import { can, ROLES } from '@/lib/auth/roles'
+import { SupportContactsPanel } from '@/components/dashboard/SupportContactsPanel'
 
 function formatAgentReference(agentId?: string, agentEmail?: string): string {
   if (agentEmail) return agentEmail
@@ -27,10 +28,12 @@ export default function SupportPage() {
   const currentRole = useAuthStore((s) => s.user?.role)
   const canReply =
     can(currentRole, 'agency:mutate') || can(currentRole, 'agency:prepare')
+  const canManageContacts = currentRole === ROLES.ADMIN
   const markTicketRead = useSupportNotificationsStore((s) => s.markTicketRead)
   const pushInboundFromMessage = useSupportNotificationsStore(
     (s) => s.pushInboundFromMessage,
   )
+  const [leftTab, setLeftTab] = useState<'tickets' | 'contacts'>('tickets')
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null)
   const [messageText, setMessageText] = useState('')
   const [playingAudioUrl, setPlayingAudioUrl] = useState<string | null>(null)
@@ -171,55 +174,90 @@ export default function SupportPage() {
       />
 
       <div className="flex-1 flex overflow-hidden p-6 gap-6">
-        <Card className="w-80 border-slate-200 shadow-sm flex flex-col bg-white">
-          <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-              Tickets Actifs
-            </h3>
-          </div>
-          <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
-            {ticketsLoading ? (
-              <div className="p-8 text-center text-xs text-slate-400">Chargement...</div>
-            ) : tickets.length === 0 ? (
-              <div className="p-8 text-center text-xs text-slate-400">Aucun ticket de support</div>
-            ) : (
-              tickets.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => setSelectedTicketId(t.id)}
-                  className={`w-full text-left p-4 hover:bg-slate-50 transition-colors flex flex-col gap-1 border-0 cursor-pointer ${
-                    selectedTicketId === t.id ? 'bg-blue-50/50 border-r-4 border-blue-600' : ''
-                  }`}
-                >
-                  <div className="flex justify-between items-start w-full">
-                    <span className="font-semibold text-xs text-slate-900 truncate w-3/4">
-                      {t.subject}
-                    </span>
-                    <span
-                      className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
-                        t.status === 'OUVERT'
-                          ? 'bg-red-50 text-red-600'
-                          : 'bg-green-50 text-green-600'
+        <Card className="w-80 border-slate-200 shadow-sm flex flex-col bg-white overflow-hidden">
+          {canManageContacts && (
+            <div className="flex border-b border-slate-100">
+              <button
+                type="button"
+                onClick={() => setLeftTab('tickets')}
+                className={`flex-1 py-2.5 text-[11px] font-bold uppercase tracking-wider border-0 cursor-pointer ${
+                  leftTab === 'tickets'
+                    ? 'bg-white text-blue-700 border-b-2 border-blue-600'
+                    : 'bg-slate-50 text-slate-500'
+                }`}
+              >
+                Tickets
+              </button>
+              <button
+                type="button"
+                onClick={() => setLeftTab('contacts')}
+                className={`flex-1 py-2.5 text-[11px] font-bold uppercase tracking-wider border-0 cursor-pointer ${
+                  leftTab === 'contacts'
+                    ? 'bg-white text-blue-700 border-b-2 border-blue-600'
+                    : 'bg-slate-50 text-slate-500'
+                }`}
+              >
+                <span className="inline-flex items-center justify-center gap-1">
+                  <Phone className="h-3 w-3" /> Numéros
+                </span>
+              </button>
+            </div>
+          )}
+
+          {leftTab === 'contacts' && canManageContacts ? (
+            <SupportContactsPanel />
+          ) : (
+            <>
+              <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                  Tickets Actifs
+                </h3>
+              </div>
+              <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
+                {ticketsLoading ? (
+                  <div className="p-8 text-center text-xs text-slate-400">Chargement...</div>
+                ) : tickets.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-slate-400">Aucun ticket de support</div>
+                ) : (
+                  tickets.map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => setSelectedTicketId(t.id)}
+                      className={`w-full text-left p-4 hover:bg-slate-50 transition-colors flex flex-col gap-1 border-0 cursor-pointer ${
+                        selectedTicketId === t.id ? 'bg-blue-50/50 border-r-4 border-blue-600' : ''
                       }`}
                     >
-                      {t.status}
-                    </span>
-                  </div>
-                  {t.description && (
-                    <p className="text-[11px] text-slate-500 truncate w-full">{t.description}</p>
-                  )}
-                  <div className="flex items-center gap-1.5 mt-2 text-[10px] text-slate-400">
-                    <Clock className="h-3 w-3" />
-                    <span>{new Date(t.created_at).toLocaleDateString()}</span>
-                    <span>•</span>
-                    <span className="font-mono">
-                      {formatAgentReference(t.agent_id, t.agent_email)}
-                    </span>
-                  </div>
-                </button>
-              ))
-            )}
-          </div>
+                      <div className="flex justify-between items-start w-full">
+                        <span className="font-semibold text-xs text-slate-900 truncate w-3/4">
+                          {t.subject}
+                        </span>
+                        <span
+                          className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
+                            t.status === 'OUVERT'
+                              ? 'bg-red-50 text-red-600'
+                              : 'bg-green-50 text-green-600'
+                          }`}
+                        >
+                          {t.status}
+                        </span>
+                      </div>
+                      {t.description && (
+                        <p className="text-[11px] text-slate-500 truncate w-full">{t.description}</p>
+                      )}
+                      <div className="flex items-center gap-1.5 mt-2 text-[10px] text-slate-400">
+                        <Clock className="h-3 w-3" />
+                        <span>{new Date(t.created_at).toLocaleDateString()}</span>
+                        <span>•</span>
+                        <span className="font-mono">
+                          {formatAgentReference(t.agent_id, t.agent_email)}
+                        </span>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </>
+          )}
         </Card>
 
         <Card className="flex-1 border-slate-200 shadow-sm flex flex-col bg-white overflow-hidden">
