@@ -78,8 +78,15 @@ export default function WalletPage() {
 
   // Update Agent Objective Mutation
   const updateObjectiveMutation = useMutation({
-    mutationFn: ({ agentId, objective_prospects, objective_clients }: { agentId: string; objective_prospects?: number; objective_clients?: number }) =>
-      walletApi.setAgentObjective(agentId, { objective_prospects, objective_clients }),
+    mutationFn: ({
+      agentId,
+      objective_prospects,
+      objective_clients,
+    }: {
+      agentId: string
+      objective_prospects: number
+      objective_clients: number
+    }) => walletApi.setAgentObjective(agentId, { objective_prospects, objective_clients }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agent-wallets'] })
       toast.success('Objectifs de l\'agent mis à jour avec succès')
@@ -138,18 +145,24 @@ export default function WalletPage() {
 
   const handleObjectiveSubmit = (e: React.FormEvent, agentId: string) => {
     e.preventDefault()
-    const prospects = newObjectiveProspects ? parseFloat(newObjectiveProspects) : undefined
-    const clients = newObjectiveClients ? parseFloat(newObjectiveClients) : undefined
-    
-    if ((prospects && isNaN(prospects)) || (clients && isNaN(clients))) {
-      toast.error('Veuillez saisir des nombres valides pour les objectifs')
+    const prospectsRaw = newObjectiveProspects.trim()
+    const clientsRaw = newObjectiveClients.trim()
+    const prospects = prospectsRaw === '' ? NaN : Number(prospectsRaw)
+    const clients = clientsRaw === '' ? NaN : Number(clientsRaw)
+
+    if (!prospectsRaw || !clientsRaw || Number.isNaN(prospects) || Number.isNaN(clients)) {
+      toast.error('Saisissez les deux objectifs (prospects et clients) en nombres valides')
       return
     }
-    if (!prospects && !clients) {
-      toast.error('Veuillez saisir au moins un objectif')
+    if (prospects < 0 || clients < 0) {
+      toast.error('Les objectifs doivent être positifs ou nuls')
       return
     }
-    updateObjectiveMutation.mutate({ agentId, objective_prospects: prospects, objective_clients: clients })
+    updateObjectiveMutation.mutate({
+      agentId,
+      objective_prospects: Math.floor(prospects),
+      objective_clients: Math.floor(clients),
+    })
   }
 
   const startEditing = (agentId: string, agent: AgentWallet) => {
@@ -621,7 +634,7 @@ export default function WalletPage() {
                           <td className="py-5 text-right">
                             <RoleGuard permission="agency:mutate" fallback={null}>
                               <Button
-                                onClick={() => startEditing(w.agent_id, w.monthly_objective)}
+                                onClick={() => startEditing(w.agent_id, w)}
                                 variant="outline"
                                 size="sm"
                                 className="text-xs border-gray-200 hover:bg-gray-50 hover:text-slate-800"
