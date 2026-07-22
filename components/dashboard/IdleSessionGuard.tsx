@@ -2,7 +2,7 @@
 
 import { useIdleTimeout } from '@/hooks/useIdleTimeout'
 import { authApi } from '@/lib/api/mobi-assur'
-import { useAuthStore } from '@/lib/auth/store'
+import { useAuthStore } from '@/lib/stores/auth-store'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { toast } from 'sonner'
