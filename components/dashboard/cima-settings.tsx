@@ -4,10 +4,12 @@ import dynamic from 'next/dynamic'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import {
+  insurersApi,
   tariffApi,
   type CirculationZone,
   type ContractDuration,
   type FeeSchedule,
+  type Insurer,
   type RcRate,
   type VehicleCategory,
 } from '@/lib/api/mobi-assur'
@@ -848,24 +850,41 @@ export function RcTariffPanel() {
 
 export function FeeSchedulePanel() {
   const qc = useQueryClient()
+  const [selectedInsurerId, setSelectedInsurerId] = useState('')
   const [form, setForm] = useState<Partial<FeeSchedule>>({})
 
+  const { data: insurers = [] } = useQuery({
+    queryKey: ['insurers'],
+    queryFn: () => insurersApi.list(),
+  })
+
+  const activeInsurers = (insurers as Insurer[]).filter((i) => i.is_active)
+
   const { data: fees, isLoading } = useQuery({
-    queryKey: ['fee-schedule'],
-    queryFn: () => tariffApi.getFeeSchedule(),
+    queryKey: ['fee-schedule', selectedInsurerId],
+    queryFn: () => tariffApi.getFeeSchedule(selectedInsurerId) as Promise<FeeSchedule>,
+    enabled: !!selectedInsurerId,
   })
 
   const saveMutation = useMutation({
-    mutationFn: () => tariffApi.setFeeSchedule(form),
+    mutationFn: () => {
+      if (!selectedInsurerId) throw new Error('Sélectionnez un assureur')
+      return tariffApi.setFeeSchedule({
+        ...fees,
+        ...form,
+        insurer_id: selectedInsurerId,
+      })
+    },
     onSuccess: (data) => {
-      setForm(data)
-      qc.invalidateQueries({ queryKey: ['fee-schedule'] })
+      setForm({})
+      qc.invalidateQueries({ queryKey: ['fee-schedule', selectedInsurerId] })
       toast.success('Grille de frais enregistrée')
+      void data
     },
     onError: (e: Error) => toast.error(e.message),
   })
 
-  const current = { ...fees, ...form }
+  const current = { ...(fees || {}), ...form }
 
   const setNum = (key: keyof FeeSchedule, value: string, pct = false) => {
     const n = Number(value)
@@ -875,67 +894,95 @@ export function FeeSchedulePanel() {
     }))
   }
 
-  if (isLoading && !fees) {
-    return <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
-  }
-
   const fields: Array<{ key: keyof FeeSchedule; label: string; pct?: boolean }> = [
-    { key: 'dr_amount', label: 'DR (FCFA)' },
+    { key: 'dr_rate', label: 'Taux DR (%)', pct: true },
+    { key: 'dr_amount', label: 'DR fixe (FCFA) — si taux = 0' },
     { key: 'ipt_amount', label: 'IPT (FCFA)' },
     { key: 'acc_amount', label: 'Accessoires (FCFA)' },
     { key: 'fc_amount', label: 'FC / ASAC (FCFA)' },
     { key: 'cr_amount', label: 'Carte rose (FCFA)' },
-    { key: 'vignette_amount', label: 'Vignette (FCFA)' },
-    { key: 'tax_rate_assurance', label: 'Taxe assurance (%)', pct: true },
     { key: 'tva_rate', label: 'TVA (%)', pct: true },
     { key: 'remise_max_pct', label: 'Remise max (%)' },
+    { key: 'coeff_2m', label: 'Coeff. 2 mois (%)', pct: true },
+    { key: 'coeff_4m', label: 'Coeff. 4 mois (%)', pct: true },
+    { key: 'coeff_6m', label: 'Coeff. 6 mois (%)', pct: true },
+    { key: 'coeff_12m', label: 'Coeff. 12 mois (%)', pct: true },
   ]
 
   return (
     <Card className="border-gray-100 shadow-sm">
       <CardHeader className="pb-4 border-b border-gray-50">
         <CardTitle className="text-sm font-bold uppercase tracking-wider text-gray-400">
-          Grille des frais légaux
+          Grille des frais par assureur
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-6 space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {fields.map(({ key, label, pct }) => {
-            const raw = current[key]
-            const display =
-              raw === undefined || raw === null
-                ? ''
-                : pct
-                  ? String(Number(raw) * 100)
-                  : String(raw)
-            return (
-              <div key={key} className="space-y-1">
-                <FieldLabel>{label}</FieldLabel>
-                <Input
-                  type="number"
-                  step={pct ? '0.01' : '1'}
-                  value={display}
-                  onChange={(e) => setNum(key, e.target.value, pct)}
-                  className="h-10 text-xs"
-                />
-              </div>
-            )
-          })}
+        <div className="space-y-1 max-w-sm">
+          <FieldLabel>Assureur</FieldLabel>
+          <select
+            className="w-full h-10 text-xs border border-gray-200 rounded-md px-2"
+            value={selectedInsurerId}
+            onChange={(e) => {
+              setSelectedInsurerId(e.target.value)
+              setForm({})
+            }}
+          >
+            <option value="">— Sélectionner —</option>
+            {activeInsurers.map((ins) => (
+              <option key={ins.id} value={ins.id}>
+                {ins.name} ({ins.code})
+              </option>
+            ))}
+          </select>
         </div>
-        <Button
-          type="button"
-          variant="primary"
-          onClick={() => saveMutation.mutate()}
-          disabled={saveMutation.isPending}
-          className="text-white"
-        >
-          {saveMutation.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin mr-1" />
-          ) : (
-            <Save className="h-4 w-4 mr-1" />
-          )}
-          Enregistrer les frais
-        </Button>
+
+        {!selectedInsurerId ? (
+          <p className="text-xs text-gray-400">
+            Créez et sélectionnez un assureur pour éditer ses frais.
+          </p>
+        ) : isLoading && !fees ? (
+          <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {fields.map(({ key, label, pct }) => {
+                const raw = current[key]
+                const display =
+                  raw === undefined || raw === null
+                    ? ''
+                    : pct
+                      ? String(Number(raw) * 100)
+                      : String(raw)
+                return (
+                  <div key={key} className="space-y-1">
+                    <FieldLabel>{label}</FieldLabel>
+                    <Input
+                      type="number"
+                      step={pct ? '0.01' : '1'}
+                      value={display}
+                      onChange={(e) => setNum(key, e.target.value, pct)}
+                      className="h-10 text-xs"
+                    />
+                  </div>
+                )
+              })}
+            </div>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => saveMutation.mutate()}
+              disabled={saveMutation.isPending}
+              className="text-white"
+            >
+              {saveMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : (
+                <Save className="h-4 w-4 mr-1" />
+              )}
+              Enregistrer les frais
+            </Button>
+          </>
+        )}
       </CardContent>
     </Card>
   )
@@ -944,22 +991,25 @@ export function FeeSchedulePanel() {
 export function ValidationCodePanel() {
   const user = useAuthStore((s) => s.user)
   const [customCode, setCustomCode] = useState('')
+  const [password, setPassword] = useState('')
   const [generatedCode, setGeneratedCode] = useState<string | null>(null)
   const [verifyCode, setVerifyCode] = useState('')
 
   const setMutation = useMutation({
-    mutationFn: () => tariffApi.setValidationCode(user!.id, customCode),
+    mutationFn: () => tariffApi.setValidationCode(user!.id, customCode, password),
     onSuccess: () => {
       toast.success('Code de validation enregistré')
       setCustomCode('')
+      setPassword('')
     },
     onError: (e: Error) => toast.error(e.message),
   })
 
   const generateMutation = useMutation({
-    mutationFn: () => tariffApi.generateValidationCode(user!.id),
+    mutationFn: () => tariffApi.generateValidationCode(user!.id, password),
     onSuccess: (data) => {
       setGeneratedCode(data.code)
+      setPassword('')
       toast.success('Code généré — notez-le maintenant')
     },
     onError: (e: Error) => toast.error(e.message),
@@ -992,12 +1042,23 @@ export function ValidationCodePanel() {
       <CardContent className="pt-6 space-y-6">
         <p className="text-xs text-slate-600">
           Ce code à 6 chiffres est requis pour approuver les conversions prospects.
-          Utilisateur connecté : <strong>{user.full_name || user.email || user.id.slice(0, 8)}</strong>
+          La génération / modification exige votre <strong>mot de passe</strong>.
         </p>
+
+        <div className="space-y-1 max-w-sm">
+          <FieldLabel>Mot de passe (obligatoire)</FieldLabel>
+          <Input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Votre mot de passe"
+            className="h-10 text-xs"
+          />
+        </div>
 
         <div className="space-y-2">
           <FieldLabel>Définir un code personnalisé</FieldLabel>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Input
               value={customCode}
               onChange={(e) => setCustomCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
@@ -1009,6 +1070,10 @@ export function ValidationCodePanel() {
               type="button"
               variant="outline"
               onClick={() => {
+                if (!password) {
+                  toast.error('Saisissez votre mot de passe')
+                  return
+                }
                 if (customCode.length !== 6) {
                   toast.error('Le code doit contenir 6 chiffres')
                   return
@@ -1027,7 +1092,13 @@ export function ValidationCodePanel() {
           <Button
             type="button"
             variant="outline"
-            onClick={() => generateMutation.mutate()}
+            onClick={() => {
+              if (!password) {
+                toast.error('Saisissez votre mot de passe')
+                return
+              }
+              generateMutation.mutate()
+            }}
             disabled={generateMutation.isPending}
           >
             {generateMutation.isPending ? (
@@ -1057,14 +1128,8 @@ export function ValidationCodePanel() {
             <Button
               type="button"
               variant="outline"
-              onClick={() => {
-                if (verifyCode.length !== 6) {
-                  toast.error('Code à 6 chiffres requis')
-                  return
-                }
-                verifyMutation.mutate()
-              }}
-              disabled={verifyMutation.isPending}
+              onClick={() => verifyMutation.mutate()}
+              disabled={verifyMutation.isPending || verifyCode.length !== 6}
             >
               Vérifier
             </Button>

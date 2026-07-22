@@ -3,6 +3,7 @@
 import { useAuth } from '@/lib/hooks/use-auth'
 import Sidebar from '@/components/dashboard/Sidebar'
 import { SupportSseListener } from '@/components/dashboard/SupportSseListener'
+import { IdleSessionGuard } from '@/components/dashboard/IdleSessionGuard'
 import { Loader2 } from 'lucide-react'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -24,6 +25,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <SupportSseListener />
+        <IdleSessionGuard />
         <main className="flex-1 flex flex-col overflow-y-auto">{children}</main>
       </div>
     </div>

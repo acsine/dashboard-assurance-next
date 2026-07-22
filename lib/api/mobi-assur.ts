@@ -525,6 +525,11 @@ export const contractsApi = {
     previewFileWithAuth(`/contracts/${contractId}/documents/${docId}/download`),
   estimateContract: (data: any) =>
     mobiRequest<unknown>('/contracts/estimate', { method: 'POST', body: JSON.stringify(data) }),
+  overrideInsurer: (contractId: string, insurerId: string) =>
+    mobiRequest<Contract>(`/contracts/${contractId}/insurer`, {
+      method: 'PATCH',
+      body: JSON.stringify({ insurer_id: insurerId }),
+    }),
 }
 
 // ─── Prospects ───────────────────────────────────────────────────────────────
@@ -705,6 +710,10 @@ export interface AgentWallet {
   monthly_objective: number
   monthly_progress_pct: number
   current_month_commissions: number
+  objective_prospects?: number
+  objective_clients?: number
+  prospects_this_month?: number
+  clients_this_month?: number
 }
 
 export const walletApi = {
@@ -732,10 +741,13 @@ export const walletApi = {
   getMe: () => mobiRequest<unknown>('/wallet/me'),
   getCommissions: () => mobiRequest<unknown>('/wallet/commissions'),
   listAgentWallets: () => mobiRequest<AgentWallet[]>('/wallet/agents'),
-  setAgentObjective: (agentId: string, objective: number) =>
+  setAgentObjective: (
+    agentId: string,
+    data: { objective_prospects: number; objective_clients: number },
+  ) =>
     mobiRequest<unknown>(`/wallet/agents/${agentId}/objective`, {
       method: 'PUT',
-      body: JSON.stringify({ objective }),
+      body: JSON.stringify(data),
     }),
 }
 
@@ -763,6 +775,46 @@ export interface PricingSettings {
   bareme_config?: BaremeConfig
   guide_content?: string
   is_default?: boolean
+}
+
+export const insurersApi = {
+  list: () => mobiRequest<Insurer[]>('/settings/insurers'),
+  create: (data: Omit<Insurer, 'id' | 'agency_id' | 'created_at' | 'updated_at'>) =>
+    mobiRequest<Insurer>('/settings/insurers', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  update: (id: string, data: Partial<Insurer>) =>
+    mobiRequest<Insurer>(`/settings/insurers/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  getPolicy: () => mobiRequest<InsurerPolicy>('/settings/insurer-policy'),
+  setPolicy: (data: InsurerPolicy) =>
+    mobiRequest<InsurerPolicy>('/settings/insurer-policy', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  importTariff: async (insurerId: string, file: File): Promise<unknown> => {
+    validateUploadFile(file)
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await fetch(`${BFF_BASE}/settings/insurers/${insurerId}/tariff/import`, {
+      method: 'POST',
+      body: formData,
+      credentials: 'include',
+    })
+    if (!res.ok) {
+      let detail = ''
+      try {
+        const err = await res.json()
+        detail = err.detail || err.message || JSON.stringify(err)
+      } catch {}
+      throw new MobiAssurApiError(detail || res.statusText, res.status, detail)
+    }
+    const json = await res.json()
+    return json?.data || json
+  },
 }
 
 export const settingsApi = {
@@ -827,6 +879,7 @@ export interface ContractDuration {
 export interface RcRate {
   id: string
   agency_id?: string
+  insurer_id?: string | null
   category_id: string
   zone_id?: string | null
   fuel: string
@@ -841,7 +894,9 @@ export interface RcRate {
 
 export interface FeeSchedule {
   agency_id?: string
+  insurer_id?: string
   dr_amount: number
+  dr_rate?: number
   ipt_amount: number
   acc_amount: number
   fc_amount: number
@@ -850,8 +905,28 @@ export interface FeeSchedule {
   tax_rate_assurance: number
   tva_rate: number
   remise_max_pct: number
+  coeff_2m?: number
+  coeff_4m?: number
+  coeff_6m?: number
+  coeff_12m?: number
   updated_at?: string | null
   updated_by?: string | null
+}
+
+export interface Insurer {
+  id: string
+  agency_id?: string
+  code: string
+  name: string
+  logo_url?: string
+  is_active: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+export interface InsurerPolicy {
+  mode: 'AUTO' | 'MANUAL'
+  selected_insurer_id: string | null
 }
 
 export interface TariffBootstrap {
@@ -859,7 +934,11 @@ export interface TariffBootstrap {
   zones: CirculationZone[]
   durations: ContractDuration[]
   rc_rates: RcRate[]
-  fees: FeeSchedule
+  insurers?: Insurer[]
+  policy?: InsurerPolicy
+  fee_schedules?: FeeSchedule[]
+  /** @deprecated use fee_schedules */
+  fees?: FeeSchedule
 }
 
 export interface GeoRegion {
@@ -879,12 +958,21 @@ export interface QuoteComputeRequest {
   remise_pct?: number
   prospect_id?: string
   cni_number?: string
+  insurer_id?: string
 }
 
 export interface QuoteComputeResult {
   quote_id: string
+  insurer_id?: string
   total: number
   breakdown: QuoteBreakdown
+  comparison?: Array<{
+    insurer_id: string
+    insurer_code?: string
+    insurer_name?: string
+    total: number
+    breakdown?: QuoteBreakdown
+  }>
   inputs?: Record<string, unknown>
 }
 
@@ -948,8 +1036,15 @@ export const tariffApi = {
   deleteTariffLine: (id: string) =>
     mobiRequest<unknown>(`/settings/tariff-lines/${id}`, { method: 'DELETE' }),
 
-  getFeeSchedule: () => mobiRequest<FeeSchedule>('/settings/fee-schedule'),
-  setFeeSchedule: (data: Partial<FeeSchedule>) =>
+  getFeeSchedule: async (insurerId?: string) => {
+    if (!insurerId) {
+      return mobiRequest<FeeSchedule[]>('/settings/fee-schedule')
+    }
+    return mobiRequest<FeeSchedule>(
+      `/settings/fee-schedule?insurer_id=${encodeURIComponent(insurerId)}`,
+    )
+  },
+  setFeeSchedule: (data: Partial<FeeSchedule> & { insurer_id: string }) =>
     mobiRequest<FeeSchedule>('/settings/fee-schedule', {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -961,14 +1056,15 @@ export const tariffApi = {
       body: JSON.stringify(data),
     }),
 
-  setValidationCode: (userId: string, code: string) =>
+  setValidationCode: (userId: string, code: string, password: string) =>
     mobiRequest<unknown>(`/users/${userId}/validation-code`, {
       method: 'POST',
-      body: JSON.stringify({ code }),
+      body: JSON.stringify({ code, password }),
     }),
-  generateValidationCode: (userId: string) =>
+  generateValidationCode: (userId: string, password: string) =>
     mobiRequest<{ code: string }>(`/users/${userId}/validation-code/generate`, {
       method: 'POST',
+      body: JSON.stringify({ password }),
     }),
   verifyValidationCode: (code: string) =>
     mobiRequest<unknown>('/auth/verify-validation-code', {

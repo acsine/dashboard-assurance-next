@@ -8,8 +8,11 @@ import { SetHtmlLocale } from "@/components/SetHtmlLocale";
 import { Providers } from "@/lib/providers";
 
 export const metadata: Metadata = {
-  title: "Sygalin",
-  description: "Application d'entreprise moderne avec Next.js",
+  title: "MOBI-ASSUR",
+  description: "Portail administration Bethel Comprehensive Insurance",
+  icons: {
+    icon: "/bethel-logo.png",
+  },
 };
 
 export default async function LocaleLayout({

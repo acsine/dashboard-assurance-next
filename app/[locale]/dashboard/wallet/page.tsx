@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { walletApi } from '@/lib/api/mobi-assur'
+import { walletApi, type AgentWallet } from '@/lib/api/mobi-assur'
 import Header from '@/components/dashboard/Header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -30,7 +30,8 @@ export default function WalletPage() {
 
   // State controls for objectives
   const [editingAgentId, setEditingAgentId] = useState<string | null>(null)
-  const [newObjective, setNewObjective] = useState('')
+  const [newObjectiveProspects, setNewObjectiveProspects] = useState('')
+  const [newObjectiveClients, setNewObjectiveClients] = useState('')
 
   // Query pending withdrawals
   const { data: withdrawals = [], isLoading: isLoadingWithdrawals } = useQuery({
@@ -77,16 +78,17 @@ export default function WalletPage() {
 
   // Update Agent Objective Mutation
   const updateObjectiveMutation = useMutation({
-    mutationFn: ({ agentId, objective }: { agentId: string; objective: number }) =>
-      walletApi.setAgentObjective(agentId, objective),
+    mutationFn: ({ agentId, objective_prospects, objective_clients }: { agentId: string; objective_prospects?: number; objective_clients?: number }) =>
+      walletApi.setAgentObjective(agentId, { objective_prospects, objective_clients }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agent-wallets'] })
-      toast.success('Objectif de l\'agent mis à jour avec succès')
+      toast.success('Objectifs de l\'agent mis à jour avec succès')
       setEditingAgentId(null)
-      setNewObjective('')
+      setNewObjectiveProspects('')
+      setNewObjectiveClients('')
     },
     onError: (err: any) => {
-      toast.error(err.message || 'Erreur lors de la mise à jour de l\'objectif')
+      toast.error(err.message || 'Erreur lors de la mise à jour des objectifs')
     },
   })
 
@@ -136,17 +138,24 @@ export default function WalletPage() {
 
   const handleObjectiveSubmit = (e: React.FormEvent, agentId: string) => {
     e.preventDefault()
-    const parsed = parseFloat(newObjective)
-    if (isNaN(parsed) || parsed <= 0) {
-      toast.error('Veuillez saisir un montant d\'objectif valide supérieur à 0')
+    const prospects = newObjectiveProspects ? parseFloat(newObjectiveProspects) : undefined
+    const clients = newObjectiveClients ? parseFloat(newObjectiveClients) : undefined
+    
+    if ((prospects && isNaN(prospects)) || (clients && isNaN(clients))) {
+      toast.error('Veuillez saisir des nombres valides pour les objectifs')
       return
     }
-    updateObjectiveMutation.mutate({ agentId, objective: parsed })
+    if (!prospects && !clients) {
+      toast.error('Veuillez saisir au moins un objectif')
+      return
+    }
+    updateObjectiveMutation.mutate({ agentId, objective_prospects: prospects, objective_clients: clients })
   }
 
-  const startEditing = (agentId: string, currentObjective: number) => {
+  const startEditing = (agentId: string, agent: AgentWallet) => {
     setEditingAgentId(agentId)
-    setNewObjective(currentObjective.toString())
+    setNewObjectiveProspects(agent.objective_prospects?.toString() ?? '')
+    setNewObjectiveClients(agent.objective_clients?.toString() ?? '')
   }
 
   const safeWithdrawals = Array.isArray(withdrawals) ? withdrawals : []
@@ -427,6 +436,9 @@ export default function WalletPage() {
                         Objectif minimum
                       </th>
                       <th className="pb-4 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                        Progression (Prospects/Clients)
+                      </th>
+                      <th className="pb-4 text-xs font-bold text-gray-400 uppercase tracking-wider">
                         Niveau d&apos;accomplissement
                       </th>
                       <th className="pb-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">
@@ -502,49 +514,84 @@ export default function WalletPage() {
                             {editingAgentId === w.agent_id ? (
                               <form
                                 onSubmit={(e) => handleObjectiveSubmit(e, w.agent_id)}
-                                className="flex items-center gap-1.5 max-w-[180px]"
+                                className="flex items-center gap-1.5 max-w-xs"
                               >
-                                <Input
-                                  type="number"
-                                  value={newObjective}
-                                  onChange={(e) => setNewObjective(e.target.value)}
-                                  className="h-8 text-xs border-gray-200 py-1 px-2"
-                                  required
-                                  autoFocus
-                                />
-                                <button
-                                  type="submit"
-                                  disabled={updateObjectiveMutation.isPending}
-                                  className="p-1 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors cursor-pointer border-0"
-                                  title="Sauvegarder"
-                                >
-                                  <Check className="h-4 w-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setEditingAgentId(null)}
-                                  className="p-1 rounded bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer border-0"
-                                  title="Annuler"
-                                >
-                                  <X className="h-4 w-4" />
-                                </button>
+                                <div className="flex flex-col gap-1 flex-1">
+                                  <Input
+                                    type="number"
+                                    placeholder="Prospects"
+                                    value={newObjectiveProspects}
+                                    onChange={(e) => setNewObjectiveProspects(e.target.value)}
+                                    className="h-8 text-xs border-gray-200 py-1 px-2"
+                                  />
+                                  <Input
+                                    type="number"
+                                    placeholder="Clients"
+                                    value={newObjectiveClients}
+                                    onChange={(e) => setNewObjectiveClients(e.target.value)}
+                                    className="h-8 text-xs border-gray-200 py-1 px-2"
+                                  />
+                                </div>
+                                <div className="flex gap-1">
+                                  <button
+                                    type="submit"
+                                    disabled={updateObjectiveMutation.isPending}
+                                    className="p-1 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors cursor-pointer border-0"
+                                    title="Sauvegarder"
+                                  >
+                                    <Check className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingAgentId(null)}
+                                    className="p-1 rounded bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer border-0"
+                                    title="Annuler"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </button>
+                                </div>
                               </form>
                             ) : (
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-sm text-slate-600">
-                                  {w.monthly_objective.toLocaleString('fr-FR')} FCFA
-                                </span>
+                              <div className="flex items-center gap-2 flex-col items-start space-y-1">
+                                <div className="text-xs">
+                                  <span className="text-gray-500">Prospects:</span>
+                                  <span className="font-bold text-slate-800 ml-1">
+                                    {w.objective_prospects?.toLocaleString('fr-FR') ?? '—'}
+                                  </span>
+                                </div>
+                                <div className="text-xs">
+                                  <span className="text-gray-500">Clients:</span>
+                                  <span className="font-bold text-slate-800 ml-1">
+                                    {w.objective_clients?.toLocaleString('fr-FR') ?? '—'}
+                                  </span>
+                                </div>
                                 <RoleGuard permission="agency:mutate" fallback={null}>
                                   <button
-                                    onClick={() => startEditing(w.agent_id, w.monthly_objective)}
-                                    className="p-1 rounded text-gray-400 hover:text-blue-600 hover:bg-gray-50 transition-colors cursor-pointer border-0"
-                                    title="Modifier l'objectif"
+                                    onClick={() => startEditing(w.agent_id, w)}
+                                    className="p-1 rounded text-gray-400 hover:text-blue-600 hover:bg-gray-50 transition-colors cursor-pointer border-0 mt-1"
+                                    title="Modifier les objectifs"
                                   >
                                     <Edit className="h-3.5 w-3.5" />
                                   </button>
                                 </RoleGuard>
                               </div>
                             )}
+                          </td>
+                          <td className="py-5">
+                            <div className="space-y-1 text-xs">
+                              <div>
+                                <span className="text-gray-500 block">Prospects:</span>
+                                <strong className="text-slate-800">
+                                  {w.prospects_this_month ?? 0} / {w.objective_prospects ?? 0}
+                                </strong>
+                              </div>
+                              <div>
+                                <span className="text-gray-500 block">Clients:</span>
+                                <strong className="text-slate-800">
+                                  {w.clients_this_month ?? 0} / {w.objective_clients ?? 0}
+                                </strong>
+                              </div>
+                            </div>
                           </td>
                           <td className="py-5">
                             <div className="space-y-1.5 max-w-[200px]">

@@ -19,9 +19,11 @@ export default function Home() {
       {/* Header bar */}
       <header className="h-20 border-b border-gray-900/60 backdrop-blur-md sticky top-0 z-50 px-8 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-xl bg-blue-600 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/20">
-            M
-          </div>
+          <img
+            src="/bethel-logo.png"
+            alt="Bethel Comprehensive Insurance"
+            className="h-10 w-auto object-contain"
+          />
           <span className="font-bold text-base tracking-wide">MOBI-ASSUR</span>
         </div>
 

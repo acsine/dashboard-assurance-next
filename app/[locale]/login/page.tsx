@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
-import { Shield, Mail, Lock, Phone, ArrowRight, Loader2 } from 'lucide-react'
+import { Mail, Lock, Phone, ArrowRight, Loader2 } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -56,9 +56,11 @@ export default function LoginPage() {
         <div className="max-w-md w-full mx-auto space-y-8">
           {/* Logo & Header */}
           <div className="space-y-3">
-            <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 border border-blue-100 text-blue-600">
-              <Shield className="h-6 w-6" />
-            </div>
+            <img
+              src="/bethel-logo.png"
+              alt="Bethel Comprehensive Insurance"
+              className="h-14 w-auto object-contain"
+            />
             <h2 className="text-3xl font-extrabold tracking-tight text-gray-900">
               Portail MOBI-ASSUR
             </h2>
