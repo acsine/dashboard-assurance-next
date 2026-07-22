@@ -3,7 +3,7 @@
 import { useIdleTimeout } from '@/hooks/useIdleTimeout'
 import { authApi } from '@/lib/api/mobi-assur'
 import { useAuthStore } from '@/lib/stores/auth-store'
-import { useRouter } from 'next/navigation'
+import { useRouter } from '@/i18n/navigation'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
@@ -23,7 +23,7 @@ export function IdleSessionGuard() {
       } catch {}
       logout()
       toast.info('Votre session a expiré par inactivité')
-      router.push('/fr/login')
+      router.replace('/login')
     },
   })
 
