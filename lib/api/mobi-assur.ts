@@ -803,17 +803,34 @@ export const insurersApi = {
       method: 'POST',
       body: formData,
       credentials: 'include',
+      cache: 'no-store',
     })
+    if (res.status === 401) {
+      if (typeof window !== 'undefined') window.location.href = '/fr/login'
+      throw new MobiAssurApiError('Session expirée', 401)
+    }
     if (!res.ok) {
       let detail = ''
       try {
         const err = await res.json()
-        detail = err.detail || err.message || JSON.stringify(err)
-      } catch {}
+        detail =
+          (typeof err.detail === 'string' && err.detail) ||
+          (typeof err.message === 'string' && err.message) ||
+          JSON.stringify(err)
+      } catch {
+        detail = await res.text().catch(() => '')
+      }
       throw new MobiAssurApiError(detail || res.statusText, res.status, detail)
     }
-    const json = await res.json()
-    return json?.data || json
+    const text = await res.text()
+    if (!text) return { ok: true }
+    try {
+      const json = JSON.parse(text)
+      if (json && typeof json === 'object' && 'data' in json) return json.data ?? json
+      return json
+    } catch {
+      return { ok: true, raw: text.slice(0, 200) }
+    }
   },
 }
 
@@ -919,6 +936,7 @@ export interface Insurer {
   code: string
   name: string
   logo_url?: string
+  product_line?: 'AUTO' | 'SANTE' | 'VOYAGE' | 'AUTRE'
   is_active: boolean
   created_at?: string
   updated_at?: string
@@ -927,6 +945,19 @@ export interface Insurer {
 export interface InsurerPolicy {
   mode: 'AUTO' | 'MANUAL'
   selected_insurer_id: string | null
+}
+
+export interface ProductLineTariff {
+  id: string
+  agency_id?: string
+  insurer_id: string
+  product_line: 'SANTE' | 'VOYAGE' | 'AUTRE'
+  label: string
+  base_amount: number
+  coverage_details?: Record<string, unknown> | null
+  is_active: boolean
+  created_at?: string
+  updated_at?: string
 }
 
 export interface TariffBootstrap {
@@ -1022,7 +1053,12 @@ export const tariffApi = {
   deleteDuration: (id: string) =>
     mobiRequest<unknown>(`/settings/contract-durations/${id}`, { method: 'DELETE' }),
 
-  listTariffLines: () => mobiRequest<RcRate[]>('/settings/tariff-lines'),
+  listTariffLines: (insurerId?: string) =>
+    mobiRequest<RcRate[]>(
+      insurerId
+        ? `/settings/tariff-lines?insurer_id=${encodeURIComponent(insurerId)}`
+        : '/settings/tariff-lines',
+    ),
   createTariffLine: (data: Omit<RcRate, 'id' | 'agency_id' | 'created_at' | 'updated_at'>) =>
     mobiRequest<RcRate>('/settings/tariff-lines', {
       method: 'POST',
@@ -1049,6 +1085,30 @@ export const tariffApi = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
+
+  listProductLineTariffs: (params?: { product_line?: string; insurer_id?: string }) => {
+    const qs = new URLSearchParams()
+    if (params?.product_line) qs.set('product_line', params.product_line)
+    if (params?.insurer_id) qs.set('insurer_id', params.insurer_id)
+    const q = qs.toString()
+    return mobiRequest<ProductLineTariff[]>(
+      `/settings/product-line-tariffs${q ? `?${q}` : ''}`,
+    )
+  },
+  createProductLineTariff: (
+    data: Omit<ProductLineTariff, 'id' | 'agency_id' | 'created_at' | 'updated_at'>,
+  ) =>
+    mobiRequest<ProductLineTariff>('/settings/product-line-tariffs', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateProductLineTariff: (id: string, data: Partial<ProductLineTariff>) =>
+    mobiRequest<ProductLineTariff>(`/settings/product-line-tariffs/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  deleteProductLineTariff: (id: string) =>
+    mobiRequest<unknown>(`/settings/product-line-tariffs/${id}`, { method: 'DELETE' }),
 
   computeQuote: (data: QuoteComputeRequest) =>
     mobiRequest<QuoteComputeResult>('/quotes/compute', {

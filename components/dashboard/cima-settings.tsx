@@ -1,8 +1,7 @@
 'use client'
 
-import dynamic from 'next/dynamic'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   insurersApi,
   tariffApi,
@@ -20,16 +19,42 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { Loader2, Plus, Save, Trash2, RefreshCw, KeyRound, Pencil, X } from 'lucide-react'
 
-const CameroonZonesMap = dynamic(() => import('./CameroonZonesMap'), {
-  ssr: false,
-  loading: () => (
-    <div className="flex h-72 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-400">
-      Chargement de la carte…
-    </div>
-  ),
-})
-
 const FUEL_OPTIONS = ['ESSENCE', 'DIESEL', 'ELECTRIQUE', 'HYBRIDE']
+
+/** Zones CIMA standards — codes canoniques alignés backend (ZONE_A|B|C). */
+const CIMA_ZONES = [
+  {
+    code: 'ZONE_A',
+    short: 'A',
+    name: 'ZONE_A',
+    description: 'Zone urbaine / tarif de référence CIMA',
+  },
+  {
+    code: 'ZONE_B',
+    short: 'B',
+    name: 'ZONE_B',
+    description: 'Zone intermédiaire CIMA',
+  },
+  {
+    code: 'ZONE_C',
+    short: 'C',
+    name: 'ZONE_C',
+    description: 'Zone périphérique / intérieure CIMA',
+  },
+] as const
+
+function zoneMatchesCode(zoneName: string, code: string) {
+  const n = (zoneName || '').trim().toUpperCase()
+  const short = code.replace('ZONE_', '')
+  return (
+    n === code ||
+    n === `ZONE ${short}` ||
+    n === `ZONE-${short}` ||
+    n === short ||
+    n.startsWith(`ZONE ${short} `) ||
+    n.startsWith(`${code} `)
+  )
+}
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -266,38 +291,25 @@ export function CategoriesPanel() {
 
 export function ZonesPanel() {
   const qc = useQueryClient()
-  const [name, setName] = useState('')
-  const [selectedCities, setSelectedCities] = useState<string[]>([])
-  const [citySearch, setCitySearch] = useState('')
 
   const { data: zones = [], isLoading } = useQuery({
     queryKey: ['tariff-zones'],
     queryFn: () => tariffApi.listZones(),
   })
 
-  const { data: regions = [] } = useQuery({
-    queryKey: ['geo-regions-cm'],
-    queryFn: () => tariffApi.geoRegions(),
-  })
+  const list = Array.isArray(zones) ? zones : []
 
-  const regionList = useMemo(() => {
-    const raw = Array.isArray(regions) ? regions : []
-    const q = citySearch.trim().toLowerCase()
-    if (!q) return raw
-    return raw.filter((r) => r.name?.toLowerCase().includes(q))
-  }, [regions, citySearch])
+  const findZone = (code: string) => list.find((z) => zoneMatchesCode(z.name, code))
 
   const createMutation = useMutation({
-    mutationFn: () =>
+    mutationFn: (payload: { name: string; cities: string[] }) =>
       tariffApi.createZone({
-        name: name.trim(),
-        cities: selectedCities,
+        name: payload.name,
+        cities: payload.cities,
         is_active: true,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tariff-zones'] })
-      setName('')
-      setSelectedCities([])
       toast.success('Zone créée')
     },
     onError: (e: Error) => toast.error(e.message),
@@ -312,108 +324,168 @@ export function ZonesPanel() {
     onError: (e: Error) => toast.error(e.message),
   })
 
-  const toggleCity = (city: string) => {
-    setSelectedCities((prev) =>
-      prev.includes(city) ? prev.filter((c) => c !== city) : [...prev, city],
-    )
-  }
-
-  const list = Array.isArray(zones) ? zones : []
+  const ensureAllMutation = useMutation({
+    mutationFn: async () => {
+      const current = await tariffApi.listZones()
+      const currentList = Array.isArray(current) ? current : []
+      const hasCode = (code: string) => currentList.some((z) => zoneMatchesCode(z.name, code))
+      const created: string[] = []
+      for (const z of CIMA_ZONES) {
+        if (!hasCode(z.code)) {
+          await tariffApi.createZone({
+            name: z.name,
+            cities: [],
+            is_active: true,
+          })
+          created.push(z.short)
+        }
+      }
+      return created
+    },
+    onSuccess: (created) => {
+      qc.invalidateQueries({ queryKey: ['tariff-zones'] })
+      if (created.length === 0) toast.success('Les zones A, B et C sont déjà présentes')
+      else toast.success(`Zones créées : ${created.join(', ')}`)
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
 
   return (
     <Card className="border-gray-100 shadow-sm">
       <CardHeader className="pb-4 border-b border-gray-50">
         <CardTitle className="text-sm font-bold uppercase tracking-wider text-gray-400">
-          Zones de circulation
+          Zones de circulation CIMA
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-6 space-y-4">
+        <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-xs text-slate-600">
+          Le barème automobile utilise uniquement <strong>3 zones</strong> :{' '}
+          <strong>A</strong>, <strong>B</strong> et <strong>C</strong>. Aucune carte géographique
+          n’est requise — la tarification vient des fichiers Excel assureurs (catégorie × puissance
+          × durée).
+        </div>
+
         {isLoading ? (
           <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
         ) : (
-          list.map((z: CirculationZone) => (
-            <div key={z.id} className="border border-gray-100 rounded-lg px-3 py-2">
-              <div className="flex items-center gap-2">
-                <p className="text-xs font-bold text-slate-900 flex-1">{z.name}</p>
-                <ActiveBadge active={z.is_active} />
-                {z.is_active && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => deleteMutation.mutate(z.id)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                  </Button>
-                )}
-              </div>
-              <p className="text-[11px] text-slate-500 mt-1">
-                {(z.cities || []).join(', ') || 'Aucune ville'}
-              </p>
-            </div>
-          ))
-        )}
-
-        <div className="space-y-3 pt-2 border-t border-gray-50">
-          <FieldLabel>Nom de la zone</FieldLabel>
-          <Input value={name} onChange={(e) => setName(e.target.value)} className="h-10 text-xs" />
-
-          <FieldLabel>Carte du Cameroun</FieldLabel>
-          <CameroonZonesMap
-            regions={Array.isArray(regions) ? regions : []}
-            selectedCities={selectedCities}
-            onToggleCity={toggleCity}
-          />
-
-          <FieldLabel>Villes / régions (liste)</FieldLabel>
-          <Input
-            placeholder="Filtrer les régions…"
-            value={citySearch}
-            onChange={(e) => setCitySearch(e.target.value)}
-            className="h-10 text-xs"
-          />
-          <div className="max-h-40 overflow-y-auto border border-gray-100 rounded-lg p-2 flex flex-wrap gap-1.5">
-            {regionList.map((r) => {
-              const label = r.name || ''
-              const selected = selectedCities.includes(label)
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {CIMA_ZONES.map((def) => {
+              const existing = findZone(def.code)
               return (
-                <button
-                  key={`${r.code || label}`}
-                  type="button"
-                  onClick={() => toggleCity(label)}
-                  className={`px-2 py-1 rounded-md text-[10px] font-semibold border transition-colors ${
-                    selected
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                  }`}
+                <div
+                  key={def.code}
+                  className="rounded-xl border border-gray-100 bg-white p-4 space-y-3"
                 >
-                  {label}
-                </button>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-lg font-extrabold text-slate-900">Zone {def.short}</p>
+                      <p className="text-[11px] text-slate-500 mt-1 leading-snug">
+                        {def.description}
+                      </p>
+                    </div>
+                    {existing ? (
+                      <ActiveBadge active={existing.is_active} />
+                    ) : (
+                      <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700">
+                        Absente
+                      </span>
+                    )}
+                  </div>
+
+                  {existing ? (
+                    existing.is_active && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => deleteMutation.mutate(existing.id)}
+                        disabled={deleteMutation.isPending}
+                      >
+                        <Trash2 className="h-3.5 w-3.5 text-red-500 mr-1" />
+                        Désactiver
+                      </Button>
+                    )
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      disabled={createMutation.isPending}
+                      onClick={() =>
+                        createMutation.mutate({ name: def.name, cities: [] })
+                      }
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1" />
+                      Créer Zone {def.short}
+                    </Button>
+                  )}
+                </div>
               )
             })}
           </div>
-          {selectedCities.length > 0 && (
-            <p className="text-[11px] text-slate-500">
-              Sélection : {selectedCities.join(', ')}
-            </p>
-          )}
+        )}
 
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              if (!name.trim()) {
-                toast.error('Nom de zone requis')
-                return
-              }
-              createMutation.mutate()
-            }}
-            disabled={createMutation.isPending}
-          >
+        <Button
+          type="button"
+          variant="primary"
+          className="text-white"
+          disabled={ensureAllMutation.isPending || isLoading}
+          onClick={() => ensureAllMutation.mutate()}
+        >
+          {ensureAllMutation.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin mr-1" />
+          ) : (
             <Plus className="h-4 w-4 mr-1" />
-            Créer la zone
-          </Button>
-        </div>
+          )}
+          Créer les zones manquantes (A, B, C)
+        </Button>
+
+        {list.filter((z) => {
+          const n = (z.name || '').toUpperCase()
+          return !['A', 'B', 'C', 'ZONE A', 'ZONE B', 'ZONE C', 'ZONE-A', 'ZONE-B', 'ZONE-C'].some(
+            (k) => n === k || n.startsWith(`${k} `),
+          )
+        }).length > 0 && (
+          <div className="pt-2 border-t border-gray-50 space-y-2">
+            <p className="text-[10px] font-bold uppercase text-slate-400">Autres zones (héritées)</p>
+            {list
+              .filter((z) => {
+                const n = (z.name || '').toUpperCase()
+                return ![
+                  'A',
+                  'B',
+                  'C',
+                  'ZONE A',
+                  'ZONE B',
+                  'ZONE C',
+                  'ZONE-A',
+                  'ZONE-B',
+                  'ZONE-C',
+                ].some((k) => n === k || n.startsWith(`${k} `))
+              })
+              .map((z: CirculationZone) => (
+                <div
+                  key={z.id}
+                  className="flex items-center gap-2 border border-gray-100 rounded-lg px-3 py-2"
+                >
+                  <p className="text-xs font-semibold flex-1">{z.name}</p>
+                  <ActiveBadge active={z.is_active} />
+                  {z.is_active && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => deleteMutation.mutate(z.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   )
@@ -507,6 +579,7 @@ export function DurationsPanel() {
 
 export function RcTariffPanel() {
   const qc = useQueryClient()
+  const [insurerId, setInsurerId] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [zoneId, setZoneId] = useState('')
   const [fuel, setFuel] = useState('ESSENCE')
@@ -515,9 +588,18 @@ export function RcTariffPanel() {
   const [trailer, setTrailer] = useState(false)
   const [rcAmount, setRcAmount] = useState('')
 
+  const { data: insurers = [] } = useQuery({
+    queryKey: ['insurers'],
+    queryFn: () => insurersApi.list(),
+  })
+  const autoInsurers = (Array.isArray(insurers) ? insurers : []).filter(
+    (i) => i.is_active && (i.product_line || 'AUTO') === 'AUTO',
+  )
+
   const { data: lines = [], isLoading } = useQuery({
-    queryKey: ['tariff-lines'],
-    queryFn: () => tariffApi.listTariffLines(),
+    queryKey: ['tariff-lines', insurerId],
+    queryFn: () => tariffApi.listTariffLines(insurerId),
+    enabled: !!insurerId,
   })
 
   const { data: categories = [] } = useQuery({
@@ -550,6 +632,7 @@ export function RcTariffPanel() {
   const createMutation = useMutation({
     mutationFn: () =>
       tariffApi.createTariffLine({
+        insurer_id: insurerId,
         category_id: categoryId,
         zone_id: zoneId || undefined,
         fuel,
@@ -560,7 +643,7 @@ export function RcTariffPanel() {
         is_active: true,
       }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['tariff-lines'] })
+      qc.invalidateQueries({ queryKey: ['tariff-lines', insurerId] })
       setRcAmount('')
       toast.success('Ligne RC créée')
     },
@@ -570,7 +653,7 @@ export function RcTariffPanel() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => tariffApi.deleteTariffLine(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['tariff-lines'] })
+      qc.invalidateQueries({ queryKey: ['tariff-lines', insurerId] })
       toast.success('Ligne RC désactivée')
     },
     onError: (e: Error) => toast.error(e.message),
@@ -588,6 +671,31 @@ export function RcTariffPanel() {
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-6 space-y-6">
+        <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4 space-y-2">
+          <FieldLabel>Assureur (obligatoire)</FieldLabel>
+          <select
+            value={insurerId}
+            onChange={(e) => setInsurerId(e.target.value)}
+            className="w-full h-10 text-xs border border-gray-200 rounded-md px-2 bg-white max-w-md"
+          >
+            <option value="">Choisir un assureur auto…</option>
+            {autoInsurers.map((i) => (
+              <option key={i.id} value={i.id}>
+                {i.code} — {i.name}
+              </option>
+            ))}
+          </select>
+          <p className="text-[11px] text-slate-500">
+            Les tarifs RC sont stockés par assureur. Importez un Excel ou saisissez manuellement.
+          </p>
+        </div>
+
+        {!insurerId ? (
+          <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400">
+            Sélectionnez un assureur pour voir et modifier son barème RC.
+          </div>
+        ) : (
+          <>
         <div className="rounded-xl border border-amber-100 bg-amber-50/70 p-4 text-xs text-amber-900 space-y-1.5">
           <p className="font-bold">Comment remplir les valeurs numériques ?</p>
           <ul className="list-disc pl-4 space-y-1 text-amber-800">
@@ -745,6 +853,10 @@ export function RcTariffPanel() {
             variant="primary"
             className="text-white"
             onClick={() => {
+              if (!insurerId) {
+                toast.error('Choisissez un assureur')
+                return
+              }
               if (!categoryId) {
                 toast.error('Choisissez une catégorie (nom)')
                 return
@@ -774,7 +886,6 @@ export function RcTariffPanel() {
           </Button>
         </div>
 
-        {/* Tableau lisible */}
         <div>
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-3">
             Lignes enregistrées
@@ -783,7 +894,7 @@ export function RcTariffPanel() {
             <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
           ) : list.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400">
-              Aucune ligne tarifaire. Remplissez le formulaire ci-dessus pour en ajouter une.
+              Aucune ligne tarifaire. Importez un Excel ou remplissez le formulaire.
             </div>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-slate-100">
@@ -843,6 +954,8 @@ export function RcTariffPanel() {
             </div>
           )}
         </div>
+          </>
+        )}
       </CardContent>
     </Card>
   )
@@ -858,7 +971,15 @@ export function FeeSchedulePanel() {
     queryFn: () => insurersApi.list(),
   })
 
-  const activeInsurers = (insurers as Insurer[]).filter((i) => i.is_active)
+  const activeInsurers = (insurers as Insurer[]).filter(
+    (i) => i.is_active && (i.product_line || 'AUTO') === 'AUTO',
+  )
+
+  useEffect(() => {
+    if (!selectedInsurerId && activeInsurers.length > 0) {
+      setSelectedInsurerId(activeInsurers[0].id)
+    }
+  }, [activeInsurers, selectedInsurerId])
 
   const { data: fees, isLoading } = useQuery({
     queryKey: ['fee-schedule', selectedInsurerId],
@@ -1135,6 +1256,200 @@ export function ValidationCodePanel() {
             </Button>
           </div>
         </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+export function ProductLineTariffPanel() {
+  const qc = useQueryClient()
+  const [productLine, setProductLine] = useState<'SANTE' | 'VOYAGE' | 'AUTRE'>('SANTE')
+  const [insurerId, setInsurerId] = useState('')
+  const [label, setLabel] = useState('')
+  const [baseAmount, setBaseAmount] = useState('')
+
+  const { data: insurers = [] } = useQuery({
+    queryKey: ['insurers'],
+    queryFn: () => insurersApi.list(),
+  })
+  const branchInsurers = (Array.isArray(insurers) ? insurers : []).filter(
+    (i) => i.is_active && (i.product_line || 'AUTO') === productLine,
+  )
+
+  const { data: tariffs = [], isLoading } = useQuery({
+    queryKey: ['product-line-tariffs', productLine],
+    queryFn: () => tariffApi.listProductLineTariffs({ product_line: productLine }),
+  })
+
+  const createMutation = useMutation({
+    mutationFn: () =>
+      tariffApi.createProductLineTariff({
+        insurer_id: insurerId,
+        product_line: productLine,
+        label: label.trim(),
+        base_amount: Number(baseAmount),
+        is_active: true,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['product-line-tariffs'] })
+      setLabel('')
+      setBaseAmount('')
+      toast.success('Tarif branche créé')
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => tariffApi.deleteProductLineTariff(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['product-line-tariffs'] })
+      toast.success('Tarif désactivé')
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+
+  const list = Array.isArray(tariffs) ? tariffs : []
+
+  return (
+    <Card className="border-gray-100 shadow-sm">
+      <CardHeader className="pb-4 border-b border-gray-50">
+        <CardTitle className="text-sm font-bold uppercase tracking-wider text-gray-400">
+          Tarifs Santé / Voyage / Autre
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-6 space-y-5">
+        <div className="flex flex-wrap gap-2">
+          {(['SANTE', 'VOYAGE', 'AUTRE'] as const).map((line) => (
+            <Button
+              key={line}
+              type="button"
+              size="sm"
+              variant={productLine === line ? 'default' : 'outline'}
+              onClick={() => {
+                setProductLine(line)
+                setInsurerId('')
+              }}
+            >
+              {line}
+            </Button>
+          ))}
+        </div>
+
+        <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="space-y-1">
+            <FieldLabel>Assureur ({productLine})</FieldLabel>
+            <select
+              value={insurerId}
+              onChange={(e) => setInsurerId(e.target.value)}
+              className="w-full h-10 text-xs border border-gray-200 rounded-md px-2 bg-white"
+            >
+              <option value="">Choisir…</option>
+              {branchInsurers.map((i) => (
+                <option key={i.id} value={i.id}>
+                  {i.code} — {i.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <FieldLabel>Libellé produit</FieldLabel>
+            <Input
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="Ex. Santé Famille Plus"
+              className="h-10 text-xs"
+            />
+          </div>
+          <div className="space-y-1">
+            <FieldLabel>Montant de base (FCFA)</FieldLabel>
+            <Input
+              type="number"
+              min="0"
+              value={baseAmount}
+              onChange={(e) => setBaseAmount(e.target.value)}
+              className="h-10 text-xs"
+            />
+          </div>
+          <Button
+            type="button"
+            variant="primary"
+            className="text-white sm:col-span-3 w-fit"
+            disabled={createMutation.isPending}
+            onClick={() => {
+              if (!insurerId) {
+                toast.error('Choisissez un assureur de cette branche')
+                return
+              }
+              if (!label.trim()) {
+                toast.error('Saisissez un libellé')
+                return
+              }
+              if (!baseAmount || Number(baseAmount) < 0) {
+                toast.error('Montant invalide')
+                return
+              }
+              createMutation.mutate()
+            }}
+          >
+            {createMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-1" />
+            ) : (
+              <Plus className="h-4 w-4 mr-1" />
+            )}
+            Ajouter le tarif
+          </Button>
+        </div>
+
+        {isLoading ? (
+          <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+        ) : list.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400">
+            Aucun tarif {productLine}. Créez d’abord un assureur de cette branche, puis un tarif.
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-slate-100">
+            <table className="w-full text-left text-[11px]">
+              <thead className="bg-slate-50">
+                <tr className="text-slate-500 uppercase">
+                  <th className="py-3 px-3">Libellé</th>
+                  <th className="py-3 px-3">Assureur</th>
+                  <th className="py-3 px-3">Montant</th>
+                  <th className="py-3 px-3" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {list.map((t) => {
+                  const ins = (Array.isArray(insurers) ? insurers : []).find(
+                    (i) => i.id === t.insurer_id,
+                  )
+                  return (
+                    <tr key={t.id}>
+                      <td className="py-3 px-3 font-semibold">{t.label}</td>
+                      <td className="py-3 px-3">
+                        {ins ? `${ins.code} — ${ins.name}` : t.insurer_id.slice(0, 8)}
+                      </td>
+                      <td className="py-3 px-3 font-mono text-blue-700">
+                        {Number(t.base_amount).toLocaleString('fr-FR')} F
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        {t.is_active && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => deleteMutation.mutate(t.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </CardContent>
     </Card>
   )

@@ -1,12 +1,10 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   settingsApi,
   insurersApi,
-  type BaremeConfig,
-  type BaremeField,
   type PricingSettings,
   type Insurer,
   type InsurerPolicy,
@@ -15,6 +13,7 @@ import {
   CategoriesPanel,
   DurationsPanel,
   FeeSchedulePanel,
+  ProductLineTariffPanel,
   RcTariffPanel,
   ValidationCodePanel,
   ZonesPanel,
@@ -24,7 +23,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
-import { Settings, Save, Loader2, Plus, Trash2, RotateCcw, Upload } from 'lucide-react'
+import { Settings, Save, Loader2, Plus, RotateCcw, Upload } from 'lucide-react'
 import { RoleGuard } from '@/components/auth/RoleGuard'
 
 type SettingsTab =
@@ -34,6 +33,7 @@ type SettingsTab =
   | 'durations'
   | 'rc'
   | 'fees'
+  | 'branches'
   | 'validation'
   | 'insurers'
 
@@ -45,6 +45,7 @@ const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'durations', label: 'Durées' },
   { id: 'rc', label: 'Barème RC' },
   { id: 'fees', label: 'Frais légaux' },
+  { id: 'branches', label: 'Santé / Voyage' },
   { id: 'validation', label: 'Code validation' },
 ]
 
@@ -54,24 +55,19 @@ const DEFAULT_GUIDE =
   '3. Utilisez l’estimation officielle avant toute proposition.\n' +
   '4. Ne promettez jamais un tarif avant validation du dossier.'
 
-const DEFAULT_BAREME: BaremeConfig = {
-  base_rate: { mode: 'fixed', value: 50000 },
-  cv_multiplier: { mode: 'fixed', value: 2500 },
-  brand_factors: {
-    TOYOTA: { mode: 'percent', value: 5 },
-    NISSAN: { mode: 'percent', value: 0 },
-    HYUNDAI: { mode: 'percent', value: -5 },
-    PEUGEOT: { mode: 'percent', value: 2 },
-  },
-}
-
 function InsurersPanelContent() {
   const [insurers, setInsurers] = useState<Insurer[]>([])
   const [policy, setPolicy] = useState<InsurerPolicy>({ mode: 'AUTO', selected_insurer_id: null })
   const [isLoadingInsurers, setIsLoadingInsurers] = useState(false)
   const [newInsurerCode, setNewInsurerCode] = useState('')
   const [newInsurerName, setNewInsurerName] = useState('')
-  const [uploadingInsurerIdTariff, setUploadingInsurerIdTariff] = useState<string | null>(null)
+  const [newInsurerLine, setNewInsurerLine] = useState<'AUTO' | 'SANTE' | 'VOYAGE' | 'AUTRE'>('AUTO')
+  const [pickingInsurerId, setPickingInsurerId] = useState<string | null>(null)
+  const [importingInsurerId, setImportingInsurerId] = useState<string | null>(null)
+  const [lastImportSummary, setLastImportSummary] = useState<string | null>(null)
+  const [lastImportedInsurerId, setLastImportedInsurerId] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const pendingInsurerIdRef = useRef<string | null>(null)
 
   const queryClient = useQueryClient()
 
@@ -93,13 +89,30 @@ function InsurersPanelContent() {
     })()
   }, [])
 
+  // Quand le dialogue fichier se ferme (focus fenêtre), on retire le spinner « ouverture ».
+  useEffect(() => {
+    const onFocus = () => {
+      window.setTimeout(() => setPickingInsurerId(null), 250)
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [])
+
   const createInsurerMutation = useMutation({
-    mutationFn: ({ code, name }: { code: string; name: string }) =>
-      insurersApi.create({ code, name, is_active: true }),
+    mutationFn: ({
+      code,
+      name,
+      product_line,
+    }: {
+      code: string
+      name: string
+      product_line: 'AUTO' | 'SANTE' | 'VOYAGE' | 'AUTRE'
+    }) => insurersApi.create({ code, name, product_line, is_active: true }),
     onSuccess: (newInsurer) => {
       setInsurers([...insurers, newInsurer])
       setNewInsurerCode('')
       setNewInsurerName('')
+      setNewInsurerLine('AUTO')
       toast.success('Assureur créé avec succès')
     },
     onError: (err: any) => {
@@ -108,8 +121,19 @@ function InsurersPanelContent() {
   })
 
   const toggleInsurerMutation = useMutation({
-    mutationFn: ({ id, is_active, code, name }: { id: string; is_active: boolean; code: string; name: string }) =>
-      insurersApi.update(id, { code, name, is_active }),
+    mutationFn: ({
+      id,
+      is_active,
+      code,
+      name,
+      product_line,
+    }: {
+      id: string
+      is_active: boolean
+      code: string
+      name: string
+      product_line?: Insurer['product_line']
+    }) => insurersApi.update(id, { code, name, is_active, product_line: product_line || 'AUTO' }),
     onSuccess: (updated) => {
       setInsurers((prev) => prev.map((i) => (i.id === updated.id ? updated : i)))
       toast.success("Statut de l'assureur mis à jour")
@@ -133,14 +157,80 @@ function InsurersPanelContent() {
   const importTariffMutation = useMutation({
     mutationFn: ({ insurerId, file }: { insurerId: string; file: File }) =>
       insurersApi.importTariff(insurerId, file),
-    onSuccess: () => {
-      toast.success('Tarif importé avec succès')
-      setUploadingInsurerIdTariff(null)
+    onSuccess: (result, variables) => {
+      const data = (result && typeof result === 'object' ? result : {}) as Record<string, unknown>
+      const created = data.created ?? 0
+      const updated = data.updated ?? 0
+      const applied = data.applied_as_defaults === true
+      const warnings = Array.isArray(data.warnings) ? data.warnings : []
+      const sheets = Array.isArray(data.sheets_parsed) ? data.sheets_parsed : []
+      const summary = [
+        `créées=${created}`,
+        `mises à jour=${updated}`,
+        sheets.length ? `feuilles=${sheets.join(',')}` : null,
+        applied ? 'appliqué comme défauts agence' : null,
+        warnings.length ? `alertes=${warnings.length}` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+      setLastImportedInsurerId(variables.insurerId)
+      setLastImportSummary(summary || 'Tarif importé')
+      queryClient.invalidateQueries({ queryKey: ['tariff-lines'] })
+      queryClient.invalidateQueries({ queryKey: ['tariff-categories'] })
+      queryClient.invalidateQueries({ queryKey: ['tariff-zones'] })
+      queryClient.invalidateQueries({ queryKey: ['fee-schedule'] })
+      queryClient.invalidateQueries({ queryKey: ['pricing-settings'] })
+      queryClient.invalidateQueries({ queryKey: ['insurers'] })
+      toast.success(
+        applied
+          ? 'Tarif importé et appliqué comme paramètres par défaut'
+          : 'Tarif Excel importé avec succès',
+      )
+      if (warnings.length > 0) {
+        toast.message(String(warnings[0]))
+      }
     },
-    onError: (err: any) => {
-      toast.error(err.message || "Erreur lors de l'import")
+    onError: (err: any, variables) => {
+      const msg =
+        typeof err?.message === 'string'
+          ? err.message
+          : typeof err?.detail === 'string'
+            ? err.detail
+            : "Erreur lors de l'import du tarif"
+      setLastImportedInsurerId(variables.insurerId)
+      toast.error(msg)
+      setLastImportSummary(`Échec : ${msg}`)
+    },
+    onSettled: () => {
+      setImportingInsurerId(null)
+      pendingInsurerIdRef.current = null
+      if (fileInputRef.current) fileInputRef.current.value = ''
     },
   })
+
+  const openFilePicker = async (insurerId: string) => {
+    if (importTariffMutation.isPending || pickingInsurerId) return
+    pendingInsurerIdRef.current = insurerId
+    setPickingInsurerId(insurerId)
+    setLastImportSummary(null)
+    // Laisse le temps au spinner de s’afficher avant la boîte de dialogue OS.
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    })
+    await new Promise((r) => setTimeout(r, 80))
+    fileInputRef.current?.click()
+  }
+
+  const handleFileSelected = (file: File | null) => {
+    const insurerId = pendingInsurerIdRef.current
+    setPickingInsurerId(null)
+    if (!file || !insurerId) {
+      pendingInsurerIdRef.current = null
+      return
+    }
+    setImportingInsurerId(insurerId)
+    importTariffMutation.mutate({ insurerId, file })
+  }
 
   const handleCreateInsurer = (e: React.FormEvent) => {
     e.preventDefault()
@@ -148,16 +238,35 @@ function InsurersPanelContent() {
       toast.error('Veuillez remplir tous les champs')
       return
     }
-    createInsurerMutation.mutate({ code: newInsurerCode, name: newInsurerName })
-  }
-
-  const handleFileUpload = (insurerId: string, file: File | null) => {
-    if (!file) return
-    importTariffMutation.mutate({ insurerId, file })
+    createInsurerMutation.mutate({
+      code: newInsurerCode,
+      name: newInsurerName,
+      product_line: newInsurerLine,
+    })
   }
 
   return (
     <div className="space-y-6">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        className="hidden"
+        onChange={(e) => {
+          handleFileSelected(e.target.files?.[0] ?? null)
+        }}
+      />
+
+      {importingInsurerId && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/35 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3 rounded-2xl bg-white px-8 py-6 shadow-xl">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            <p className="text-sm font-semibold text-slate-700">Import du tarif Excel…</p>
+            <p className="text-xs text-slate-500">Veuillez patienter pendant le traitement.</p>
+          </div>
+        </div>
+      )}
+
       {isLoadingInsurers ? (
         <div className="py-8 text-center text-gray-400">
           <Loader2 className="h-6 w-6 animate-spin mx-auto text-blue-500 mb-2" />
@@ -230,7 +339,7 @@ function InsurersPanelContent() {
 
           <form onSubmit={handleCreateInsurer} className="p-4 border border-gray-100 rounded-lg bg-gray-50/30 space-y-3">
             <h4 className="text-xs font-bold text-gray-600 uppercase tracking-wider">Ajouter un Assureur</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Input
                 placeholder="Code"
                 value={newInsurerCode}
@@ -243,6 +352,18 @@ function InsurersPanelContent() {
                 onChange={(e) => setNewInsurerName(e.target.value)}
                 className="h-10 text-xs border-gray-200"
               />
+              <select
+                value={newInsurerLine}
+                onChange={(e) =>
+                  setNewInsurerLine(e.target.value as 'AUTO' | 'SANTE' | 'VOYAGE' | 'AUTRE')
+                }
+                className="h-10 text-xs border border-gray-200 rounded-md px-2 bg-white"
+              >
+                <option value="AUTO">Automobile</option>
+                <option value="SANTE">Santé</option>
+                <option value="VOYAGE">Voyage</option>
+                <option value="AUTRE">Autre</option>
+              </select>
             </div>
             <Button
               type="submit"
@@ -263,7 +384,9 @@ function InsurersPanelContent() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h5 className="font-bold text-sm text-gray-900">{insurer.name}</h5>
-                    <span className="text-xs text-gray-400">{insurer.code}</span>
+                    <span className="text-xs text-gray-400">
+                      {insurer.code} · {insurer.product_line || 'AUTO'}
+                    </span>
                   </div>
                   <button
                     type="button"
@@ -272,6 +395,7 @@ function InsurersPanelContent() {
                         id: insurer.id,
                         code: insurer.code,
                         name: insurer.name,
+                        product_line: insurer.product_line || 'AUTO',
                         is_active: !insurer.is_active,
                       })
                     }
@@ -285,39 +409,42 @@ function InsurersPanelContent() {
                   </button>
                 </div>
 
-                <div className="pt-3 border-t border-gray-50">
-                  {uploadingInsurerIdTariff === insurer.id ? (
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="file"
-                        accept=".xlsx,.xls"
-                        onChange={(e) => {
-                          if (e.target.files?.[0]) {
-                            handleFileUpload(insurer.id, e.target.files[0])
-                          }
-                        }}
-                        className="text-xs flex-1"
-                      />
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setUploadingInsurerIdTariff(null)}
-                      >
-                        Annuler
-                      </Button>
-                    </div>
-                  ) : (
+                <div className="pt-3 border-t border-gray-50 space-y-2">
+                  {(insurer.product_line || 'AUTO') === 'AUTO' ? (
                     <Button
                       type="button"
                       size="sm"
                       variant="outline"
-                      onClick={() => setUploadingInsurerIdTariff(insurer.id)}
-                      disabled={importTariffMutation.isPending}
+                      isLoading={
+                        pickingInsurerId === insurer.id || importingInsurerId === insurer.id
+                      }
+                      disabled={
+                        !!pickingInsurerId ||
+                        !!importingInsurerId ||
+                        importTariffMutation.isPending
+                      }
+                      onClick={() => openFilePicker(insurer.id)}
                       className="text-xs"
                     >
-                      <Upload className="h-3.5 w-3.5 mr-1" /> Importer Tarif Excel
+                      {pickingInsurerId === insurer.id ? (
+                        <>Ouverture du sélecteur…</>
+                      ) : importingInsurerId === insurer.id ? (
+                        <>Import en cours…</>
+                      ) : (
+                        <>
+                          <Upload className="h-3.5 w-3.5 mr-1" /> Importer Tarif Excel (.xlsx)
+                        </>
+                      )}
                     </Button>
+                  ) : (
+                    <p className="text-[11px] text-slate-500">
+                      Branche {insurer.product_line} — tarifs dans l’onglet Santé / Voyage.
+                    </p>
+                  )}
+                  {lastImportedInsurerId === insurer.id && lastImportSummary && (
+                    <p className="text-[10px] text-slate-500 break-all leading-relaxed">
+                      {lastImportSummary}
+                    </p>
                   )}
                 </div>
               </div>
@@ -345,10 +472,6 @@ function SettingsContent() {
   const [tva, setTva] = useState('19.25')
   const [commissionRate, setCommissionRate] = useState('10')
   const [guideContent, setGuideContent] = useState(DEFAULT_GUIDE)
-  const [bareme, setBareme] = useState<BaremeConfig>(DEFAULT_BAREME)
-  const [newBrand, setNewBrand] = useState('')
-  const [newBrandMode, setNewBrandMode] = useState<'fixed' | 'percent'>('percent')
-  const [newBrandValue, setNewBrandValue] = useState('0')
 
   const { data: pricing, isLoading } = useQuery({
     queryKey: ['pricing-settings'],
@@ -366,14 +489,6 @@ function SettingsContent() {
       setCommissionRate(String(Number(pricing.commission_rate) * 100))
     }
     if (pricing.guide_content) setGuideContent(pricing.guide_content)
-    if (pricing.bareme_config) {
-      setBareme({
-        base_rate: pricing.bareme_config.base_rate ?? DEFAULT_BAREME.base_rate,
-        cv_multiplier:
-          pricing.bareme_config.cv_multiplier ?? DEFAULT_BAREME.cv_multiplier,
-        brand_factors: pricing.bareme_config.brand_factors ?? {},
-      })
-    }
   }, [pricing])
 
   const buildPayload = (): Partial<PricingSettings> => ({
@@ -384,7 +499,6 @@ function SettingsContent() {
     tva_rate: Number(tva) / 100,
     commission_rate: Number(commissionRate) / 100,
     guide_content: guideContent,
-    bareme_config: bareme,
   })
 
   const saveMutation = useMutation({
@@ -420,7 +534,6 @@ function SettingsContent() {
         tva_rate: 0.1925,
         commission_rate: 0.1,
         guide_content: DEFAULT_GUIDE,
-        bareme_config: DEFAULT_BAREME,
       })
     },
     onSuccess: () => {
@@ -432,55 +545,16 @@ function SettingsContent() {
     },
   })
 
-  const addBrandMutation = useMutation({
-    mutationFn: () =>
-      settingsApi.addBrand({
-        marque: newBrand.trim().toUpperCase(),
-        mode: newBrandMode,
-        value: Number(newBrandValue),
-      }),
-    onSuccess: (data) => {
-      if (data.bareme_config) setBareme(data.bareme_config)
-      setNewBrand('')
-      setNewBrandValue('0')
-      queryClient.invalidateQueries({ queryKey: ['pricing-settings'] })
-      toast.success('Marque ajoutée au barème')
-    },
-    onError: (err: Error) => toast.error(err.message || 'Erreur ajout marque'),
-  })
-
-  const deleteBrandMutation = useMutation({
-    mutationFn: (marque: string) => settingsApi.deleteBrand(marque),
-    onSuccess: (data) => {
-      if (data.bareme_config) setBareme(data.bareme_config)
-      queryClient.invalidateQueries({ queryKey: ['pricing-settings'] })
-      toast.success('Marque retirée')
-    },
-    onError: (err: Error) => toast.error(err.message || 'Erreur suppression'),
-  })
-
-  const updateBaremeField = (
-    key: 'base_rate' | 'cv_multiplier',
-    patch: Partial<BaremeField>,
-  ) => {
-    setBareme((prev) => ({
-      ...prev,
-      [key]: { ...prev[key], ...patch },
-    }))
-  }
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     saveMutation.mutate()
   }
 
-  const brandEntries = Object.entries(bareme.brand_factors || {})
-
   return (
     <div className="flex-1 flex flex-col bg-white">
       <Header
         title="Paramètres de tarification"
-        subtitle="Guide agent, barème CIMA, frais légaux et code de validation."
+        subtitle="Guide agent, assureurs, zones CIMA A/B/C, frais légaux et code de validation."
       />
 
       <div className="px-8 pt-6">
@@ -523,56 +597,10 @@ function SettingsContent() {
                 className="w-full rounded-md border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder={DEFAULT_GUIDE}
               />
-            </CardContent>
-          </Card>
-
-          {/* Barème */}
-          <Card className="border-gray-100 shadow-sm bg-white">
-            <CardHeader className="pb-4 border-b border-gray-50">
-              <CardTitle className="text-sm font-bold uppercase tracking-wider text-gray-400">
-                Barème indicatif (base + CV + marques)
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-6 space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {(['base_rate', 'cv_multiplier'] as const).map((key) => (
-                  <div key={key} className="space-y-2 border border-gray-100 rounded-lg p-3">
-                    <p className="text-[10px] font-bold text-gray-500 uppercase">
-                      {key === 'base_rate' ? 'Taux de base' : 'Multiplicateur CV'}
-                    </p>
-                    <select
-                      value={bareme[key].mode}
-                      onChange={(e) =>
-                        updateBaremeField(key, {
-                          mode: e.target.value as 'fixed' | 'percent',
-                        })
-                      }
-                      className="w-full h-10 text-xs border border-gray-200 rounded-md px-2"
-                    >
-                      <option value="fixed">Fixe (FCFA)</option>
-                      <option value="percent">Pourcentage</option>
-                    </select>
-                    <Input
-                      type="number"
-                      value={bareme[key].value}
-                      onChange={(e) =>
-                        updateBaremeField(key, { value: Number(e.target.value) })
-                      }
-                      className="h-10 text-xs"
-                    />
-                  </div>
-                ))}
-              </div>
-
-              <div className="space-y-3 rounded-md border border-amber-100 bg-amber-50/50 p-3">
-                <p className="text-[10px] font-bold text-amber-800 uppercase">
-                  Facteurs marques
-                </p>
-                <p className="text-xs text-amber-900/80">
-                  Le facteur marque n’est plus utilisé pour le calcul des devis. La tarification
-                  repose sur les barèmes multi-assureurs (RC × durée 20/40/60/100 % + frais).
-                </p>
-              </div>
+              <p className="text-[11px] text-slate-500">
+                Les primes viennent des barèmes Excel importés par assureur (catégorie × puissance ×
+                durée × zone A/B/C). Le taux de base et le multiplicateur CV ne sont plus utilisés.
+              </p>
             </CardContent>
           </Card>
 
@@ -719,6 +747,7 @@ function SettingsContent() {
         {activeTab === 'durations' && <DurationsPanel />}
         {activeTab === 'rc' && <RcTariffPanel />}
         {activeTab === 'fees' && <FeeSchedulePanel />}
+        {activeTab === 'branches' && <ProductLineTariffPanel />}
         {activeTab === 'validation' && <ValidationCodePanel />}
       </div>
     </div>

@@ -8,19 +8,7 @@ import {
   sessionCookieOptions,
   signSession,
 } from '@/lib/auth/session'
-
-const MAX_FILE_BYTES = 10 * 1024 * 1024
-const ALLOWED_MIME = new Set([
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'application/pdf',
-  'audio/mpeg',
-  'audio/mp4',
-  'audio/ogg',
-  'audio/webm',
-  'audio/wav',
-])
+import { validateUploadFile } from '@/lib/files/validation'
 
 function backendPath(segments: string[], search: string): string {
   return `/${segments.map(encodeURIComponent).join('/')}${search}`
@@ -36,8 +24,7 @@ async function requestBody(request: NextRequest): Promise<BodyInit | undefined> 
   const data = await request.formData()
   for (const value of data.values()) {
     if (typeof value !== 'string') {
-      if (value.size > MAX_FILE_BYTES) throw new Error('Chaque fichier est limité à 10 Mo')
-      if (!ALLOWED_MIME.has(value.type)) throw new Error(`Type de fichier interdit : ${value.type || 'inconnu'}`)
+      validateUploadFile({ size: value.size, type: value.type, name: value.name })
     }
   }
   return data
