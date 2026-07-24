@@ -439,7 +439,7 @@ function UsersContent() {
 
         {editingUser && (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <Card className="w-full max-w-md bg-white border border-gray-100 shadow-2xl rounded-2xl animate-in fade-in zoom-in-95 duration-200">
+            <Card className="w-full max-w-md bg-white border border-gray-100 shadow-2xl rounded-2xl max-h-[90vh] overflow-y-auto scrollbar-hide animate-in fade-in zoom-in-95 duration-200">
               <CardContent className="pt-6 space-y-4">
                 <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider pb-2 border-b border-gray-50">
                   Modifier le collaborateur
@@ -533,7 +533,7 @@ function UsersContent() {
 
         {tempPassword !== null && (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <Card className="w-full max-w-sm bg-white border border-gray-100 shadow-2xl rounded-2xl animate-in fade-in zoom-in-95 duration-200">
+            <Card className="w-full max-w-sm bg-white border border-gray-100 shadow-2xl rounded-2xl max-h-[90vh] overflow-y-auto scrollbar-hide animate-in fade-in zoom-in-95 duration-200">
               <CardContent className="pt-6 space-y-4 text-center">
                 <div className="h-12 w-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
                   <Check className="h-6 w-6" />
@@ -564,7 +564,7 @@ function UsersContent() {
 
         {deletingUser && (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <Card className="w-full max-w-sm bg-white border border-gray-100 shadow-2xl rounded-2xl animate-in fade-in zoom-in-95 duration-200">
+            <Card className="w-full max-w-sm bg-white border border-gray-100 shadow-2xl rounded-2xl max-h-[90vh] overflow-y-auto scrollbar-hide animate-in fade-in zoom-in-95 duration-200">
               <CardContent className="pt-6 space-y-4 text-center">
                 <div className="h-12 w-12 rounded-full bg-red-50 text-red-600 flex items-center justify-center mx-auto">
                   <X className="h-6 w-6" />

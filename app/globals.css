@@ -70,6 +70,25 @@ body {
   .text-balance {
       text-wrap: balance;
   }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Contenu scrollable des overlays plein écran (modales) */
+div.fixed.inset-0 [class*="overflow-y-auto"],
+div.fixed.inset-0 [class*="overflow-auto"] {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+div.fixed.inset-0 [class*="overflow-y-auto"]::-webkit-scrollbar,
+div.fixed.inset-0 [class*="overflow-auto"]::-webkit-scrollbar {
+  display: none;
 }
 
 /* Base CSS variables */

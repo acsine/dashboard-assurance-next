@@ -7,6 +7,7 @@ import {
   tariffApi,
   usersApi,
   MobiAssurApiError,
+  insurerSupportsLine,
   type ConversionPayload,
   type ConversionRequest,
   type Prospect,
@@ -369,7 +370,7 @@ export default function ProspectsPage() {
 
   const quoteCatalogReady = useMemo(() => {
     const insurers = (bootstrap?.insurers ?? []).filter(
-      (i) => i.is_active && (i.product_line || 'AUTO') === 'AUTO',
+      (i) => i.is_active && insurerSupportsLine(i, 'AUTO'),
     )
     if (insurers.length === 0) {
       return {
@@ -980,7 +981,7 @@ export default function ProspectsPage() {
       {/* Modal marquer intéressé */}
       {interestedProspect && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <Card className="w-full max-w-lg bg-white border border-gray-100 shadow-2xl rounded-2xl max-h-[90vh] overflow-y-auto">
+          <Card className="w-full max-w-lg bg-white border border-gray-100 shadow-2xl rounded-2xl max-h-[90vh] overflow-y-auto scrollbar-hide">
             <CardContent className="pt-6 space-y-4">
               <div className="pb-2 border-b border-gray-50">
                 <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
@@ -1057,7 +1058,7 @@ export default function ProspectsPage() {
       {/* Modal conversion directe */}
       {convertingProspect && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <Card className="w-full max-w-lg bg-white border border-gray-100 shadow-2xl rounded-2xl max-h-[90vh] overflow-y-auto">
+          <Card className="w-full max-w-lg bg-white border border-gray-100 shadow-2xl rounded-2xl max-h-[90vh] overflow-y-auto scrollbar-hide">
             <CardContent className="pt-6 space-y-4">
               <div className="pb-2 border-b border-gray-50">
                 <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
@@ -1225,7 +1226,7 @@ export default function ProspectsPage() {
       {/* Modal approbation conversion */}
       {approvingRequest && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <Card className="w-full max-w-md bg-white border border-gray-100 shadow-2xl rounded-2xl">
+          <Card className="w-full max-w-md bg-white border border-gray-100 shadow-2xl rounded-2xl max-h-[90vh] overflow-y-auto scrollbar-hide">
             <CardContent className="pt-6 space-y-4">
               <div className="pb-2 border-b border-gray-50">
                 <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">

@@ -956,16 +956,51 @@ export interface FeeSchedule {
   updated_by?: string | null
 }
 
+export type ProductLineCode = 'AUTO' | 'SANTE' | 'VOYAGE' | 'AUTRE'
+
 export interface Insurer {
   id: string
   agency_id?: string
   code: string
   name: string
   logo_url?: string
-  product_line?: 'AUTO' | 'SANTE' | 'VOYAGE' | 'AUTRE'
+  /** Branches couvertes (multi). */
+  product_lines?: ProductLineCode[]
+  /** @deprecated dérivé : AUTO si présent, sinon première branche */
+  product_line?: ProductLineCode
   is_active: boolean
   created_at?: string
   updated_at?: string
+}
+
+export function insurerProductLines(ins: {
+  product_lines?: string[] | null
+  product_line?: string | null
+}): ProductLineCode[] {
+  const raw = Array.isArray(ins.product_lines) ? ins.product_lines : []
+  const cleaned = raw
+    .map((l) => String(l || '').toUpperCase())
+    .filter((l): l is ProductLineCode =>
+      l === 'AUTO' || l === 'SANTE' || l === 'VOYAGE' || l === 'AUTRE',
+    )
+  if (cleaned.length > 0) return [...new Set(cleaned)]
+  const fallback = String(ins.product_line || 'AUTO').toUpperCase()
+  if (
+    fallback === 'AUTO' ||
+    fallback === 'SANTE' ||
+    fallback === 'VOYAGE' ||
+    fallback === 'AUTRE'
+  ) {
+    return [fallback]
+  }
+  return ['AUTO']
+}
+
+export function insurerSupportsLine(
+  ins: { product_lines?: string[] | null; product_line?: string | null },
+  line: ProductLineCode,
+): boolean {
+  return insurerProductLines(ins).includes(line)
 }
 
 export interface InsurerPolicy {
@@ -976,6 +1011,7 @@ export interface InsurerPolicy {
     code: string
     name: string
     product_line?: string
+    product_lines?: ProductLineCode[]
   } | null
 }
 

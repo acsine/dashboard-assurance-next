@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import {
   insurersApi,
   tariffApi,
+  insurerSupportsLine,
   type CirculationZone,
   type ContractDuration,
   type FeeSchedule,
@@ -593,7 +594,7 @@ export function RcTariffPanel() {
     queryFn: () => insurersApi.list(),
   })
   const autoInsurers = (Array.isArray(insurers) ? insurers : []).filter(
-    (i) => i.is_active && (i.product_line || 'AUTO') === 'AUTO',
+    (i) => i.is_active && insurerSupportsLine(i, 'AUTO'),
   )
 
   const { data: lines = [], isLoading } = useQuery({
@@ -972,7 +973,7 @@ export function FeeSchedulePanel() {
   })
 
   const activeInsurers = (insurers as Insurer[]).filter(
-    (i) => i.is_active && (i.product_line || 'AUTO') === 'AUTO',
+    (i) => i.is_active && insurerSupportsLine(i, 'AUTO'),
   )
 
   useEffect(() => {
@@ -1273,7 +1274,7 @@ export function ProductLineTariffPanel() {
     queryFn: () => insurersApi.list(),
   })
   const branchInsurers = (Array.isArray(insurers) ? insurers : []).filter(
-    (i) => i.is_active && (i.product_line || 'AUTO') === productLine,
+    (i) => i.is_active && insurerSupportsLine(i, productLine),
   )
 
   const { data: tariffs = [], isLoading } = useQuery({

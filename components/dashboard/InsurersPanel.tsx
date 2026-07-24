@@ -5,15 +5,71 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   insurersApi,
   tariffApi,
+  insurerProductLines,
+  insurerSupportsLine,
   type FeeSchedule,
   type Insurer,
   type InsurerPolicy,
   type InsurerWithFees,
+  type ProductLineCode,
 } from '@/lib/api/mobi-assur'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { Loader2, Pencil, Plus, RefreshCw, Upload } from 'lucide-react'
+
+const ALL_PRODUCT_LINES: { code: ProductLineCode; label: string }[] = [
+  { code: 'AUTO', label: 'Automobile' },
+  { code: 'SANTE', label: 'Santé' },
+  { code: 'VOYAGE', label: 'Voyage' },
+  { code: 'AUTRE', label: 'Autre' },
+]
+
+function ProductLinesCheckboxes({
+  value,
+  onChange,
+}: {
+  value: ProductLineCode[]
+  onChange: (next: ProductLineCode[]) => void
+}) {
+  const toggle = (code: ProductLineCode) => {
+    if (value.includes(code)) {
+      const next = value.filter((c) => c !== code)
+      if (next.length === 0) {
+        toast.error('Sélectionnez au moins une branche')
+        return
+      }
+      onChange(next)
+    } else {
+      onChange([...value, code])
+    }
+  }
+  return (
+    <div className="flex flex-wrap gap-2">
+      {ALL_PRODUCT_LINES.map((line) => {
+        const checked = value.includes(line.code)
+        return (
+          <label
+            key={line.code}
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] cursor-pointer ${
+              checked
+                ? 'border-blue-500 bg-blue-50 text-blue-800 font-semibold'
+                : 'border-gray-200 bg-white text-gray-600'
+            }`}
+          >
+            <input
+              type="checkbox"
+              className="sr-only"
+              checked={checked}
+              onChange={() => toggle(line.code)}
+            />
+            {line.label}
+          </label>
+        )
+      })}
+    </div>
+  )
+}
 
 function generateInsurerCode(name: string): string {
   const slug = name
@@ -171,7 +227,7 @@ function InsurerFeesEditModal({
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl border border-gray-100">
+      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto scrollbar-hide rounded-2xl bg-white shadow-2xl border border-gray-100">
         <div className="p-5 border-b border-gray-50">
           <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
             Modifier les tarifs — {insurer.name}
@@ -226,7 +282,9 @@ function InsurerFeesEditModal({
 export function InsurersPanelContent() {
   const [newInsurerCode, setNewInsurerCode] = useState('')
   const [newInsurerName, setNewInsurerName] = useState('')
-  const [newInsurerLine, setNewInsurerLine] = useState<'AUTO' | 'SANTE' | 'VOYAGE' | 'AUTRE'>('AUTO')
+  const [newInsurerLines, setNewInsurerLines] = useState<ProductLineCode[]>(['AUTO'])
+  const [editingLinesInsurerId, setEditingLinesInsurerId] = useState<string | null>(null)
+  const [editingLinesDraft, setEditingLinesDraft] = useState<ProductLineCode[]>(['AUTO'])
   const [pickingInsurerId, setPickingInsurerId] = useState<string | null>(null)
   const [importingInsurerId, setImportingInsurerId] = useState<string | null>(null)
   const [lastImportSummary, setLastImportSummary] = useState<string | null>(null)
@@ -266,16 +324,16 @@ export function InsurersPanelContent() {
     mutationFn: ({
       code,
       name,
-      product_line,
+      product_lines,
     }: {
       code: string
       name: string
-      product_line: 'AUTO' | 'SANTE' | 'VOYAGE' | 'AUTRE'
-    }) => insurersApi.create({ code, name, product_line, is_active: true }),
+      product_lines: ProductLineCode[]
+    }) => insurersApi.create({ code, name, product_lines, is_active: true }),
     onSuccess: () => {
       setNewInsurerCode('')
       setNewInsurerName('')
-      setNewInsurerLine('AUTO')
+      setNewInsurerLines(['AUTO'])
       refresh()
       toast.success('Assureur créé avec succès')
     },
@@ -287,7 +345,7 @@ export function InsurersPanelContent() {
       insurersApi.update(ins.id, {
         code: ins.code,
         name: ins.name,
-        product_line: ins.product_line || 'AUTO',
+        product_lines: insurerProductLines(ins),
         is_active: !ins.is_active,
       }),
     onSuccess: () => {
@@ -295,6 +353,28 @@ export function InsurersPanelContent() {
       toast.success("Statut de l'assureur mis à jour")
     },
     onError: (err: Error) => toast.error(err.message || 'Erreur lors de la mise à jour'),
+  })
+
+  const updateLinesMutation = useMutation({
+    mutationFn: ({
+      ins,
+      product_lines,
+    }: {
+      ins: InsurerWithFees
+      product_lines: ProductLineCode[]
+    }) =>
+      insurersApi.update(ins.id, {
+        code: ins.code,
+        name: ins.name,
+        product_lines,
+        is_active: ins.is_active,
+      }),
+    onSuccess: () => {
+      setEditingLinesInsurerId(null)
+      refresh()
+      toast.success('Branches mises à jour')
+    },
+    onError: (err: Error) => toast.error(err.message || 'Erreur branches'),
   })
 
   const policyMutation = useMutation({
@@ -384,7 +464,7 @@ export function InsurersPanelContent() {
   }
 
   const autoInsurers = insurers.filter(
-    (i) => i.is_active && (i.product_line || 'AUTO') === 'AUTO',
+    (i) => i.is_active && insurerSupportsLine(i, 'AUTO'),
   )
   const autoWithFees = autoInsurers.filter((i) => i.fees != null)
   let agentsBlockReason: string | null = null
@@ -527,10 +607,14 @@ export function InsurersPanelContent() {
                 toast.error('Veuillez remplir tous les champs')
                 return
               }
+              if (newInsurerLines.length === 0) {
+                toast.error('Sélectionnez au moins une branche')
+                return
+              }
               createInsurerMutation.mutate({
                 code: newInsurerCode,
                 name: newInsurerName,
-                product_line: newInsurerLine,
+                product_lines: newInsurerLines,
               })
             }}
             className="p-4 border border-gray-100 rounded-lg bg-gray-50/30 space-y-3"
@@ -538,7 +622,7 @@ export function InsurersPanelContent() {
             <h4 className="text-xs font-bold text-gray-600 uppercase tracking-wider">
               Ajouter un Assureur
             </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="flex gap-1.5">
                 <Input
                   placeholder="Code"
@@ -563,18 +647,12 @@ export function InsurersPanelContent() {
                 onChange={(e) => setNewInsurerName(e.target.value)}
                 className="h-10 text-xs border-gray-200"
               />
-              <select
-                value={newInsurerLine}
-                onChange={(e) =>
-                  setNewInsurerLine(e.target.value as 'AUTO' | 'SANTE' | 'VOYAGE' | 'AUTRE')
-                }
-                className="h-10 text-xs border border-gray-200 rounded-md px-2 bg-white"
-              >
-                <option value="AUTO">Automobile</option>
-                <option value="SANTE">Santé</option>
-                <option value="VOYAGE">Voyage</option>
-                <option value="AUTRE">Autre</option>
-              </select>
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                Branches couvertes
+              </p>
+              <ProductLinesCheckboxes value={newInsurerLines} onChange={setNewInsurerLines} />
             </div>
             <Button
               type="submit"
@@ -587,7 +665,12 @@ export function InsurersPanelContent() {
           </form>
 
           <div className="space-y-3">
-            {insurers.map((insurer) => (
+            {insurers.map((insurer) => {
+              const lines = insurerProductLines(insurer)
+              const hasAuto = insurerSupportsLine(insurer, 'AUTO')
+              const hasOtherBranches = lines.some((l) => l !== 'AUTO')
+              const isEditingLines = editingLinesInsurerId === insurer.id
+              return (
               <div
                 key={insurer.id}
                 className="p-4 border border-gray-100 rounded-lg bg-white space-y-3"
@@ -602,9 +685,17 @@ export function InsurersPanelContent() {
                         </span>
                       )}
                     </div>
-                    <span className="text-xs text-gray-400">
-                      {insurer.code} · {insurer.product_line || 'AUTO'}
-                    </span>
+                    <span className="text-xs text-gray-400">{insurer.code}</span>
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {lines.map((line) => (
+                        <span
+                          key={line}
+                          className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600"
+                        >
+                          {line}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                   <button
                     type="button"
@@ -619,6 +710,40 @@ export function InsurersPanelContent() {
                   </button>
                 </div>
 
+                {isEditingLines ? (
+                  <div className="rounded-lg border border-blue-100 bg-blue-50/40 p-3 space-y-2">
+                    <p className="text-[10px] font-bold text-blue-800 uppercase">Branches</p>
+                    <ProductLinesCheckboxes
+                      value={editingLinesDraft}
+                      onChange={setEditingLinesDraft}
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={updateLinesMutation.isPending}
+                        isLoading={updateLinesMutation.isPending}
+                        onClick={() =>
+                          updateLinesMutation.mutate({
+                            ins: insurer,
+                            product_lines: editingLinesDraft,
+                          })
+                        }
+                      >
+                        Enregistrer
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setEditingLinesInsurerId(null)}
+                      >
+                        Annuler
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+
                 <div className="pt-3 border-t border-gray-50 flex flex-wrap gap-2">
                   <Button
                     type="button"
@@ -627,9 +752,21 @@ export function InsurersPanelContent() {
                     className="text-xs"
                     onClick={() => setEditingInsurer(insurer)}
                   >
-                    <Pencil className="h-3.5 w-3.5 mr-1" /> Éditer
+                    <Pencil className="h-3.5 w-3.5 mr-1" /> Éditer frais
                   </Button>
-                  {(insurer.product_line || 'AUTO') === 'AUTO' ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="text-xs"
+                    onClick={() => {
+                      setEditingLinesInsurerId(insurer.id)
+                      setEditingLinesDraft(lines)
+                    }}
+                  >
+                    Branches
+                  </Button>
+                  {hasAuto ? (
                     <Button
                       type="button"
                       size="sm"
@@ -655,11 +792,12 @@ export function InsurersPanelContent() {
                         </>
                       )}
                     </Button>
-                  ) : (
+                  ) : null}
+                  {hasOtherBranches ? (
                     <p className="text-[11px] text-slate-500 self-center">
-                      Branche {insurer.product_line} — tarifs dans l’onglet Santé / Voyage.
+                      Tarifs hors auto : onglet Santé / Voyage.
                     </p>
-                  )}
+                  ) : null}
                   {lastImportedInsurerId === insurer.id && lastImportSummary && (
                     <p className="w-full text-[10px] text-slate-500 break-all leading-relaxed">
                       {lastImportSummary}
@@ -667,7 +805,8 @@ export function InsurersPanelContent() {
                   )}
                 </div>
               </div>
-            ))}
+              )
+            })}
             {insurers.length === 0 && (
               <div className="py-8 text-center text-gray-400">
                 <p className="text-sm">Aucun assureur créé</p>
