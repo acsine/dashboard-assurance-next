@@ -1,24 +1,34 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { proxiedAssetUrl, supportApi } from '@/lib/api/mobi-assur'
 import Header from '@/components/dashboard/Header'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { toast } from 'sonner'
-import { MessageSquare, Send, Play, Pause, Volume2, Clock, CheckCircle, Phone } from 'lucide-react'
+import {
+  MessageSquare,
+  Send,
+  Play,
+  Pause,
+  Volume2,
+  Clock,
+  CheckCircle,
+  Phone,
+  Search,
+} from 'lucide-react'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { useSupportNotificationsStore } from '@/lib/stores/support-notifications-store'
 import { can, ROLES } from '@/lib/auth/roles'
 import { SupportContactsPanel } from '@/components/dashboard/SupportContactsPanel'
 
-function formatAgentReference(agentId?: string, agentEmail?: string): string {
-  if (agentEmail) return agentEmail
-  if (!agentId) return 'Non renseigné'
-  return agentId.length > 8 ? agentId.substring(0, 8).toUpperCase() : agentId.toUpperCase()
+function formatParticipantLabel(name?: string | null, email?: string | null, code?: string | null) {
+  if (name?.trim()) return name.trim()
+  if (email?.trim()) return email.trim()
+  if (code?.trim()) return code.trim()
+  return 'Interlocuteur'
 }
 
 export default function SupportPage() {
@@ -34,76 +44,107 @@ export default function SupportPage() {
     (s) => s.pushInboundFromMessage,
   )
   const [leftTab, setLeftTab] = useState<'tickets' | 'contacts'>('tickets')
-  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null)
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [messageText, setMessageText] = useState('')
   const [playingAudioUrl, setPlayingAudioUrl] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
 
-  const { data: tickets = [], isLoading: ticketsLoading } = useQuery({
-    queryKey: ['tickets'],
-    queryFn: () => supportApi.listTickets(),
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
+  const { data: conversations = [], isLoading: conversationsLoading } = useQuery({
+    queryKey: ['support-conversations', debouncedSearch],
+    queryFn: () => supportApi.listConversations(debouncedSearch || undefined),
     refetchInterval: 20_000,
   })
 
+  // Résolution deep-link ?ticket=… → discussion agent
+  const { data: tickets = [] } = useQuery({
+    queryKey: ['tickets'],
+    queryFn: () => supportApi.listTickets(),
+    refetchInterval: 60_000,
+  })
+
   const { data: messages = [], isLoading: messagesLoading } = useQuery({
-    queryKey: ['messages', selectedTicketId],
+    queryKey: ['conversation-messages', selectedAgentId],
     queryFn: () =>
-      selectedTicketId ? supportApi.getMessages(selectedTicketId) : Promise.resolve([]),
-    enabled: !!selectedTicketId,
-    refetchInterval: selectedTicketId ? 12_000 : false,
+      selectedAgentId
+        ? supportApi.getConversationMessages(selectedAgentId)
+        : Promise.resolve([]),
+    enabled: !!selectedAgentId,
+    refetchInterval: selectedAgentId ? 12_000 : false,
   })
 
   const sendMessageMutation = useMutation({
-    mutationFn: ({ ticketId, content }: { ticketId: string; content: string }) =>
-      supportApi.sendMessage(ticketId, content),
+    mutationFn: ({ agentId, content }: { agentId: string; content: string }) =>
+      supportApi.sendConversationMessage(agentId, content),
     onSuccess: () => {
       setMessageText('')
-      queryClient.invalidateQueries({ queryKey: ['messages', selectedTicketId] })
-      queryClient.invalidateQueries({ queryKey: ['tickets'] })
+      queryClient.invalidateQueries({ queryKey: ['conversation-messages', selectedAgentId] })
+      queryClient.invalidateQueries({ queryKey: ['support-conversations'] })
     },
     onError: (err: any) => {
       toast.error(err.message || "Erreur d'envoi")
     },
   })
 
-  // Deep-link ?ticket=...
   useEffect(() => {
     const ticketFromUrl = searchParams.get('ticket')
-    if (ticketFromUrl) {
-      setSelectedTicketId(ticketFromUrl)
-      markTicketRead(ticketFromUrl)
+    const agentFromUrl = searchParams.get('agent')
+    if (agentFromUrl) {
+      setSelectedAgentId(agentFromUrl)
+      return
     }
-  }, [searchParams, markTicketRead])
+    if (ticketFromUrl) {
+      const ticket = tickets.find((t) => t.id === ticketFromUrl)
+      if (ticket?.agent_id) {
+        setSelectedAgentId(ticket.agent_id)
+        markTicketRead(ticketFromUrl)
+      } else {
+        const viaLatest = conversations.find((c) => c.latest_ticket_id === ticketFromUrl)
+        if (viaLatest) {
+          setSelectedAgentId(viaLatest.participant_id)
+          markTicketRead(ticketFromUrl)
+        }
+      }
+    }
+  }, [searchParams, tickets, conversations, markTicketRead])
 
   useEffect(() => {
-    if (selectedTicketId) markTicketRead(selectedTicketId)
-  }, [selectedTicketId, markTicketRead])
+    if (!selectedAgentId) return
+    const conv = conversations.find((c) => c.participant_id === selectedAgentId)
+    if (conv?.latest_ticket_id) markTicketRead(conv.latest_ticket_id)
+  }, [selectedAgentId, conversations, markTicketRead])
 
-  // Accusé de lecture serveur dès que le fil est affiché.
   useEffect(() => {
-    if (!selectedTicketId || !currentUserId || messages.length === 0) return
+    if (!selectedAgentId || !currentUserId || messages.length === 0) return
     const hasUnreadInbound = messages.some(
       (m) =>
         !m.read_at &&
         m.sender_id?.toString() !== currentUserId.toString(),
     )
     if (!hasUnreadInbound) return
-    void supportApi.markMessagesRead(selectedTicketId).catch(() => undefined)
-  }, [selectedTicketId, currentUserId, messages])
+    void supportApi.markConversationRead(selectedAgentId).then(() => {
+      queryClient.invalidateQueries({ queryKey: ['support-conversations'] })
+      queryClient.invalidateQueries({ queryKey: ['conversation-messages', selectedAgentId] })
+    }).catch(() => undefined)
+  }, [selectedAgentId, currentUserId, messages, queryClient])
 
-  // Filet cloche : poll messages des tickets non sélectionnés (si SSE KO).
-  // Premier passage = amorçage (pas de badge), puis uniquement les nouveaux ids.
   const seenMessageIdsRef = useRef<Set<string>>(new Set())
   const bellPrimedRef = useRef(false)
   useEffect(() => {
-    if (tickets.length === 0) return
+    if (conversations.length === 0) return
     let cancelled = false
-    const syncOtherTickets = async () => {
-      const others = tickets.filter((t) => t.id !== selectedTicketId)
-      for (const ticket of others.slice(0, 12)) {
+    const syncOtherConversations = async () => {
+      const others = conversations.filter((c) => c.participant_id !== selectedAgentId)
+      for (const conv of others.slice(0, 12)) {
         try {
-          const msgs = await supportApi.getMessages(ticket.id)
+          const msgs = await supportApi.getConversationMessages(conv.participant_id)
           if (cancelled) return
           for (const m of msgs) {
             const id = m.id?.toString()
@@ -115,26 +156,29 @@ export default function SupportPage() {
             if (seenMessageIdsRef.current.has(id)) continue
             seenMessageIdsRef.current.add(id)
             pushInboundFromMessage(
-              { ...m, ticket_id: m.ticket_id || ticket.id },
+              { ...m, ticket_id: m.ticket_id || conv.latest_ticket_id || conv.participant_id },
               {
                 currentUserId: currentUserId,
-                skipTicketId: selectedTicketId,
+                skipTicketId: selectedAgentId
+                  ? conversations.find((c) => c.participant_id === selectedAgentId)
+                      ?.latest_ticket_id
+                  : null,
               },
             )
           }
         } catch {
-          // ignore per-ticket errors
+          // ignore
         }
       }
       bellPrimedRef.current = true
     }
-    void syncOtherTickets()
-    const timer = setInterval(() => void syncOtherTickets(), 15_000)
+    void syncOtherConversations()
+    const timer = setInterval(() => void syncOtherConversations(), 15_000)
     return () => {
       cancelled = true
       clearInterval(timer)
     }
-  }, [tickets, selectedTicketId, currentUserId, pushInboundFromMessage])
+  }, [conversations, selectedAgentId, currentUserId, pushInboundFromMessage])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -142,8 +186,8 @@ export default function SupportPage() {
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedTicketId || !messageText.trim()) return
-    sendMessageMutation.mutate({ ticketId: selectedTicketId, content: messageText })
+    if (!selectedAgentId || !messageText.trim()) return
+    sendMessageMutation.mutate({ agentId: selectedAgentId, content: messageText })
   }
 
   const togglePlayAudio = (url: string) => {
@@ -164,13 +208,16 @@ export default function SupportPage() {
     }
   }
 
-  const selectedTicket = tickets.find((t) => t.id === selectedTicketId)
+  const selectedConversation = useMemo(
+    () => conversations.find((c) => c.participant_id === selectedAgentId) || null,
+    [conversations, selectedAgentId],
+  )
 
   return (
     <div className="flex-1 flex flex-col bg-slate-50 h-screen overflow-hidden">
       <Header
         title="Support & Assistance Agents"
-        subtitle="Échangez en direct avec vos agents sur le terrain et écoutez leurs signalements vocaux."
+        subtitle="Une discussion par agent — recherchez un interlocuteur et suivez les messages non lus."
       />
 
       <div className="flex-1 flex overflow-hidden p-6 gap-6">
@@ -186,7 +233,7 @@ export default function SupportPage() {
                     : 'bg-slate-50 text-slate-500'
                 }`}
               >
-                Tickets
+                Discussions
               </button>
               <button
                 type="button"
@@ -208,52 +255,99 @@ export default function SupportPage() {
             <SupportContactsPanel />
           ) : (
             <>
-              <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+              <div className="p-4 border-b border-slate-100 bg-slate-50/50 space-y-3">
                 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                  Tickets Actifs
+                  Discussions
                 </h3>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                  <Input
+                    type="search"
+                    placeholder="Rechercher un agent…"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="h-9 pl-8 text-xs border-slate-200 rounded-lg bg-white"
+                  />
+                </div>
               </div>
               <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
-                {ticketsLoading ? (
+                {conversationsLoading ? (
                   <div className="p-8 text-center text-xs text-slate-400">Chargement...</div>
-                ) : tickets.length === 0 ? (
-                  <div className="p-8 text-center text-xs text-slate-400">Aucun ticket de support</div>
+                ) : conversations.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-slate-400">
+                    {debouncedSearch
+                      ? 'Aucun agent trouvé pour cette recherche'
+                      : 'Aucune discussion'}
+                  </div>
                 ) : (
-                  tickets.map((t) => (
-                    <button
-                      key={t.id}
-                      onClick={() => setSelectedTicketId(t.id)}
-                      className={`w-full text-left p-4 hover:bg-slate-50 transition-colors flex flex-col gap-1 border-0 cursor-pointer ${
-                        selectedTicketId === t.id ? 'bg-blue-50/50 border-r-4 border-blue-600' : ''
-                      }`}
-                    >
-                      <div className="flex justify-between items-start w-full">
-                        <span className="font-semibold text-xs text-slate-900 truncate w-3/4">
-                          {t.subject}
-                        </span>
-                        <span
-                          className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
-                            t.status === 'OUVERT'
-                              ? 'bg-red-50 text-red-600'
-                              : 'bg-green-50 text-green-600'
-                          }`}
-                        >
-                          {t.status}
-                        </span>
-                      </div>
-                      {t.description && (
-                        <p className="text-[11px] text-slate-500 truncate w-full">{t.description}</p>
-                      )}
-                      <div className="flex items-center gap-1.5 mt-2 text-[10px] text-slate-400">
-                        <Clock className="h-3 w-3" />
-                        <span>{new Date(t.created_at).toLocaleDateString()}</span>
-                        <span>•</span>
-                        <span className="font-mono">
-                          {formatAgentReference(t.agent_id, t.agent_email)}
-                        </span>
-                      </div>
-                    </button>
-                  ))
+                  conversations.map((c) => {
+                    const isSelected = selectedAgentId === c.participant_id
+                    const unread = c.unread_count || 0
+                    return (
+                      <button
+                        key={c.participant_id}
+                        type="button"
+                        onClick={() => setSelectedAgentId(c.participant_id)}
+                        className={`w-full text-left p-4 hover:bg-slate-50 transition-colors flex flex-col gap-1 border-0 cursor-pointer ${
+                          isSelected ? 'bg-blue-50/50 border-r-4 border-blue-600' : ''
+                        }`}
+                      >
+                        <div className="flex justify-between items-start w-full gap-2">
+                          <span className="font-semibold text-xs text-slate-900 truncate flex-1">
+                            {formatParticipantLabel(
+                              c.participant_name,
+                              c.participant_email,
+                              c.participant_code,
+                            )}
+                          </span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {unread > 0 && (
+                              <span className="min-w-[1.25rem] h-5 px-1.5 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center">
+                                {unread > 99 ? '99+' : unread}
+                              </span>
+                            )}
+                            <span
+                              className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
+                                c.open_ticket_count > 0 || c.status === 'OUVERT'
+                                  ? 'bg-red-50 text-red-600'
+                                  : 'bg-green-50 text-green-600'
+                              }`}
+                            >
+                              {c.open_ticket_count > 0 ? 'OUVERT' : c.status}
+                            </span>
+                          </div>
+                        </div>
+                        {c.participant_code && (
+                          <p className="text-[10px] text-slate-400 font-mono truncate">
+                            {c.participant_code}
+                            {c.participant_email ? ` · ${c.participant_email}` : ''}
+                          </p>
+                        )}
+                        {c.last_message_preview && (
+                          <p className="text-[11px] text-slate-500 truncate w-full">
+                            {c.last_message_preview}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-1.5 mt-1 text-[10px] text-slate-400">
+                          <Clock className="h-3 w-3" />
+                          <span>
+                            {c.last_activity_at
+                              ? new Date(c.last_activity_at).toLocaleString('fr-FR', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })
+                              : '—'}
+                          </span>
+                          <span>•</span>
+                          <span>
+                            {c.ticket_count} fil{c.ticket_count > 1 ? 's' : ''}
+                          </span>
+                        </div>
+                      </button>
+                    )
+                  })
                 )}
               </div>
             </>
@@ -261,53 +355,50 @@ export default function SupportPage() {
         </Card>
 
         <Card className="flex-1 border-slate-200 shadow-sm flex flex-col bg-white overflow-hidden">
-          {selectedTicket ? (
+          {selectedConversation ? (
             <>
               <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/30">
                 <div>
-                  <h4 className="text-sm font-bold text-slate-950">{selectedTicket.subject}</h4>
+                  <h4 className="text-sm font-bold text-slate-950">
+                    {formatParticipantLabel(
+                      selectedConversation.participant_name,
+                      selectedConversation.participant_email,
+                      selectedConversation.participant_code,
+                    )}
+                  </h4>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Canal :{' '}
-                    <span className="font-semibold text-blue-600">{selectedTicket.channel}</span> •
-                    Agent :{' '}
-                    <span className="font-semibold font-mono">
-                      {formatAgentReference(selectedTicket.agent_id, selectedTicket.agent_email)}
-                    </span>
+                    {selectedConversation.participant_type === 'CLIENT' ? 'Client' : 'Agent'}
+                    {selectedConversation.participant_code
+                      ? ` · ${selectedConversation.participant_code}`
+                      : ''}
+                    {selectedConversation.participant_email
+                      ? ` · ${selectedConversation.participant_email}`
+                      : ''}
+                    {selectedConversation.subject
+                      ? ` · ${selectedConversation.subject}`
+                      : ''}
                   </p>
                 </div>
                 <span className="inline-flex items-center gap-1 text-[11px] text-slate-500">
                   <CheckCircle className="h-4 w-4 text-green-500" />
-                  Support Actif
+                  Discussion active
                 </span>
               </div>
 
               <div className="flex-1 p-6 overflow-y-auto bg-slate-55 space-y-4">
-                {selectedTicket.description && (
-                  <div className="flex justify-start">
-                    <div className="max-w-[70%] bg-slate-100 border border-slate-200 text-slate-800 p-3 rounded-2xl rounded-tl-none">
-                      <span className="text-[9px] font-bold text-slate-400 block mb-1">
-                        DESCRIPTION TICKET
-                      </span>
-                      <p className="text-xs leading-relaxed">{selectedTicket.description}</p>
-                    </div>
-                  </div>
-                )}
-
                 {messagesLoading ? (
                   <div className="py-20 text-center text-xs text-slate-400">
                     Chargement de la discussion...
                   </div>
                 ) : messages.length === 0 ? (
                   <div className="py-16 text-center text-xs text-slate-400">
-                    Aucun message pour l&apos;instant. Répondez à l&apos;agent ci-dessous.
+                    Aucun message pour l&apos;instant. Répondez ci-dessous.
                   </div>
                 ) : (
                   messages.map((m) => {
                     const isMe = currentUserId
                       ? m.sender_id?.toString() === currentUserId.toString()
-                      : selectedTicket.agent_id
-                        ? m.sender_id?.toString() !== selectedTicket.agent_id.toString()
-                        : false
+                      : m.sender_id?.toString() !== selectedConversation.participant_id
                     const audioUrl = m.voice_playback_url || m.voice_url
                     return (
                       <div
@@ -356,6 +447,7 @@ export default function SupportPage() {
                           {audioUrl && (
                             <div className="mt-2 flex items-center gap-2 bg-black/5 p-2 rounded-xl border border-black/10">
                               <button
+                                type="button"
                                 onClick={() => togglePlayAudio(audioUrl)}
                                 className="h-8 w-8 rounded-full bg-blue-500 hover:bg-blue-400 text-white flex items-center justify-center cursor-pointer border-0 active:scale-95 transition-all"
                               >
@@ -409,8 +501,7 @@ export default function SupportPage() {
               <MessageSquare className="h-16 w-16 text-slate-200 mb-4" />
               <h4 className="text-sm font-bold text-slate-700">Aucune conversation sélectionnée</h4>
               <p className="text-xs text-slate-500 mt-1 max-w-xs">
-                Sélectionnez un ticket dans la liste latérale pour débuter l&apos;assistance en
-                direct.
+                Sélectionnez un agent dans la liste pour ouvrir sa discussion.
               </p>
             </div>
           )}

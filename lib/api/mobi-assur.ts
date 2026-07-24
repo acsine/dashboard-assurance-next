@@ -257,6 +257,24 @@ export interface SupportTicket {
   created_at: string
 }
 
+/** Une discussion = un agent (tous ses tickets agrégés). */
+export interface SupportConversation {
+  id: string
+  participant_type: 'AGENT' | 'CLIENT'
+  participant_id: string
+  participant_name: string
+  participant_email?: string | null
+  participant_code?: string | null
+  latest_ticket_id?: string | null
+  subject?: string | null
+  ticket_count: number
+  open_ticket_count: number
+  unread_count: number
+  last_message_preview?: string | null
+  last_activity_at?: string | null
+  status: string
+}
+
 export interface SupportContact {
   id: string
   agency_id?: string
@@ -284,6 +302,22 @@ export interface ChatMessage {
 
 export const supportApi = {
   listTickets: () => mobiRequest<SupportTicket[]>('/support/tickets'),
+  listConversations: (q?: string) =>
+    mobiRequest<SupportConversation[]>(
+      `/support/conversations${q?.trim() ? `?q=${encodeURIComponent(q.trim())}` : ''}`,
+    ),
+  getConversationMessages: (agentId: string) =>
+    mobiRequest<ChatMessage[]>(`/support/conversations/${agentId}/messages`),
+  sendConversationMessage: (agentId: string, content: string) =>
+    mobiRequest<ChatMessage>(`/support/conversations/${agentId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    }),
+  markConversationRead: (agentId: string) =>
+    mobiRequest<{ message_ids: string[]; read_at?: string }>(
+      `/support/conversations/${agentId}/messages/read`,
+      { method: 'POST' },
+    ),
   getMessages: (ticketId: string) => mobiRequest<ChatMessage[]>(`/support/tickets/${ticketId}/messages`),
   sendMessage: (ticketId: string, content: string) =>
     mobiRequest<ChatMessage>(`/support/tickets/${ticketId}/messages`, {
@@ -764,9 +798,24 @@ export interface WithdrawalRequest {
   id: string
   agent_id: string
   amount: number
+  method?: string
   status: string
   motif?: string
   created_at?: string
+  requested_at?: string
+  validated_at?: string | null
+  completed_at?: string | null
+  payment_reference?: string | null
+  payment_date?: string | null
+  rejection_reason?: string | null
+  admin_notes?: string | null
+  agent_name?: string | null
+  agent_email?: string | null
+  agent_phone?: string | null
+  agent_code?: string | null
+  available_balance?: number | null
+  pending_balance?: number | null
+  pending_withdrawal_balance?: number | null
 }
 
 export interface PendingBreakdown {
@@ -797,6 +846,15 @@ export interface AgentWallet {
 export const walletApi = {
   listPendingWithdrawals: () =>
     mobiRequest<WithdrawalRequest[]>('/wallet/withdrawals/pending'),
+  listWithdrawalHistory: (params?: { q?: string; status?: string }) => {
+    const search = new URLSearchParams()
+    if (params?.q?.trim()) search.set('q', params.q.trim())
+    if (params?.status?.trim()) search.set('status', params.status.trim())
+    const qs = search.toString()
+    return mobiRequest<WithdrawalRequest[]>(
+      `/wallet/withdrawals/history${qs ? `?${qs}` : ''}`,
+    )
+  },
   getWithdrawal: (id: string) =>
     mobiRequest<WithdrawalRequest>(`/wallet/withdrawals/${id}`),
   rejectWithdrawal: (id: string, rejectionReason: string) =>
