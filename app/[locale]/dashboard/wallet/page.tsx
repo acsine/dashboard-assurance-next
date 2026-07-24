@@ -461,14 +461,16 @@ export default function WalletPage() {
                   </thead>
                   <tbody>
                     {safeAgentWallets.map((w) => {
-                      const isTargetReached = w.monthly_progress_pct >= 100
+                      const progressPct = Number(w.monthly_progress_pct ?? 0)
+                      const isTargetReached = progressPct >= 100
                       const progressColor = isTargetReached
                         ? 'bg-emerald-500 shadow-emerald-500/20'
-                        : w.monthly_progress_pct >= 50
+                        : progressPct >= 50
                         ? 'bg-amber-500 shadow-amber-500/20'
                         : 'bg-blue-500 shadow-blue-500/20'
                       const pipeline = w.pending_breakdown?.pipeline ?? 0
                       const awaiting = w.pending_breakdown?.awaiting_payment ?? 0
+                      const monthCommissions = Number(w.current_month_commissions ?? 0)
 
                       return (
                         <tr
@@ -520,7 +522,7 @@ export default function WalletPage() {
                           </td>
                           <td className="py-5">
                             <span className="font-extrabold text-sm text-slate-800 block">
-                              {w.current_month_commissions.toLocaleString('fr-FR')} FCFA
+                              {monthCommissions.toLocaleString('fr-FR')} FCFA
                             </span>
                           </td>
                           <td className="py-5">
@@ -610,7 +612,7 @@ export default function WalletPage() {
                             <div className="space-y-1.5 max-w-[200px]">
                               <div className="flex justify-between items-center text-xs">
                                 <span className="font-extrabold text-slate-900">
-                                  {w.monthly_progress_pct}%
+                                  {progressPct}%
                                 </span>
                                 {isTargetReached ? (
                                   <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md">
@@ -625,7 +627,7 @@ export default function WalletPage() {
                               </div>
                               <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                                 <div
-                                  style={{ width: `${w.monthly_progress_pct}%` }}
+                                  style={{ width: `${Math.min(progressPct, 100)}%` }}
                                   className={`h-full rounded-full transition-all duration-500 ${progressColor}`}
                                 />
                               </div>

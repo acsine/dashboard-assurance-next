@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter } from '@/i18n/navigation'
 import { useSearchParams } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { clientsApi, contractsApi } from '@/lib/api/mobi-assur'
+import { clientsApi, contractsApi, tariffApi } from '@/lib/api/mobi-assur'
 import Header from '@/components/dashboard/Header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -23,6 +23,8 @@ function NewContractFormContent() {
 
   // Form states
   const [clientId, setClientId] = useState(preselectedClientId)
+  const [productType, setProductType] = useState('CAT1')
+  const [productLine, setProductLine] = useState<'AUTO' | 'SANTE' | 'VOYAGE' | 'AUTRE'>('AUTO')
   const [subscriptionType, setSubscriptionType] = useState('AFFAIRE_NOUVELLE')
   const [zoneCirculation, setZoneCirculation] = useState('ZONE_C')
   const [dateEffet, setDateEffet] = useState('')
@@ -38,6 +40,25 @@ function NewContractFormContent() {
     queryKey: ['clients'],
     queryFn: () => clientsApi.list(),
   })
+
+  const { data: productTypes } = useQuery({
+    queryKey: ['product-types'],
+    queryFn: () => tariffApi.listProductTypes(),
+  })
+
+  const productTypeOptions =
+    productTypes?.product_lines.flatMap((line) =>
+      line.contract_product_types.map((code) => ({
+        code,
+        line: line.code,
+        label: `${line.label} — ${code}`,
+      })),
+    ) ?? [
+      { code: 'CAT1', line: 'AUTO' as const, label: 'Automobile — CAT1' },
+      { code: 'CAT11', line: 'AUTO' as const, label: 'Automobile — CAT11' },
+    ]
+
+  const needsVehicle = productLine === 'AUTO'
 
   const safeClients = Array.isArray(clients) ? clients : []
 
@@ -68,20 +89,25 @@ function NewContractFormContent() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!clientId || !vehicleId || !dateEffet) {
-      toast.error('Client, véhicule existant et date d’effet sont obligatoires')
+    if (!clientId || !dateEffet) {
+      toast.error('Client et date d’effet sont obligatoires')
+      return
+    }
+    if (needsVehicle && !vehicleId) {
+      toast.error('Sélectionnez un véhicule pour un contrat automobile')
       return
     }
 
     createContractMutation.mutate({
       client_id: clientId,
-      product_type: 'CAT1',
+      product_type: productType,
+      product_line: productLine,
       subscription_type: subscriptionType,
       zone_circulation: zoneCirculation,
       date_effet: new Date(dateEffet).toISOString(),
       duree_jours: Number(dureeJours),
       conducteur_nom: driverName || undefined,
-      vehicles: [{ vehicle_id: vehicleId, prime_vehicule: 0 }],
+      vehicles: needsVehicle ? [{ vehicle_id: vehicleId, prime_vehicule: 0 }] : [],
     })
   }
 
@@ -163,9 +189,26 @@ function NewContractFormContent() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                      Produit *
+                      Type de produit *
                     </label>
-                    <Input value="Véhicule de tourisme (CAT 1)" disabled className="h-11 text-xs" />
+                    <select
+                      value={productType}
+                      onChange={(e) => {
+                        const next = e.target.value
+                        const opt = productTypeOptions.find((o) => o.code === next)
+                        setProductType(next)
+                        setProductLine((opt?.line as typeof productLine) || 'AUTO')
+                        if ((opt?.line || 'AUTO') !== 'AUTO') setVehicleId('')
+                      }}
+                      className="flex h-11 w-full rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs transition-colors focus-visible:outline-none"
+                      required
+                    >
+                      {productTypeOptions.map((opt) => (
+                        <option key={opt.code} value={opt.code}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   <div className="space-y-1">
@@ -228,6 +271,7 @@ function NewContractFormContent() {
               </div>
 
               {/* Vehicles specifications */}
+              {needsVehicle && (
               <div className="space-y-4 pt-4">
                 <h3 className="border-b border-gray-50 pb-2 text-sm font-bold uppercase tracking-wider text-gray-900">
                   Véhicule assuré (mono-véhicule V1)
@@ -254,6 +298,12 @@ function NewContractFormContent() {
                   </p>
                 )}
               </div>
+              )}
+              {!needsVehicle && (
+                <p className="text-xs text-slate-500 pt-2">
+                  Produit hors automobile : aucun véhicule n’est requis pour ce contrat.
+                </p>
+              )}
 
               {/* Action triggers */}
               <div className="flex justify-end gap-3 pt-6 border-t border-gray-100">

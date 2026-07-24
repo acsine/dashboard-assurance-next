@@ -33,11 +33,27 @@ export class MobiAssurApiError extends Error {
   constructor(
     message: string,
     public status: number,
-    public detail?: string
+    public detail?: string,
+    public fieldErrors?: Record<string, string>,
   ) {
     super(message)
     this.name = 'MobiAssurApiError'
   }
+}
+
+function parseFieldErrors(payload: unknown): Record<string, string> | undefined {
+  if (!payload || typeof payload !== 'object') return undefined
+  const data = (payload as { data?: { errors?: unknown } }).data
+  const errors = data?.errors
+  if (!Array.isArray(errors)) return undefined
+  const out: Record<string, string> = {}
+  for (const entry of errors) {
+    if (!entry || typeof entry !== 'object') continue
+    for (const [key, value] of Object.entries(entry as Record<string, unknown>)) {
+      out[key] = String(value)
+    }
+  }
+  return Object.keys(out).length ? out : undefined
 }
 
 async function mobiRequest<T>(
@@ -64,11 +80,13 @@ async function mobiRequest<T>(
 
   if (!res.ok) {
     let detail = ''
+    let fieldErrors: Record<string, string> | undefined
     try {
       const err = await res.json()
-      detail = err.detail || JSON.stringify(err)
+      fieldErrors = parseFieldErrors(err)
+      detail = err.message || err.detail || JSON.stringify(err)
     } catch {}
-    throw new MobiAssurApiError(detail || res.statusText, res.status, detail)
+    throw new MobiAssurApiError(detail || res.statusText, res.status, detail, fieldErrors)
   }
 
   const text = await res.text()
@@ -77,7 +95,11 @@ async function mobiRequest<T>(
   
   if (json && typeof json === 'object' && 'status' in json && 'data' in json) {
     if (json.data && typeof json.data === 'object' && 'items' in json.data && Array.isArray(json.data.items)) {
-      return json.data.items as T
+      const keys = Object.keys(json.data as object)
+      const listOnly = keys.every((k) =>
+        ['items', 'total', 'page', 'limit', 'offset', 'count'].includes(k),
+      )
+      if (listOnly) return json.data.items as T
     }
     return json.data as T
   }
@@ -553,6 +575,9 @@ export interface QuoteBreakdown {
   tax_assurance?: number
   tva_accessoires?: number
   total?: number
+  insurer_id?: string
+  insurer_name?: string
+  insurer_code?: string
 }
 
 export interface Prospect {
@@ -707,9 +732,9 @@ export interface AgentWallet {
   /** pending_breakdown.pipeline + pending_breakdown.awaiting_payment */
   pending_balance: number
   pending_breakdown?: PendingBreakdown
-  monthly_objective: number
-  monthly_progress_pct: number
-  current_month_commissions: number
+  monthly_objective?: number
+  monthly_progress_pct?: number
+  current_month_commissions?: number
   objective_prospects?: number
   objective_clients?: number
   prospects_this_month?: number
@@ -779,6 +804,7 @@ export interface PricingSettings {
 
 export const insurersApi = {
   list: () => mobiRequest<Insurer[]>('/settings/insurers'),
+  listWithFees: () => mobiRequest<InsurersWithFeesResponse>('/settings/insurers/with-fees'),
   create: (data: Omit<Insurer, 'id' | 'agency_id' | 'created_at' | 'updated_at'>) =>
     mobiRequest<Insurer>('/settings/insurers', {
       method: 'POST',
@@ -945,6 +971,31 @@ export interface Insurer {
 export interface InsurerPolicy {
   mode: 'AUTO' | 'MANUAL'
   selected_insurer_id: string | null
+  selected_insurer?: {
+    id: string
+    code: string
+    name: string
+    product_line?: string
+  } | null
+}
+
+export interface InsurerWithFees extends Insurer {
+  is_selected_for_agents?: boolean
+  fees?: FeeSchedule | null
+}
+
+export interface InsurersWithFeesResponse {
+  policy: InsurerPolicy
+  items: InsurerWithFees[]
+}
+
+export interface ProductTypesResponse {
+  product_lines: Array<{
+    code: 'AUTO' | 'SANTE' | 'VOYAGE' | 'AUTRE'
+    label: string
+    contract_product_types: string[]
+  }>
+  insurers_by_line: Record<string, Array<{ id: string; code: string; name: string }>>
 }
 
 export interface ProductLineTariff {
@@ -1009,6 +1060,7 @@ export interface QuoteComputeResult {
 
 export const tariffApi = {
   bootstrap: () => mobiRequest<TariffBootstrap>('/settings/tariff/bootstrap'),
+  listProductTypes: () => mobiRequest<ProductTypesResponse>('/settings/product-types'),
 
   listCategories: () => mobiRequest<VehicleCategory[]>('/settings/vehicle-categories'),
   createCategory: (data: Omit<VehicleCategory, 'id' | 'agency_id' | 'created_at' | 'updated_at'>) =>

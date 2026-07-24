@@ -55,16 +55,16 @@ export default function LoginPage() {
       <div className="w-full lg:w-1/2 flex flex-col justify-center px-8 sm:px-16 lg:px-24 py-12 bg-white relative z-10">
         <div className="max-w-md w-full mx-auto space-y-8">
           {/* Logo & Header */}
-          <div className="space-y-3">
+          <div className="flex flex-col items-center text-center space-y-4">
             <img
               src="/bethel-logo.png"
               alt="Bethel Comprehensive Insurance"
-              className="h-14 w-auto object-contain"
+              className="h-24 sm:h-28 w-auto object-contain"
             />
-            <h2 className="text-3xl font-extrabold tracking-tight text-gray-900">
+            <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-gray-900">
               Portail MOBI-ASSUR
             </h2>
-            <p className="text-gray-500 text-sm">
+            <p className="text-gray-500 text-sm max-w-sm">
               Connectez-vous à votre espace administration pour gérer les polices et valider les commissions.
             </p>
           </div>

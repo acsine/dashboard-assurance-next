@@ -6,6 +6,7 @@ import {
   prospectsApi,
   tariffApi,
   usersApi,
+  MobiAssurApiError,
   type ConversionPayload,
   type ConversionRequest,
   type Prospect,
@@ -33,6 +34,15 @@ type Tab = 'all' | 'pending'
 
 const BLOCKED_CONVERT_STATUSES = new Set(['CONVERTI', 'EN_ATTENTE_VALIDATION'])
 const FUEL_OPTIONS = ['ESSENCE', 'DIESEL', 'ELECTRIQUE', 'HYBRIDE']
+const CHASSIS_VIN_RE = /^[A-Z0-9]{17}$/
+
+function normalizeChassis(value: string): string {
+  return value.replace(/\s/g, '').toUpperCase()
+}
+
+function isValidChassis(value: string): boolean {
+  return CHASSIS_VIN_RE.test(normalizeChassis(value))
+}
 
 function payloadOf(req: ConversionRequest): Record<string, unknown> {
   return (req.payload || {}) as Record<string, unknown>
@@ -319,9 +329,11 @@ export default function ProspectsPage() {
   const [search, setSearch] = useState('')
   const [convertingProspect, setConvertingProspect] = useState<Prospect | null>(null)
   const [convertForm, setConvertForm] = useState<ConvertFormState>(emptyConvertForm())
+  const [convertFieldErrors, setConvertFieldErrors] = useState<Record<string, string>>({})
   const [interestedProspect, setInterestedProspect] = useState<Prospect | null>(null)
   const [tariffForm, setTariffForm] = useState<TariffFormState>(emptyTariffForm())
   const [liveQuote, setLiveQuote] = useState<QuoteComputeResult | null>(null)
+  const [quoteError, setQuoteError] = useState<string | null>(null)
   const [approvingRequest, setApprovingRequest] = useState<ConversionRequest | null>(null)
   const [approvalCode, setApprovalCode] = useState('')
   const [approvalPaymentRef, setApprovalPaymentRef] = useState('')
@@ -349,6 +361,53 @@ export default function ProspectsPage() {
   const categories = bootstrap?.categories ?? []
   const zones = bootstrap?.zones ?? []
   const durations = bootstrap?.durations ?? []
+  const insurerPolicy = bootstrap?.policy
+  const policyLabel =
+    insurerPolicy?.mode === 'MANUAL'
+      ? `MANUEL — ${insurerPolicy.selected_insurer?.name || 'assureur non configuré'}`
+      : 'AUTO — meilleur PTTC'
+
+  const quoteCatalogReady = useMemo(() => {
+    const insurers = (bootstrap?.insurers ?? []).filter(
+      (i) => i.is_active && (i.product_line || 'AUTO') === 'AUTO',
+    )
+    if (insurers.length === 0) {
+      return {
+        ok: false,
+        message:
+          'Aucun assureur AUTO configuré : créez un assureur et importez son tarif dans Paramètres.',
+      }
+    }
+    if (insurerPolicy?.mode === 'MANUAL' && !insurerPolicy.selected_insurer_id) {
+      return {
+        ok: false,
+        message: 'Mode MANUEL : sélectionnez l’assureur agents dans Paramètres > Assureurs.',
+      }
+    }
+    const feeIds = new Set(
+      (bootstrap?.fee_schedules ?? [])
+        .map((f) => f.insurer_id)
+        .filter(Boolean),
+    )
+    const rcIds = new Set(
+      (bootstrap?.rc_rates ?? [])
+        .map((r) => r.insurer_id)
+        .filter(Boolean),
+    )
+    const targets =
+      insurerPolicy?.mode === 'MANUAL' && insurerPolicy.selected_insurer_id
+        ? insurers.filter((i) => i.id === insurerPolicy.selected_insurer_id)
+        : insurers
+    const usable = targets.some((i) => feeIds.has(i.id) && rcIds.has(i.id))
+    if (!usable) {
+      return {
+        ok: false,
+        message:
+          'Aucun tarif utilisable (frais + barème RC) : importez un Excel assureur avant les devis.',
+      }
+    }
+    return { ok: true, message: null as string | null }
+  }, [bootstrap, insurerPolicy])
 
   const agentNameById = useMemo(() => {
     const map = new Map<string, string>()
@@ -396,6 +455,12 @@ export default function ProspectsPage() {
   useEffect(() => {
     if (!interestedProspect || !canComputeQuote(tariffForm)) {
       setLiveQuote(null)
+      setQuoteError(null)
+      return
+    }
+    if (!quoteCatalogReady.ok) {
+      setLiveQuote(null)
+      setQuoteError(quoteCatalogReady.message)
       return
     }
     const timer = setTimeout(async () => {
@@ -404,12 +469,24 @@ export default function ProspectsPage() {
           buildQuotePayload(tariffForm, interestedProspect.id),
         )
         setLiveQuote(result)
-      } catch {
+        setQuoteError(null)
+      } catch (err) {
         setLiveQuote(null)
+        const message =
+          err instanceof Error
+            ? err.message
+            : 'Impossible de calculer le devis (politique / tarif)'
+        setQuoteError(message)
       }
     }, 500)
     return () => clearTimeout(timer)
-  }, [interestedProspect, tariffForm, canComputeQuote, buildQuotePayload])
+  }, [
+    interestedProspect,
+    tariffForm,
+    canComputeQuote,
+    buildQuotePayload,
+    quoteCatalogReady,
+  ])
 
   const approveMutation = useMutation({
     mutationFn: ({
@@ -462,9 +539,15 @@ export default function ProspectsPage() {
       toast.success('Prospect converti en client. La commission ira à l’agent prospecteur.')
       setConvertingProspect(null)
       setConvertForm(emptyConvertForm())
+      setConvertFieldErrors({})
     },
-    onError: (err: Error) => {
-      toast.error(err.message || 'Erreur lors de la conversion')
+    onError: (err: unknown) => {
+      if (err instanceof MobiAssurApiError && err.fieldErrors) {
+        setConvertFieldErrors(err.fieldErrors)
+        toast.error(err.message || 'Certaines valeurs saisies sont invalides')
+        return
+      }
+      toast.error(err instanceof Error ? err.message : 'Erreur lors de la conversion')
     },
   })
 
@@ -504,17 +587,20 @@ export default function ProspectsPage() {
   const openConvertDialog = (p: Prospect) => {
     setConvertingProspect(p)
     setConvertForm(emptyConvertForm(p))
+    setConvertFieldErrors({})
   }
 
   const openInterestedDialog = (p: Prospect) => {
     setInterestedProspect(p)
     setTariffForm(emptyTariffForm(p))
     setLiveQuote(null)
+    setQuoteError(null)
   }
 
   const handleConvertSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!convertingProspect) return
+    setConvertFieldErrors({})
     if (!convertForm.full_name.trim() || !convertForm.phone.trim()) {
       toast.error('Nom et téléphone sont requis')
       return
@@ -545,9 +631,17 @@ export default function ProspectsPage() {
         toast.error('Marque et n° de châssis sont requis pour le véhicule')
         return
       }
+      const chassis = normalizeChassis(convertForm.chassis_num)
+      if (!isValidChassis(chassis)) {
+        const msg =
+          'Numéro de châssis invalide : exactement 17 caractères alphanumériques (VIN)'
+        setConvertFieldErrors({ chassis_num: msg })
+        toast.error(msg)
+        return
+      }
       body.vehicle = {
         marque: convertForm.marque.trim(),
-        chassis_num: convertForm.chassis_num.trim().toUpperCase(),
+        chassis_num: chassis,
         immatriculation: convertForm.immatriculation.trim() || undefined,
         puissance_cv: convertForm.puissance_cv
           ? parseInt(convertForm.puissance_cv, 10)
@@ -567,6 +661,13 @@ export default function ProspectsPage() {
     }
     if (!canComputeQuote(tariffForm)) {
       toast.error('Paramètres tarifaires incomplets')
+      return
+    }
+    if (!liveQuote) {
+      toast.error(
+        quoteError ||
+          'Devis obligatoire : configurez la politique assureur / le barème avant de continuer',
+      )
       return
     }
     markInterestedMutation.mutate({
@@ -888,6 +989,13 @@ export default function ProspectsPage() {
                 <p className="text-xs text-slate-500 mt-1">
                   CNI + paramètres tarifaires CIMA. Le devis se calcule automatiquement.
                 </p>
+                <p className="text-xs font-semibold text-blue-700 mt-2">
+                  Politique agents : {policyLabel}
+                </p>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Le devis utilise les frais / barème de l’assureur sélectionné (MANUEL) ou le
+                  meilleur PTTC (AUTO).
+                </p>
               </div>
               <form onSubmit={handleMarkInterestedSubmit} className="space-y-4">
                 <TariffFields
@@ -897,11 +1005,25 @@ export default function ProspectsPage() {
                   zones={zones}
                   durations={durations}
                 />
-                {canComputeQuote(tariffForm) && !liveQuote && (
+                {canComputeQuote(tariffForm) && !liveQuote && !quoteError && (
                   <div className="flex items-center gap-2 text-xs text-slate-400">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     Calcul du devis…
                   </div>
+                )}
+                {quoteError && (
+                  <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                    {quoteError}
+                  </p>
+                )}
+                {liveQuote && (
+                  <p className="text-xs font-semibold text-emerald-700">
+                    Assureur du devis :{' '}
+                    {liveQuote.breakdown?.insurer_name ||
+                      liveQuote.comparison?.find((c) => c.insurer_id === liveQuote.insurer_id)
+                        ?.insurer_name ||
+                      '—'}
+                  </p>
                 )}
                 <QuoteBreakdownView breakdown={liveQuote?.breakdown} total={liveQuote?.total} />
                 <div className="flex gap-2 justify-end pt-2">
@@ -912,6 +1034,7 @@ export default function ProspectsPage() {
                       setInterestedProspect(null)
                       setTariffForm(emptyTariffForm())
                       setLiveQuote(null)
+                      setQuoteError(null)
                     }}
                   >
                     Annuler
@@ -1028,14 +1151,32 @@ export default function ProspectsPage() {
                     }
                     className="h-10 text-xs border-gray-200"
                   />
-                  <Input
-                    placeholder="N° châssis"
-                    value={convertForm.chassis_num}
-                    onChange={(e) =>
-                      setConvertForm({ ...convertForm, chassis_num: e.target.value })
-                    }
-                    className="h-10 text-xs border-gray-200"
-                  />
+                  <div className="space-y-1">
+                    <Input
+                      placeholder="N° châssis (17 car. VIN)"
+                      value={convertForm.chassis_num}
+                      onChange={(e) => {
+                        const chassis_num = normalizeChassis(e.target.value).slice(0, 17)
+                        setConvertForm({ ...convertForm, chassis_num })
+                        setConvertFieldErrors((prev) => {
+                          if (!prev.chassis_num) return prev
+                          const next = { ...prev }
+                          delete next.chassis_num
+                          return next
+                        })
+                      }}
+                      maxLength={17}
+                      className={`h-10 text-xs border-gray-200 font-mono ${
+                        convertFieldErrors.chassis_num ? 'border-red-400' : ''
+                      }`}
+                    />
+                    <p className="text-[10px] text-slate-400">
+                      Exactement 17 caractères alphanumériques (VIN)
+                    </p>
+                    {convertFieldErrors.chassis_num && (
+                      <p className="text-[11px] text-red-600">{convertFieldErrors.chassis_num}</p>
+                    )}
+                  </div>
                   <Input
                     type="number"
                     placeholder="Puissance CV"
@@ -1046,6 +1187,13 @@ export default function ProspectsPage() {
                     className="h-10 text-xs border-gray-200"
                   />
                 </div>
+                {Object.entries(convertFieldErrors)
+                  .filter(([key]) => key !== 'chassis_num')
+                  .map(([key, msg]) => (
+                    <p key={key} className="text-[11px] text-red-600">
+                      {key} : {msg}
+                    </p>
+                  ))}
 
                 <div className="flex gap-2 justify-end pt-3">
                   <Button
@@ -1054,6 +1202,7 @@ export default function ProspectsPage() {
                     onClick={() => {
                       setConvertingProspect(null)
                       setConvertForm(emptyConvertForm())
+                      setConvertFieldErrors({})
                     }}
                   >
                     Annuler

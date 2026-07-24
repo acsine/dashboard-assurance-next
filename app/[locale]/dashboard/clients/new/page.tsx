@@ -197,6 +197,13 @@ function NewClientContent() {
       toast.error('Marque et châssis du véhicule sont obligatoires')
       return
     }
+    const chassisNormalized = chassisNum.replace(/\s/g, '').toUpperCase()
+    if (!/^[A-Z0-9]{17}$/.test(chassisNormalized)) {
+      toast.error(
+        'Numéro de châssis invalide : exactement 17 caractères alphanumériques (VIN)',
+      )
+      return
+    }
     if (!dateEffet) {
       toast.error('Date d\'effet du contrat requise')
       return
@@ -390,14 +397,20 @@ function NewClientContent() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className={labelClass}>N° Châssis *</label>
+                    <label className={labelClass}>N° Châssis (VIN, 17 car.) *</label>
                     <Input
                       value={chassisNum}
-                      onChange={(e) => setChassisNum(e.target.value)}
+                      onChange={(e) =>
+                        setChassisNum(e.target.value.replace(/\s/g, '').toUpperCase().slice(0, 17))
+                      }
                       className={inputClass}
                       required
                       maxLength={17}
+                      placeholder="17 caractères alphanumériques"
                     />
+                    <p className="text-[10px] text-slate-400">
+                      Exactement 17 caractères alphanumériques
+                    </p>
                   </div>
                   <div className="space-y-1">
                     <label className={labelClass}>Énergie</label>
