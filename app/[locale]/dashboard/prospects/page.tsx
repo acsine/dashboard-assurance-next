@@ -30,10 +30,11 @@ import {
   Sparkles,
   Loader2,
   Eye,
+  BellRing,
 } from 'lucide-react'
 import { RoleGuard } from '@/components/auth/RoleGuard'
 
-type Tab = 'all' | 'pending'
+type Tab = 'all' | 'pending' | 'recontact'
 
 const BLOCKED_CONVERT_STATUSES = new Set(['CONVERTI', 'EN_ATTENTE_VALIDATION'])
 const FUEL_OPTIONS = ['ESSENCE', 'DIESEL', 'ELECTRIQUE', 'HYBRIDE']
@@ -94,6 +95,25 @@ function statusBadgeClass(status: string): string {
     default:
       return 'bg-gray-100 text-gray-600'
   }
+}
+
+function needsRecontact(p: Prospect): boolean {
+  if (!p.has_external_insurance || !p.external_policy_expires_on) return false
+  if (['CONVERTI', 'APPROUVEE', 'PERDU'].includes(p.status)) return false
+  const expiry = new Date(p.external_policy_expires_on)
+  if (Number.isNaN(expiry.getTime())) return false
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  expiry.setHours(0, 0, 0, 0)
+  const days = Math.round((expiry.getTime() - today.getTime()) / 86400000)
+  return days >= 0 && days <= 30
+}
+
+function formatExpiry(value?: string): string {
+  if (!value) return '—'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return value
+  return d.toLocaleDateString('fr-FR')
 }
 
 function formatFcfa(value?: number | null): string {
@@ -911,16 +931,21 @@ export default function ProspectsPage() {
 
   const safeProspects = Array.isArray(prospects) ? prospects : []
   const safePendingRequests = Array.isArray(pendingRequests) ? pendingRequests : []
+  const recontactProspects = useMemo(
+    () => safeProspects.filter((p) => needsRecontact(p)),
+    [safeProspects],
+  )
 
   const filteredProspects = useMemo(() => {
+    const source = tab === 'recontact' ? recontactProspects : safeProspects
     const q = search.trim().toLowerCase()
-    if (!q) return safeProspects
-    return safeProspects.filter((p: Prospect) => {
+    if (!q) return source
+    return source.filter((p: Prospect) => {
       const agentLabel = p.agent_id ? resolveAgentLabel(p.agent_id).toLowerCase() : ''
-      const hay = `${p.full_name || ''} ${p.phone || ''} ${p.status || ''} ${p.cni_number || ''} ${p.agent_id || ''} ${agentLabel}`.toLowerCase()
+      const hay = `${p.full_name || ''} ${p.phone || ''} ${p.status || ''} ${p.cni_number || ''} ${p.agent_id || ''} ${agentLabel} ${p.external_insurer_name || ''}`.toLowerCase()
       return hay.includes(q)
     })
-  }, [safeProspects, search, agentNameById])
+  }, [safeProspects, recontactProspects, search, agentNameById, tab])
 
   return (
     <div className="flex-1 flex flex-col bg-white">
@@ -955,12 +980,28 @@ export default function ProspectsPage() {
             <Clock className="h-3.5 w-3.5" />
             Conversions en attente ({safePendingRequests.length})
           </button>
+          <button
+            type="button"
+            onClick={() => setTab('recontact')}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border transition-colors ${
+              tab === 'recontact'
+                ? 'bg-amber-600 text-white border-amber-600'
+                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            <BellRing className="h-3.5 w-3.5" />
+            Relance J-30 — fin contrat concurrent ({recontactProspects.length})
+          </button>
         </div>
 
-        {tab === 'all' ? (
+        {tab === 'all' || tab === 'recontact' ? (
           <div className="bg-white rounded-2xl border border-gray-100 p-6 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <h3 className="text-sm font-bold text-slate-900">Prospects de l&apos;agence</h3>
+              <h3 className="text-sm font-bold text-slate-900">
+                {tab === 'recontact'
+                  ? 'À relancer : fin de contrat chez un autre prestataire (≤ 30 jours) — pour en faire un client'
+                  : "Prospects de l'agence"}
+              </h3>
               <Input
                 placeholder="Rechercher nom, téléphone, CNI, statut…"
                 value={search}
@@ -976,7 +1017,11 @@ export default function ProspectsPage() {
             ) : filteredProspects.length === 0 ? (
               <div className="py-20 text-center text-gray-400">
                 <Users className="h-12 w-12 mx-auto text-gray-300 mb-3" />
-                <p className="text-sm font-semibold">Aucun prospect trouvé</p>
+                <p className="text-sm font-semibold">
+                  {tab === 'recontact'
+                    ? 'Aucun prospect à recontacter dans les 30 jours'
+                    : 'Aucun prospect trouvé'}
+                </p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -987,6 +1032,12 @@ export default function ProspectsPage() {
                       <th className="py-3 pr-4 font-bold">Téléphone</th>
                       <th className="py-3 pr-4 font-bold">CNI</th>
                       <th className="py-3 pr-4 font-bold">Devis</th>
+                      {tab === 'recontact' && (
+                        <>
+                          <th className="py-3 pr-4 font-bold">Prestataire actuel</th>
+                          <th className="py-3 pr-4 font-bold">Fin de contrat</th>
+                        </>
+                      )}
                       <th className="py-3 pr-4 font-bold">Statut</th>
                       <th className="py-3 pr-4 font-bold">Agent</th>
                       <th className="py-3 pr-4 font-bold">Créé le</th>
@@ -1011,6 +1062,16 @@ export default function ProspectsPage() {
                           <td className="py-3 pr-4 text-emerald-700 font-semibold">
                             {p.quote_total != null ? formatFcfa(p.quote_total) : '—'}
                           </td>
+                          {tab === 'recontact' && (
+                            <>
+                              <td className="py-3 pr-4 text-slate-700">
+                                {p.external_insurer_name || '—'}
+                              </td>
+                              <td className="py-3 pr-4 text-amber-700 font-semibold">
+                                {formatExpiry(p.external_policy_expires_on)}
+                              </td>
+                            </>
+                          )}
                           <td className="py-3 pr-4">
                             <span
                               className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${statusBadgeClass(

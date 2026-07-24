@@ -651,6 +651,9 @@ export interface Prospect {
   quote_id?: string
   quote_total?: number
   quote_breakdown?: QuoteBreakdown
+  has_external_insurance?: boolean
+  external_insurer_name?: string
+  external_policy_expires_on?: string
   created_at?: string
   updated_at?: string
 }
@@ -757,7 +760,12 @@ export interface ApproveConversionBody {
 }
 
 export const prospectsApi = {
-  list: () => mobiRequest<Prospect[]>('/prospects'),
+  list: (params?: { needs_recontact?: boolean }) => {
+    const qs = params?.needs_recontact
+      ? '?needs_recontact=true'
+      : ''
+    return mobiRequest<Prospect[]>(`/prospects${qs}`)
+  },
   get: (id: string) => mobiRequest<Prospect>(`/prospects/${id}`),
   listPendingConversions: () =>
     mobiRequest<ConversionRequest[]>('/prospects/conversions/pending'),
