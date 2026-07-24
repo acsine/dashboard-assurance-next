@@ -24,7 +24,7 @@ export default function Home() {
             alt="Bethel Comprehensive Insurance"
             className="h-10 w-auto object-contain"
           />
-          <span className="font-bold text-base tracking-wide">MOBI-ASSUR</span>
+          <span className="font-bold text-base tracking-wide">Bethel Comprehensive Insurance</span>
         </div>
 
         <Button
@@ -50,7 +50,7 @@ export default function Home() {
             </div>
 
             <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight bg-gradient-to-b from-white via-gray-100 to-gray-400 bg-clip-text text-transparent leading-none">
-              Pilotez l'infrastructure de MOBI-ASSUR.
+              Pilotez l'infrastructure de Bethel Comprehensive Insurance.
             </h1>
             <p className="text-gray-400 text-base sm:text-lg max-w-xl mx-auto leading-relaxed">
               Le portail de commandement global unifié pour les agences de souscription d'assurances automobile au Cameroun.
@@ -109,7 +109,7 @@ export default function Home() {
 
       {/* Footer bar */}
       <footer className="h-16 border-t border-gray-900/60 flex items-center justify-center text-xs text-gray-500">
-        © 2026 MOBI-ASSUR Cameroun. Tous droits réservés.
+        © 2026 Bethel Comprehensive Insurance. Tous droits réservés.
       </footer>
     </div>
   )

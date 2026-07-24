@@ -2,7 +2,7 @@ import type { Role } from '@/lib/auth/roles'
 import { validateUploadFile } from '@/lib/files/validation'
 
 /**
- * MOBI-ASSUR API Client
+ * Bethel Comprehensive Insurance API Client
  * Client centralisé vers le BFF Next.js. Les JWT restent exclusivement en cookie HttpOnly.
  */
 
@@ -72,9 +72,8 @@ async function mobiRequest<T>(
   })
 
   if (res.status === 401) {
-    if (typeof window !== 'undefined') {
-      window.location.href = '/fr/login'
-    }
+    const { forceSessionExpiredLogout } = await import('@/lib/auth/session-expired')
+    await forceSessionExpiredLogout('Session expirée. Veuillez vous reconnecter.')
     throw new MobiAssurApiError('Session expirée', 401)
   }
 
@@ -86,6 +85,15 @@ async function mobiRequest<T>(
       fieldErrors = parseFieldErrors(err)
       detail = err.message || err.detail || JSON.stringify(err)
     } catch {}
+    const isSessionDead =
+      res.status === 502 &&
+      typeof detail === 'string' &&
+      /renouvellement|session expir/i.test(detail)
+    if (isSessionDead) {
+      const { forceSessionExpiredLogout } = await import('@/lib/auth/session-expired')
+      await forceSessionExpiredLogout('Session expirée. Veuillez vous reconnecter.')
+      throw new MobiAssurApiError('Session expirée', 401)
+    }
     throw new MobiAssurApiError(detail || res.statusText, res.status, detail, fieldErrors)
   }
 
@@ -422,6 +430,10 @@ export const clientsApi = {
       credentials: 'include',
     })
     if (!res.ok) {
+      if (res.status === 401) {
+        const { forceSessionExpiredLogout } = await import('@/lib/auth/session-expired')
+        await forceSessionExpiredLogout('Session expirée. Veuillez vous reconnecter.')
+      }
       let detail = ''
       try {
         const err = await res.json()
@@ -649,6 +661,45 @@ export interface ConversionPayload {
   }
 }
 
+export interface ConversionAgentInfo {
+  id: string
+  full_name?: string | null
+  email?: string | null
+  phone?: string | null
+  agent_code?: string | null
+  role?: string | null
+  is_active?: boolean | null
+}
+
+export interface DesiredContractInfo {
+  quote_id?: string | null
+  quote_total?: number | null
+  quote_breakdown?: QuoteBreakdown | null
+  insurer_id?: string | null
+  insurer_name?: string | null
+  category_id?: string | null
+  category_label?: string | null
+  zone_id?: string | null
+  zone_label?: string | null
+  duration_id?: string | null
+  duration_label?: string | null
+  fuel?: string | null
+  power_cv?: number | null
+  trailer?: boolean
+  include_dr?: boolean
+  include_ipt?: boolean
+  remise_pct?: number
+  vehicle?: {
+    marque?: string | null
+    modele?: string | null
+    chassis_num?: string | null
+    immatriculation?: string | null
+    puissance_cv?: number | null
+    energie?: string | null
+    nb_places?: number | null
+  }
+}
+
 export interface ConversionRequest {
   id: string
   prospect_id: string
@@ -662,6 +713,8 @@ export interface ConversionRequest {
   payment_date?: string
   payload?: ConversionPayload & Record<string, unknown>
   prospect?: Prospect
+  agent?: ConversionAgentInfo
+  desired_contract?: DesiredContractInfo
 }
 
 export interface ApproveConversionBody {
@@ -815,6 +868,13 @@ export const insurersApi = {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
+  delete: (id: string) =>
+    mobiRequest<{
+      id: string
+      code: string
+      name: string
+      deleted?: Record<string, unknown>
+    }>(`/settings/insurers/${id}`, { method: 'DELETE' }),
   getPolicy: () => mobiRequest<InsurerPolicy>('/settings/insurer-policy'),
   setPolicy: (data: InsurerPolicy) =>
     mobiRequest<InsurerPolicy>('/settings/insurer-policy', {
@@ -832,7 +892,8 @@ export const insurersApi = {
       cache: 'no-store',
     })
     if (res.status === 401) {
-      if (typeof window !== 'undefined') window.location.href = '/fr/login'
+      const { forceSessionExpiredLogout } = await import('@/lib/auth/session-expired')
+      await forceSessionExpiredLogout('Session expirée. Veuillez vous reconnecter.')
       throw new MobiAssurApiError('Session expirée', 401)
     }
     if (!res.ok) {

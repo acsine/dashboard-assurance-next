@@ -127,7 +127,20 @@ export function SupportSseListener() {
     }
     eventSource.addEventListener('message_read', onMessageRead)
     eventSource.onerror = () => {
-      // Le navigateur reconnecte EventSource automatiquement
+      // EventSource ne donne pas le status HTTP ; si flux fermé, vérifier la session.
+      if (eventSource.readyState !== EventSource.CLOSED) return
+      void fetch('/api/auth/session', { credentials: 'include', cache: 'no-store' })
+        .then(async (response) => {
+          if (response.status === 401) {
+            const { forceSessionExpiredLogout } = await import(
+              '@/lib/auth/session-expired'
+            )
+            await forceSessionExpiredLogout(
+              'Session expirée. Veuillez vous reconnecter.',
+            )
+          }
+        })
+        .catch(() => undefined)
     }
 
     return () => {

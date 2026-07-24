@@ -16,7 +16,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
-import { Loader2, Pencil, Plus, RefreshCw, Upload } from 'lucide-react'
+import { Loader2, Pencil, Plus, RefreshCw, Trash2, Upload } from 'lucide-react'
 
 const ALL_PRODUCT_LINES: { code: ProductLineCode; label: string }[] = [
   { code: 'AUTO', label: 'Automobile' },
@@ -112,14 +112,31 @@ const FEE_FIELDS: Array<{ key: keyof FeeSchedule; label: string; pct?: boolean }
 
 function FeesComparisonChart({ items }: { items: InsurerWithFees[] }) {
   const rows = items.filter((i) => i.is_active && i.fees)
-  const maxVal = Math.max(
-    1,
-    ...rows.flatMap((i) => [
-      Number(i.fees?.acc_amount || 0),
-      Number(i.fees?.fc_amount || 0),
-      Number(i.fees?.cr_amount || 0),
-    ]),
-  )
+  const metrics: Array<{
+    key: 'acc' | 'fc' | 'cr'
+    label: string
+    color: string
+    value: (ins: InsurerWithFees) => number
+  }> = [
+    {
+      key: 'acc',
+      label: 'ACC (accessoires)',
+      color: 'bg-blue-500',
+      value: (ins) => Number(ins.fees?.acc_amount || 0),
+    },
+    {
+      key: 'fc',
+      label: 'FC / ASAC',
+      color: 'bg-emerald-500',
+      value: (ins) => Number(ins.fees?.fc_amount || 0),
+    },
+    {
+      key: 'cr',
+      label: 'Carte rose',
+      color: 'bg-amber-500',
+      value: (ins) => Number(ins.fees?.cr_amount || 0),
+    },
+  ]
 
   if (rows.length === 0) {
     return (
@@ -130,55 +147,60 @@ function FeesComparisonChart({ items }: { items: InsurerWithFees[] }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      <p className="text-[11px] text-slate-500">
+        Comparaison des montants entre les {rows.length} assureur
+        {rows.length > 1 ? 's' : ''} actif{rows.length > 1 ? 's' : ''} disposant
+        d’une grille de frais.
+      </p>
       <div className="flex flex-wrap gap-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm bg-blue-500" /> ACC
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> FC/ASAC
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm bg-amber-500" /> Carte rose
-        </span>
+        {metrics.map((m) => (
+          <span key={m.key} className="inline-flex items-center gap-1.5">
+            <span className={`h-2.5 w-2.5 rounded-sm ${m.color}`} /> {m.label}
+          </span>
+        ))}
       </div>
-      <div className="space-y-3">
-        {rows.map((ins) => {
-          const acc = Number(ins.fees?.acc_amount || 0)
-          const fc = Number(ins.fees?.fc_amount || 0)
-          const cr = Number(ins.fees?.cr_amount || 0)
-          return (
-            <div key={ins.id} className="space-y-1">
-              <p className="text-xs font-semibold text-slate-700">
-                {ins.name}{' '}
-                <span className="text-slate-400 font-normal">({ins.code})</span>
-              </p>
-              <div className="flex gap-1.5 h-7 items-end">
-                <div
-                  className="bg-blue-500 rounded-t min-w-[4px] transition-all"
-                  style={{ height: `${Math.max(8, (acc / maxVal) * 100)}%`, width: '28%' }}
-                  title={`ACC ${formatMoney(acc)}`}
-                />
-                <div
-                  className="bg-emerald-500 rounded-t min-w-[4px] transition-all"
-                  style={{ height: `${Math.max(8, (fc / maxVal) * 100)}%`, width: '28%' }}
-                  title={`FC ${formatMoney(fc)}`}
-                />
-                <div
-                  className="bg-amber-500 rounded-t min-w-[4px] transition-all"
-                  style={{ height: `${Math.max(8, (cr / maxVal) * 100)}%`, width: '28%' }}
-                  title={`CR ${formatMoney(cr)}`}
-                />
-              </div>
-              <div className="flex gap-3 text-[10px] text-slate-500 font-mono">
-                <span>{formatMoney(acc)}</span>
-                <span>{formatMoney(fc)}</span>
-                <span>{formatMoney(cr)}</span>
-              </div>
+
+      {metrics.map((metric) => {
+        const values = rows.map((ins) => ({
+          id: ins.id,
+          name: ins.name,
+          code: ins.code,
+          amount: metric.value(ins),
+        }))
+        const maxVal = Math.max(1, ...values.map((v) => v.amount))
+        return (
+          <div key={metric.key} className="space-y-2">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+              {metric.label}
+            </p>
+            <div className="space-y-2">
+              {values.map((v) => (
+                <div key={v.id} className="grid grid-cols-[minmax(0,7.5rem)_1fr_auto] gap-2 items-center">
+                  <p className="text-[11px] font-medium text-slate-700 truncate" title={`${v.name} (${v.code})`}>
+                    {v.name}
+                    <span className="block text-[10px] text-slate-400 font-normal truncate">
+                      {v.code}
+                    </span>
+                  </p>
+                  <div className="h-3 rounded-full bg-slate-100 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${metric.color} transition-all`}
+                      style={{
+                        width: `${Math.max(v.amount > 0 ? 4 : 0, (v.amount / maxVal) * 100)}%`,
+                      }}
+                      title={`${formatMoney(v.amount)} FCFA`}
+                    />
+                  </div>
+                  <span className="text-[11px] font-mono text-slate-600 tabular-nums whitespace-nowrap">
+                    {formatMoney(v.amount)}
+                  </span>
+                </div>
+              ))}
             </div>
-          )
-        })}
-      </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -385,6 +407,39 @@ export function InsurersPanelContent() {
     },
     onError: (err: Error) => toast.error(err.message || 'Erreur politique'),
   })
+
+  const deleteInsurerMutation = useMutation({
+    mutationFn: (ins: InsurerWithFees) => insurersApi.delete(ins.id),
+    onSuccess: (result, ins) => {
+      if (editingInsurer?.id === ins.id) setEditingInsurer(null)
+      if (editingLinesInsurerId === ins.id) setEditingLinesInsurerId(null)
+      refresh()
+      const d = result?.deleted
+      const parts = d
+        ? [
+            d.fee_schedules != null ? `frais=${d.fee_schedules}` : null,
+            d.rc_rates != null ? `RC=${d.rc_rates}` : null,
+            d.product_line_tariffs != null ? `tarifs=${d.product_line_tariffs}` : null,
+            d.policy_reset_to_auto ? 'politique → AUTO' : null,
+          ].filter(Boolean)
+        : []
+      toast.success(
+        parts.length
+          ? `Assureur « ${ins.name} » supprimé (${parts.join(' · ')})`
+          : `Assureur « ${ins.name} » supprimé`,
+      )
+    },
+    onError: (err: Error) => toast.error(err.message || 'Erreur lors de la suppression'),
+  })
+
+  const confirmDeleteInsurer = (ins: InsurerWithFees) => {
+    const ok = window.confirm(
+      `Supprimer définitivement « ${ins.name} » (${ins.code}) ?\n\n` +
+        `Effet cascade : frais, barème RC, tarifs branches, détachement des devis / prospects / contrats. ` +
+        `Si c’était l’assureur agents (mode MANUEL), la politique repasse en AUTO.`,
+    )
+    if (ok) deleteInsurerMutation.mutate(ins)
+  }
 
   const importTariffMutation = useMutation({
     mutationFn: ({ insurerId, file }: { insurerId: string; file: File }) =>
@@ -798,6 +853,20 @@ export function InsurersPanelContent() {
                       Tarifs hors auto : onglet Santé / Voyage.
                     </p>
                   ) : null}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="text-xs text-red-600 border-red-200 hover:bg-red-50 ml-auto"
+                    disabled={deleteInsurerMutation.isPending}
+                    isLoading={
+                      deleteInsurerMutation.isPending &&
+                      deleteInsurerMutation.variables?.id === insurer.id
+                    }
+                    onClick={() => confirmDeleteInsurer(insurer)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-1" /> Supprimer
+                  </Button>
                   {lastImportedInsurerId === insurer.id && lastImportSummary && (
                     <p className="w-full text-[10px] text-slate-500 break-all leading-relaxed">
                       {lastImportSummary}
@@ -870,7 +939,7 @@ export function InsurersPanelContent() {
 
           <div className="rounded-xl border border-gray-100 bg-white p-4 space-y-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">
-              Comparaison ACC / FC / Carte rose
+              Comparaison entre assureurs (ACC / FC / Carte rose)
             </h4>
             <FeesComparisonChart items={insurers} />
           </div>

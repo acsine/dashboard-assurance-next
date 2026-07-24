@@ -8,6 +8,7 @@ import {
   usersApi,
   MobiAssurApiError,
   insurerSupportsLine,
+  proxiedAssetUrl,
   type ConversionPayload,
   type ConversionRequest,
   type Prospect,
@@ -28,6 +29,7 @@ import {
   ArrowRightLeft,
   Sparkles,
   Loader2,
+  Eye,
 } from 'lucide-react'
 import { RoleGuard } from '@/components/auth/RoleGuard'
 
@@ -151,23 +153,229 @@ function emptyConvertForm(p?: Prospect): ConvertFormState {
   }
 }
 
-function QuoteBreakdownView({ breakdown, total }: { breakdown?: QuoteBreakdown; total?: number }) {
+function QuoteBreakdownView({ breakdown, total }: { breakdown?: QuoteBreakdown | Record<string, unknown> | null; total?: number | null }) {
   if (!breakdown && total == null) return null
+  const b = (breakdown || {}) as Record<string, unknown>
+  const num = (key: string) => {
+    const v = b[key]
+    return typeof v === 'number' ? v : null
+  }
+  const rc = num('rc_net') ?? num('rc') ?? num('rc_duree')
+  const dr = num('dr')
+  const ipt = num('ipt')
+  const acc = num('acc')
+  const fc = num('fc')
+  const tva = num('tva')
+  const cr = num('cr')
+  const vignette = num('vignette')
+  const bdTotal = num('total')
   return (
     <div className="rounded-lg border border-emerald-100 bg-emerald-50/50 p-3 text-[11px] space-y-1">
       <p className="font-bold text-emerald-800 uppercase tracking-wider">Devis estimé</p>
-      {breakdown?.rc_net != null && (
-        <p>RC nette : {formatFcfa(breakdown.rc_net)}</p>
-      )}
-      {breakdown?.dr != null && breakdown.dr > 0 && <p>DR : {formatFcfa(breakdown.dr)}</p>}
-      {breakdown?.ipt != null && breakdown.ipt > 0 && <p>IPT : {formatFcfa(breakdown.ipt)}</p>}
-      {breakdown?.acc != null && <p>Accessoires : {formatFcfa(breakdown.acc)}</p>}
-      {breakdown?.vignette != null && breakdown.vignette > 0 && (
-        <p>Vignette : {formatFcfa(breakdown.vignette)}</p>
-      )}
+      {rc != null && <p>RC nette : {formatFcfa(rc)}</p>}
+      {dr != null && dr > 0 && <p>DR : {formatFcfa(dr)}</p>}
+      {ipt != null && ipt > 0 && <p>IPT : {formatFcfa(ipt)}</p>}
+      {acc != null && <p>Accessoires : {formatFcfa(acc)}</p>}
+      {fc != null && fc > 0 && <p>FC / ASAC : {formatFcfa(fc)}</p>}
+      {tva != null && tva > 0 && <p>TVA : {formatFcfa(tva)}</p>}
+      {cr != null && cr > 0 && <p>Carte rose : {formatFcfa(cr)}</p>}
+      {vignette != null && vignette > 0 && <p>Vignette : {formatFcfa(vignette)}</p>}
       <p className="font-bold text-emerald-900 pt-1 border-t border-emerald-100">
-        Total : {formatFcfa(total ?? breakdown?.total)}
+        Total : {formatFcfa(total ?? bdTotal)}
       </p>
+    </div>
+  )
+}
+
+function InfoRow({ label, value }: { label: string; value?: React.ReactNode }) {
+  if (value == null || value === '' || value === '—') return null
+  return (
+    <div className="flex gap-2 text-[11px] leading-relaxed">
+      <span className="text-slate-400 font-semibold shrink-0 min-w-[7.5rem]">{label}</span>
+      <span className="text-slate-800 font-medium break-all">{value}</span>
+    </div>
+  )
+}
+
+function ConversionReviewPanel({
+  req,
+  agentFallbackLabel,
+}: {
+  req: ConversionRequest
+  agentFallbackLabel: string
+}) {
+  const payload = payloadOf(req)
+  const prospect = req.prospect
+  const agent = req.agent
+  const contract = req.desired_contract
+  const vehicle = contract?.vehicle || (payload.vehicle as Record<string, unknown> | undefined) || {}
+  const cniPhoto =
+    (payload.cni_photo_url as string | undefined) || prospect?.cni_photo_url
+  const permisPhoto =
+    (payload.permis_photo_url as string | undefined) || prospect?.permis_photo_url
+
+  return (
+    <div className="space-y-4 max-h-[55vh] overflow-y-auto scrollbar-hide pr-1">
+      <section className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 space-y-2">
+        <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+          Prospect
+        </h4>
+        <InfoRow
+          label="Nom"
+          value={
+            (payload.full_name as string) ||
+            prospect?.full_name ||
+            conversionDisplayName(req)
+          }
+        />
+        <InfoRow label="Téléphone" value={(payload.phone as string) || prospect?.phone} />
+        <InfoRow label="Email" value={(payload.email as string) || undefined} />
+        <InfoRow
+          label="Profession"
+          value={(payload.profession as string) || prospect?.profession}
+        />
+        <InfoRow label="Adresse" value={(payload.address as string) || undefined} />
+        <InfoRow label="Ville" value={(payload.city as string) || undefined} />
+        <InfoRow
+          label="CNI"
+          value={(payload.cni_number as string) || prospect?.cni_number}
+        />
+        <InfoRow label="Statut" value={prospect?.status || 'EN_ATTENTE_VALIDATION'} />
+        {(cniPhoto || permisPhoto) && (
+          <div className="flex flex-wrap gap-2 pt-1">
+            {cniPhoto && (
+              <a
+                href={proxiedAssetUrl(cniPhoto)}
+                target="_blank"
+                rel="noreferrer"
+                className="text-[10px] text-blue-600 underline"
+              >
+                Voir photo CNI
+              </a>
+            )}
+            {permisPhoto && (
+              <a
+                href={proxiedAssetUrl(permisPhoto)}
+                target="_blank"
+                rel="noreferrer"
+                className="text-[10px] text-blue-600 underline"
+              >
+                Voir photo permis
+              </a>
+            )}
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-xl border border-blue-100 bg-blue-50/40 p-3 space-y-2">
+        <h4 className="text-[10px] font-bold uppercase tracking-wider text-blue-700">
+          Agent initiateur
+        </h4>
+        <InfoRow
+          label="Nom"
+          value={agent?.full_name || agentFallbackLabel}
+        />
+        <InfoRow label="Code agent" value={agent?.agent_code || undefined} />
+        <InfoRow label="Email" value={agent?.email || undefined} />
+        <InfoRow label="Téléphone" value={agent?.phone || undefined} />
+        <InfoRow label="Rôle" value={agent?.role || undefined} />
+        <InfoRow
+          label="Actif"
+          value={
+            agent?.is_active == null ? undefined : agent.is_active ? 'Oui' : 'Non'
+          }
+        />
+        <InfoRow
+          label="Demandée le"
+          value={
+            req.requested_at
+              ? new Date(req.requested_at).toLocaleString('fr-FR')
+              : undefined
+          }
+        />
+      </section>
+
+      <section className="rounded-xl border border-emerald-100 bg-emerald-50/30 p-3 space-y-2">
+        <h4 className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+          Contrat souhaité
+        </h4>
+        <InfoRow label="Assureur" value={contract?.insurer_name || undefined} />
+        <InfoRow label="Catégorie" value={contract?.category_label || undefined} />
+        <InfoRow label="Zone" value={contract?.zone_label || undefined} />
+        <InfoRow label="Durée" value={contract?.duration_label || undefined} />
+        <InfoRow label="Carburant" value={contract?.fuel || undefined} />
+        <InfoRow
+          label="Puissance"
+          value={
+            contract?.power_cv != null ? `${contract.power_cv} CV` : undefined
+          }
+        />
+        <InfoRow
+          label="Options"
+          value={[
+            contract?.trailer ? 'Remorque' : null,
+            contract?.include_dr ? 'DR' : null,
+            contract?.include_ipt ? 'IPT' : null,
+            contract?.remise_pct ? `Remise ${contract.remise_pct}%` : null,
+          ]
+            .filter(Boolean)
+            .join(' · ') || undefined}
+        />
+        <InfoRow
+          label="Véhicule"
+          value={
+            [vehicle.marque, vehicle.modele].filter(Boolean).join(' ') || undefined
+          }
+        />
+        <InfoRow
+          label="Immatriculation"
+          value={(vehicle.immatriculation as string) || undefined}
+        />
+        <InfoRow
+          label="Châssis / VIN"
+          value={(vehicle.chassis_num as string) || undefined}
+        />
+        <InfoRow
+          label="Puissance véhicule"
+          value={
+            vehicle.puissance_cv != null
+              ? `${vehicle.puissance_cv} CV`
+              : undefined
+          }
+        />
+        <QuoteBreakdownView
+          breakdown={contract?.quote_breakdown || prospect?.quote_breakdown}
+          total={contract?.quote_total ?? prospect?.quote_total}
+        />
+      </section>
+
+      <section className="rounded-xl border border-amber-100 bg-amber-50/40 p-3 space-y-2">
+        <h4 className="text-[10px] font-bold uppercase tracking-wider text-amber-800">
+          Paiement déclaré
+        </h4>
+        <InfoRow
+          label="Mode"
+          value={
+            req.payment_mode === 'MANUAL_PAYMENT'
+              ? 'Paiement manuel (agent)'
+              : 'À régler en agence'
+          }
+        />
+        {req.payment_mode === 'MANUAL_PAYMENT' && (
+          <>
+            <InfoRow label="Référence" value={req.payment_reference || undefined} />
+            <InfoRow
+              label="Montant"
+              value={
+                req.payment_amount != null
+                  ? formatFcfa(req.payment_amount)
+                  : undefined
+              }
+            />
+            <InfoRow label="Date" value={req.payment_date || undefined} />
+          </>
+        )}
+      </section>
     </div>
   )
 }
@@ -873,8 +1081,13 @@ export default function ProspectsPage() {
               <div className="space-y-4">
                 {safePendingRequests.map((req) => {
                   const agentId = req.agent_id || req.prospect?.agent_id
+                  const agentLabel =
+                    req.agent?.full_name || resolveAgentLabel(agentId)
                   const cni = conversionCni(req)
-                  const quoteTotal = req.prospect?.quote_total
+                  const quoteTotal =
+                    req.desired_contract?.quote_total ?? req.prospect?.quote_total
+                  const insurerName = req.desired_contract?.insurer_name
+                  const vehicle = req.desired_contract?.vehicle
                   return (
                     <div
                       key={req.id}
@@ -894,10 +1107,20 @@ export default function ProspectsPage() {
                         {quoteTotal != null && (
                           <span className="text-xs text-emerald-700 font-semibold block">
                             Devis : {formatFcfa(quoteTotal)}
+                            {insurerName ? ` · ${insurerName}` : ''}
+                          </span>
+                        )}
+                        {(vehicle?.marque || vehicle?.immatriculation) && (
+                          <span className="text-xs text-slate-600 block">
+                            Véhicule :{' '}
+                            {[vehicle?.marque, vehicle?.immatriculation]
+                              .filter(Boolean)
+                              .join(' · ')}
                           </span>
                         )}
                         <span className="text-xs text-slate-700 font-semibold block">
-                          Agent : {resolveAgentLabel(agentId)}
+                          Agent : {agentLabel}
+                          {req.agent?.phone ? ` · ${req.agent.phone}` : ''}
                         </span>
                         {req.payment_mode === 'MANUAL_PAYMENT' && (
                           <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-2 py-1 inline-block">
@@ -905,10 +1128,6 @@ export default function ProspectsPage() {
                             {req.payment_amount != null && ` (${formatFcfa(req.payment_amount)})`}
                           </span>
                         )}
-                        <QuoteBreakdownView
-                          breakdown={req.prospect?.quote_breakdown}
-                          total={quoteTotal}
-                        />
                       </div>
 
                       {rejectingId === req.id ? (
@@ -951,17 +1170,20 @@ export default function ProspectsPage() {
                                 setApprovalPaymentRef('')
                               }}
                               disabled={approveMutation.isPending}
-                              variant="success"
-                              size="sm"
-                            >
-                              <Check className="h-4 w-4 mr-1.5" />
-                              Approuver
-                            </Button>
-                            <Button
-                              onClick={() => setRejectingId(req.id)}
                               variant="outline"
                               size="sm"
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                            >
+                              <Eye className="h-4 w-4 mr-1.5" />
+                              Consulter
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => {
+                                setRejectingId(req.id)
+                                setRejectMotif('')
+                              }}
                             >
                               <X className="h-4 w-4 mr-1.5" />
                               Rejeter
@@ -1223,20 +1445,36 @@ export default function ProspectsPage() {
         </div>
       )}
 
-      {/* Modal approbation conversion */}
+      {/* Modal consultation + approbation conversion */}
       {approvingRequest && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <Card className="w-full max-w-md bg-white border border-gray-100 shadow-2xl rounded-2xl max-h-[90vh] overflow-y-auto scrollbar-hide">
-            <CardContent className="pt-6 space-y-4">
-              <div className="pb-2 border-b border-gray-50">
+          <Card className="w-full max-w-2xl bg-white border border-gray-100 shadow-2xl rounded-2xl max-h-[92vh] overflow-hidden flex flex-col">
+            <CardContent className="pt-6 space-y-4 flex flex-col min-h-0">
+              <div className="pb-2 border-b border-gray-50 shrink-0">
                 <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
-                  Approuver la conversion
+                  Revue avant validation
                 </h3>
                 <p className="text-xs text-slate-500 mt-1">
+                  Demande #{approvingRequest.id.substring(0, 8).toUpperCase()} —{' '}
                   {conversionDisplayName(approvingRequest)}
                 </p>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Consultez le prospect, l&apos;agent et le contrat souhaité avant
+                  d&apos;approuver.
+                </p>
               </div>
-              <form onSubmit={handleApproveSubmit} className="space-y-3">
+
+              <ConversionReviewPanel
+                req={approvingRequest}
+                agentFallbackLabel={resolveAgentLabel(
+                  approvingRequest.agent_id || approvingRequest.prospect?.agent_id,
+                )}
+              />
+
+              <form
+                onSubmit={handleApproveSubmit}
+                className="space-y-3 border-t border-gray-100 pt-4 shrink-0"
+              >
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
                     Code validation (6 chiffres) *
@@ -1278,7 +1516,7 @@ export default function ProspectsPage() {
                       setApprovalPaymentRef('')
                     }}
                   >
-                    Annuler
+                    Fermer
                   </Button>
                   <Button
                     type="submit"
@@ -1286,7 +1524,8 @@ export default function ProspectsPage() {
                     disabled={approveMutation.isPending}
                     isLoading={approveMutation.isPending}
                   >
-                    Confirmer
+                    <Check className="h-4 w-4 mr-1.5" />
+                    Approuver la conversion
                   </Button>
                 </div>
               </form>

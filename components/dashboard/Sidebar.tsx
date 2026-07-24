@@ -154,7 +154,7 @@ export default function Sidebar() {
               />
               {(!isCollapsed || isMobileOpen) && (
                 <div className="whitespace-nowrap">
-                  <h1 className="text-slate-900 font-extrabold text-base leading-none">MOBI-ASSUR</h1>
+                  <h1 className="text-slate-900 font-extrabold text-base leading-none">Bethel Comprehensive Insurance</h1>
                   <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold block mt-1">
                     Management Portal
                   </span>

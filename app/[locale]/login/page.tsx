@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from '@/i18n/navigation'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { authApi } from '@/lib/api/mobi-assur'
+import { consumeAuthToast } from '@/lib/auth/session-expired'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
@@ -18,6 +19,11 @@ export default function LoginPage() {
 
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
+
+  useEffect(() => {
+    const msg = consumeAuthToast()
+    if (msg) toast.info(msg)
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -53,18 +59,18 @@ export default function LoginPage() {
     <div className="min-h-screen flex bg-white text-gray-900">
       {/* Left side: Login Form */}
       <div className="w-full lg:w-1/2 flex flex-col justify-center px-8 sm:px-16 lg:px-24 py-12 bg-white relative z-10">
-        <div className="max-w-md w-full mx-auto space-y-8">
+        <div className="max-w-md w-full mx-auto space-y-5">
           {/* Logo & Header */}
-          <div className="flex flex-col items-center text-center space-y-4">
+          <div className="flex flex-col items-center text-center gap-0">
             <img
               src="/bethel-logo.png"
               alt="Bethel Comprehensive Insurance"
-              className="h-24 sm:h-28 w-auto object-contain"
+              className="h-52 sm:h-64 md:h-72 w-auto max-w-[min(100%,28rem)] object-contain -mb-10 sm:-mb-14 md:-mb-16"
             />
-            <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-gray-900">
-              Portail MOBI-ASSUR
+            <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-gray-900 leading-none">
+              Portail Bethel Comprehensive Insurance
             </h2>
-            <p className="text-gray-500 text-sm max-w-sm">
+            <p className="text-gray-500 text-sm max-w-sm mt-1.5">
               Connectez-vous à votre espace administration pour gérer les polices et valider les commissions.
             </p>
           </div>
@@ -173,7 +179,7 @@ export default function LoginPage() {
 
           {/* Footer branding */}
           <p className="text-xs text-gray-400 text-center pt-8 border-t border-gray-100">
-            © 2026 MOBI-ASSUR Cameroun. Tous droits réservés.
+            © 2026 Bethel Comprehensive Insurance. Tous droits réservés.
           </p>
         </div>
       </div>
@@ -193,7 +199,7 @@ export default function LoginPage() {
             Service Client Unifié
           </span>
           <p className="text-lg font-medium leading-snug">
-            "MOBI-ASSUR me permet de valider les polices d'assurance de mes clients en temps réel et de piloter mon équipe d'agents terrain sans aucune contrainte de papier."
+            "Bethel Comprehensive Insurance me permet de valider les polices d'assurance de mes clients en temps réel et de piloter mon équipe d'agents terrain sans aucune contrainte de papier."
           </p>
           <span className="text-xs font-semibold block text-gray-300">
             Marie-Claire N. — Gestionnaire de Comptes

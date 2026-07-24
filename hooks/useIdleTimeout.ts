@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 
 interface UseIdleTimeoutOptions {
   timeoutMs?: number
@@ -7,33 +7,41 @@ interface UseIdleTimeoutOptions {
 }
 
 const DEFAULT_TIMEOUT = 15 * 60 * 1000
-const WARNING_TIME = 14 * 60 * 1000
 
 export function useIdleTimeout({
   timeoutMs = DEFAULT_TIMEOUT,
   onWarning,
   onTimeout,
 }: UseIdleTimeoutOptions = {}) {
-  const timeoutIdRef = useRef<NodeJS.Timeout | null>(null)
-  const warningIdRef = useRef<NodeJS.Timeout | null>(null)
+  const timeoutIdRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const warningIdRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const onWarningRef = useRef(onWarning)
+  const onTimeoutRef = useRef(onTimeout)
 
-  const resetTimer = () => {
+  useEffect(() => {
+    onWarningRef.current = onWarning
+    onTimeoutRef.current = onTimeout
+  }, [onWarning, onTimeout])
+
+  const resetTimer = useCallback(() => {
     if (timeoutIdRef.current) clearTimeout(timeoutIdRef.current)
     if (warningIdRef.current) clearTimeout(warningIdRef.current)
 
+    const warningDelay = Math.max(0, timeoutMs - 60_000)
+
     warningIdRef.current = setTimeout(() => {
-      onWarning?.()
-    }, WARNING_TIME)
+      onWarningRef.current?.()
+    }, warningDelay)
 
     timeoutIdRef.current = setTimeout(() => {
-      onTimeout?.()
+      onTimeoutRef.current?.()
     }, timeoutMs)
-  }
+  }, [timeoutMs])
 
   useEffect(() => {
     resetTimer()
 
-    const events = ['mousedown', 'keydown', 'scroll', 'touchstart']
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart'] as const
     const handleActivity = () => resetTimer()
 
     events.forEach((event) => {
@@ -47,5 +55,7 @@ export function useIdleTimeout({
         document.removeEventListener(event, handleActivity)
       })
     }
-  }, [timeoutMs, onWarning, onTimeout])
+  }, [resetTimer])
+
+  return { resetTimer }
 }

@@ -8,7 +8,7 @@ import { SetHtmlLocale } from "@/components/SetHtmlLocale";
 import { Providers } from "@/lib/providers";
 
 export const metadata: Metadata = {
-  title: "MOBI-ASSUR",
+  title: "Bethel Comprehensive Insurance",
   description: "Portail administration Bethel Comprehensive Insurance",
   icons: {
     icon: "/bethel-logo.png",

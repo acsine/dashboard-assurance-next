@@ -64,7 +64,7 @@ async function expectNoBrowserTokens(page: Page) {
 test('redirige un dashboard sans session vers le login', async ({ page }) => {
   await page.goto('/fr/dashboard')
   await expect(page).toHaveURL(/\/fr\/login$/)
-  await expect(page.getByRole('heading', { name: 'Portail MOBI-ASSUR' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Portail Bethel Comprehensive Insurance' })).toBeVisible()
 })
 
 for (const role of ['ADMIN_AGENCE', 'RESPONSABLE_AGENCE'] as const) {

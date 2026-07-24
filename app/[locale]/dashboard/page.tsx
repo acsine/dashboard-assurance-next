@@ -99,7 +99,7 @@ export default function DashboardOverview() {
 
       <Header
         title="Commandement Global des Opérations"
-        subtitle="Supervision en temps réel du réseau national d'assurance MOBI-ASSUR."
+        subtitle="Supervision en temps réel du réseau national d'assurance Bethel Comprehensive Insurance."
       />
 
       <div className="p-8 space-y-8 flex-1">
@@ -285,7 +285,7 @@ export default function DashboardOverview() {
                 <AlertCircle className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <h4 className="text-xs font-extrabold text-blue-900">V1 de MOBI-ASSUR</h4>
+                <h4 className="text-xs font-extrabold text-blue-900">V1 de Bethel Comprehensive Insurance</h4>
                 <p className="text-[11px] text-blue-700/90 mt-1.5 leading-relaxed font-medium">
                   Cette version intègre les modules d'émission de polices, validation de retraits et
                   configuration des barèmes.

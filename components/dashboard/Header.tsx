@@ -62,7 +62,7 @@ export default function Header({ title, subtitle }: HeaderProps) {
 
         <div className="bg-blue-50 border border-blue-100 text-blue-700 text-xs px-3 py-1.5 rounded-full font-semibold hidden lg:flex items-center gap-2">
           <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-ping" />
-          MOBI-ASSUR Live Mode
+          Bethel Comprehensive Insurance Live Mode
         </div>
 
         <div className="flex items-center gap-2 relative">
@@ -151,7 +151,7 @@ export default function Header({ title, subtitle }: HeaderProps) {
               {user?.full_name || 'Admin User'}
             </span>
             <span className="text-[10px] text-gray-500 block">
-              {user?.email || 'admin@mobi-assur.com'}
+              {user?.email || 'admin@bethel-insurance.com'}
             </span>
           </div>
           <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-blue-500/10">

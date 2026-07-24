@@ -69,12 +69,16 @@ async function handler(
     return response
   } catch (error) {
     const detail = error instanceof Error ? error.message : 'Erreur de proxy'
-    const status = detail.includes('10 Mo') ? 413 : detail.includes('fichier') ? 415 : 502
-    const response = NextResponse.json({ detail }, { status })
-    if (detail.includes('renouvellement')) {
+    if (detail.includes('renouvellement') || detail.includes('Session')) {
+      const response = NextResponse.json(
+        { detail: 'Session expirée' },
+        { status: 401 },
+      )
       response.cookies.set(SESSION_COOKIE, '', { ...sessionCookieOptions, maxAge: 0 })
+      return response
     }
-    return response
+    const status = detail.includes('10 Mo') ? 413 : detail.includes('fichier') ? 415 : 502
+    return NextResponse.json({ detail }, { status })
   }
 }
 
