@@ -6,8 +6,16 @@ import Header from '@/components/dashboard/Header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
-import { Award, Loader2, Plus, Trash2 } from 'lucide-react'
-import { rewardsApi, objectivesApi } from '@/lib/api/mobi-assur'
+import { Award, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
+import {
+  rewardsApi,
+  objectivesApi,
+  asList,
+  type BonusRule,
+  type ConversionRate,
+  type Challenge,
+  type ObjectiveMetric,
+} from '@/lib/api/mobi-assur'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { can } from '@/lib/auth/roles'
 
@@ -19,38 +27,53 @@ const selectClass =
 const thClass = 'pb-4 text-xs font-bold text-gray-400 uppercase tracking-wider'
 const trClass = 'border-b border-gray-50 last:border-0 hover:bg-gray-50/40 transition-colors'
 
+const emptyBonus = {
+  period: 'DAILY',
+  points_threshold: '100',
+  reward_amount: '5000',
+  label: '',
+}
+const emptyConv = {
+  points_required: '50',
+  fcfa_amount: '2500',
+  label: '',
+}
+const emptyChal = {
+  title: '',
+  description: '',
+  scope: 'METRIC',
+  metric_id: '',
+  period: 'DAILY',
+  target_value: '10',
+  max_winners: '10',
+  reward_amount: '10000',
+  reward_points: '0',
+  starts_at: '',
+  ends_at: '',
+  status: 'ACTIVE',
+}
+
+function toLocalInput(iso?: string | null) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 export default function RewardsPage() {
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
   const canManage = can(user?.role, 'settings:manage')
   const [tab, setTab] = useState<Tab>('bonus')
   const [showForm, setShowForm] = useState(false)
+  const [editBonus, setEditBonus] = useState<BonusRule | null>(null)
+  const [editConv, setEditConv] = useState<ConversionRate | null>(null)
+  const [editChal, setEditChal] = useState<Challenge | null>(null)
 
-  const [bonusForm, setBonusForm] = useState({
-    period: 'DAILY',
-    points_threshold: '100',
-    reward_amount: '5000',
-    label: '',
-  })
-  const [convForm, setConvForm] = useState({
-    points_required: '50',
-    fcfa_amount: '2500',
-    label: '',
-  })
-  const [chalForm, setChalForm] = useState({
-    title: '',
-    description: '',
-    scope: 'METRIC',
-    metric_id: '',
-    period: 'DAILY',
-    target_value: '10',
-    max_winners: '10',
-    reward_amount: '10000',
-    reward_points: '0',
-    starts_at: '',
-    ends_at: '',
-    status: 'ACTIVE',
-  })
+  const [bonusForm, setBonusForm] = useState(emptyBonus)
+  const [convForm, setConvForm] = useState(emptyConv)
+  const [chalForm, setChalForm] = useState(emptyChal)
 
   const { data: bonusData, isLoading: loadingBonus } = useQuery({
     queryKey: ['bonus-rules'],
@@ -73,45 +96,113 @@ export default function RewardsPage() {
     enabled: tab === 'challenges',
   })
 
-  const createBonus = useMutation({
-    mutationFn: () =>
-      rewardsApi.createBonusRule({
-        period: bonusForm.period as any,
+  const resetForms = () => {
+    setShowForm(false)
+    setEditBonus(null)
+    setEditConv(null)
+    setEditChal(null)
+    setBonusForm(emptyBonus)
+    setConvForm(emptyConv)
+    setChalForm(emptyChal)
+  }
+
+  const openNew = () => {
+    setEditBonus(null)
+    setEditConv(null)
+    setEditChal(null)
+    setBonusForm(emptyBonus)
+    setConvForm(emptyConv)
+    setChalForm(emptyChal)
+    setShowForm(true)
+  }
+
+  const openEditBonus = (r: BonusRule) => {
+    setEditBonus(r)
+    setBonusForm({
+      period: r.period,
+      points_threshold: String(r.points_threshold),
+      reward_amount: String(r.reward_amount),
+      label: r.label || '',
+    })
+    setShowForm(true)
+  }
+
+  const openEditConv = (r: ConversionRate) => {
+    setEditConv(r)
+    setConvForm({
+      points_required: String(r.points_required),
+      fcfa_amount: String(r.fcfa_amount),
+      label: r.label || '',
+    })
+    setShowForm(true)
+  }
+
+  const openEditChal = (c: Challenge) => {
+    setEditChal(c)
+    setChalForm({
+      title: c.title,
+      description: c.description || '',
+      scope: c.scope,
+      metric_id: c.metric_id || '',
+      period: c.period || 'DAILY',
+      target_value: String(c.target_value),
+      max_winners: String(c.max_winners),
+      reward_amount: String(c.reward_amount),
+      reward_points: String(c.reward_points),
+      starts_at: toLocalInput(c.starts_at),
+      ends_at: toLocalInput(c.ends_at),
+      status: c.status,
+    })
+    setShowForm(true)
+  }
+
+  const saveBonus = useMutation({
+    mutationFn: () => {
+      const payload = {
+        period: bonusForm.period as BonusRule['period'],
         points_threshold: Number(bonusForm.points_threshold),
         reward_amount: Number(bonusForm.reward_amount),
         label: bonusForm.label || `Bonus ${bonusForm.period}`,
         is_active: true,
-      }),
+      }
+      return editBonus
+        ? rewardsApi.updateBonusRule(editBonus.id, payload)
+        : rewardsApi.createBonusRule(payload)
+    },
     onSuccess: () => {
-      toast.success('Bonus créé')
-      setShowForm(false)
+      toast.success(editBonus ? 'Bonus mis à jour' : 'Bonus créé')
+      resetForms()
       queryClient.invalidateQueries({ queryKey: ['bonus-rules'] })
     },
     onError: (e: any) => toast.error(e?.message || 'Erreur'),
   })
 
-  const createConv = useMutation({
-    mutationFn: () =>
-      rewardsApi.createConversionRate({
+  const saveConv = useMutation({
+    mutationFn: () => {
+      const payload = {
         points_required: Number(convForm.points_required),
         fcfa_amount: Number(convForm.fcfa_amount),
         label: convForm.label || null,
         is_active: true,
-      }),
+      }
+      return editConv
+        ? rewardsApi.updateConversionRate(editConv.id, payload)
+        : rewardsApi.createConversionRate(payload)
+    },
     onSuccess: () => {
-      toast.success('Taux créé')
-      setShowForm(false)
+      toast.success(editConv ? 'Taux mis à jour' : 'Taux créé')
+      resetForms()
       queryClient.invalidateQueries({ queryKey: ['conversion-rates'] })
     },
     onError: (e: any) => toast.error(e?.message || 'Erreur'),
   })
 
-  const createChal = useMutation({
-    mutationFn: () =>
-      rewardsApi.createChallenge({
+  const saveChal = useMutation({
+    mutationFn: () => {
+      const payload = {
         title: chalForm.title,
         description: chalForm.description || null,
-        scope: chalForm.scope as any,
+        scope: chalForm.scope as Challenge['scope'],
         metric_id: chalForm.scope === 'METRIC' ? chalForm.metric_id || null : null,
         period: chalForm.scope === 'PERIOD_TYPE' ? chalForm.period : null,
         target_value: Number(chalForm.target_value),
@@ -120,21 +211,30 @@ export default function RewardsPage() {
         reward_points: Number(chalForm.reward_points),
         starts_at: new Date(chalForm.starts_at).toISOString(),
         ends_at: new Date(chalForm.ends_at).toISOString(),
-        status: chalForm.status as any,
-      }),
+        status: chalForm.status as Challenge['status'],
+      }
+      return editChal
+        ? rewardsApi.updateChallenge(editChal.id, payload)
+        : rewardsApi.createChallenge(payload)
+    },
     onSuccess: () => {
-      toast.success('Challenge créé')
-      setShowForm(false)
+      toast.success(editChal ? 'Challenge mis à jour' : 'Challenge créé')
+      resetForms()
       queryClient.invalidateQueries({ queryKey: ['challenges'] })
     },
     onError: (e: any) => toast.error(e?.message || 'Erreur'),
   })
 
   const tabLabels: Record<Tab, string> = {
-    bonus: 'Nouveau bonus',
-    conversion: 'Nouveau taux',
-    challenges: 'Nouveau challenge',
+    bonus: editBonus ? 'Modifier le bonus' : 'Nouveau bonus',
+    conversion: editConv ? 'Modifier le taux' : 'Nouveau taux',
+    challenges: editChal ? 'Modifier le challenge' : 'Nouveau challenge',
   }
+
+  const bonusRules = asList<BonusRule>(bonusData)
+  const convRates = asList<ConversionRate>(convData)
+  const challenges = asList<Challenge>(chalData)
+  const metrics = asList<ObjectiveMetric>(metricsData)
 
   return (
     <div className="flex-1 flex flex-col bg-white">
@@ -149,11 +249,15 @@ export default function RewardsPage() {
           {canManage && (
             <button
               type="button"
-              onClick={() => setShowForm((v) => !v)}
+              onClick={() => (showForm && !editBonus && !editConv && !editChal ? resetForms() : openNew())}
               className="flex items-center gap-2 px-5 py-3 text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-xl active:scale-95 transition-all shadow-md shadow-blue-500/10 cursor-pointer border-0 shrink-0 self-start sm:self-auto"
             >
               <Plus className="h-4 w-4" />
-              {tabLabels[tab]}
+              {tab === 'bonus'
+                ? 'Nouveau bonus'
+                : tab === 'conversion'
+                  ? 'Nouveau taux'
+                  : 'Nouveau challenge'}
             </button>
           )}
         </div>
@@ -171,7 +275,7 @@ export default function RewardsPage() {
               type="button"
               onClick={() => {
                 setTab(id)
-                setShowForm(false)
+                resetForms()
               }}
               className={`pb-4 text-sm font-bold tracking-tight border-b-2 px-1 transition-all cursor-pointer ${
                 tab === id
@@ -189,7 +293,7 @@ export default function RewardsPage() {
             {canManage && showForm && (
               <div className="w-full bg-white rounded-2xl border border-gray-100 p-6">
                 <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider border-b border-gray-50 pb-2 mb-4">
-                  Créer un bonus seuil
+                  {tabLabels.bonus}
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
                   <div className="space-y-1">
@@ -236,17 +340,17 @@ export default function RewardsPage() {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 justify-end pt-5 border-t border-gray-50 mt-5">
-                  <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>
+                  <Button type="button" variant="ghost" onClick={resetForms}>
                     Annuler
                   </Button>
                   <Button
                     type="button"
                     variant="primary"
                     className="text-white"
-                    isLoading={createBonus.isPending}
-                    onClick={() => createBonus.mutate()}
+                    isLoading={saveBonus.isPending}
+                    onClick={() => saveBonus.mutate()}
                   >
-                    Créer
+                    {editBonus ? 'Enregistrer' : 'Créer'}
                   </Button>
                 </div>
               </div>
@@ -257,7 +361,7 @@ export default function RewardsPage() {
                 <div className="py-20 text-center text-gray-400">
                   <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-500 mb-3" />
                 </div>
-              ) : (bonusData?.items || []).length === 0 ? (
+              ) : bonusRules.length === 0 ? (
                 <div className="py-20 text-center text-gray-400">
                   <Award className="h-12 w-12 mx-auto text-gray-300 mb-3" />
                   <p className="text-sm font-semibold">Aucun bonus défini</p>
@@ -275,7 +379,7 @@ export default function RewardsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {(bonusData?.items || []).map((r) => (
+                      {bonusRules.map((r) => (
                         <tr key={r.id} className={trClass}>
                           <td className="py-4 font-bold text-sm text-gray-900">{r.label}</td>
                           <td className="py-4 text-xs text-slate-600">{r.period}</td>
@@ -285,17 +389,29 @@ export default function RewardsPage() {
                           </td>
                           <td className="py-4 text-right">
                             {canManage && (
-                              <button
-                                type="button"
-                                className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all cursor-pointer border-0 inline-flex"
-                                onClick={() =>
-                                  rewardsApi.deleteBonusRule(r.id).then(() =>
-                                    queryClient.invalidateQueries({ queryKey: ['bonus-rules'] }),
-                                  )
-                                }
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
+                              <div className="flex gap-2 justify-end">
+                                <button
+                                  type="button"
+                                  title="Modifier"
+                                  className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all cursor-pointer border-0 inline-flex active:scale-95"
+                                  onClick={() => openEditBonus(r)}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  title="Supprimer"
+                                  className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all cursor-pointer border-0 inline-flex active:scale-95"
+                                  onClick={() =>
+                                    rewardsApi.deleteBonusRule(r.id).then(() => {
+                                      toast.success('Bonus supprimé')
+                                      queryClient.invalidateQueries({ queryKey: ['bonus-rules'] })
+                                    })
+                                  }
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
                             )}
                           </td>
                         </tr>
@@ -313,7 +429,7 @@ export default function RewardsPage() {
             {canManage && showForm && (
               <div className="w-full bg-white rounded-2xl border border-gray-100 p-6">
                 <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider border-b border-gray-50 pb-2 mb-4">
-                  Créer un taux de conversion
+                  {tabLabels.conversion}
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
                   <div className="space-y-1">
@@ -346,17 +462,17 @@ export default function RewardsPage() {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 justify-end pt-5 border-t border-gray-50 mt-5">
-                  <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>
+                  <Button type="button" variant="ghost" onClick={resetForms}>
                     Annuler
                   </Button>
                   <Button
                     type="button"
                     variant="primary"
                     className="text-white"
-                    isLoading={createConv.isPending}
-                    onClick={() => createConv.mutate()}
+                    isLoading={saveConv.isPending}
+                    onClick={() => saveConv.mutate()}
                   >
-                    Créer
+                    {editConv ? 'Enregistrer' : 'Créer'}
                   </Button>
                 </div>
               </div>
@@ -366,6 +482,11 @@ export default function RewardsPage() {
               {loadingConv ? (
                 <div className="py-20 text-center text-gray-400">
                   <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-500 mb-3" />
+                </div>
+              ) : convRates.length === 0 ? (
+                <div className="py-20 text-center text-gray-400">
+                  <Award className="h-12 w-12 mx-auto text-gray-300 mb-3" />
+                  <p className="text-sm font-semibold">Aucun taux de conversion</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -379,7 +500,7 @@ export default function RewardsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {(convData?.items || []).map((r) => (
+                      {convRates.map((r) => (
                         <tr key={r.id} className={trClass}>
                           <td className="py-4 font-bold text-sm text-gray-900">
                             {r.label || '—'}
@@ -390,19 +511,31 @@ export default function RewardsPage() {
                           </td>
                           <td className="py-4 text-right">
                             {canManage && (
-                              <button
-                                type="button"
-                                className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all cursor-pointer border-0 inline-flex"
-                                onClick={() =>
-                                  rewardsApi.deleteConversionRate(r.id).then(() =>
-                                    queryClient.invalidateQueries({
-                                      queryKey: ['conversion-rates'],
-                                    }),
-                                  )
-                                }
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
+                              <div className="flex gap-2 justify-end">
+                                <button
+                                  type="button"
+                                  title="Modifier"
+                                  className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all cursor-pointer border-0 inline-flex active:scale-95"
+                                  onClick={() => openEditConv(r)}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  title="Supprimer"
+                                  className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all cursor-pointer border-0 inline-flex active:scale-95"
+                                  onClick={() =>
+                                    rewardsApi.deleteConversionRate(r.id).then(() => {
+                                      toast.success('Taux supprimé')
+                                      queryClient.invalidateQueries({
+                                        queryKey: ['conversion-rates'],
+                                      })
+                                    })
+                                  }
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
                             )}
                           </td>
                         </tr>
@@ -420,7 +553,7 @@ export default function RewardsPage() {
             {canManage && showForm && (
               <div className="w-full bg-white rounded-2xl border border-gray-100 p-6">
                 <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider border-b border-gray-50 pb-2 mb-4">
-                  Créer un challenge
+                  {tabLabels.challenges}
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
                   <div className="space-y-1">
@@ -455,7 +588,7 @@ export default function RewardsPage() {
                         }
                       >
                         <option value="">Choisir…</option>
-                        {(metricsData?.items || []).map((m) => (
+                        {metrics.map((m) => (
                           <option key={m.id} value={m.id}>
                             {m.label} ({m.period})
                           </option>
@@ -535,9 +668,21 @@ export default function RewardsPage() {
                       className="h-10 text-xs border-gray-200"
                     />
                   </div>
+                  <div className="space-y-1">
+                    <label className={labelClass}>Statut</label>
+                    <select
+                      className={selectClass}
+                      value={chalForm.status}
+                      onChange={(e) => setChalForm({ ...chalForm, status: e.target.value })}
+                    >
+                      <option value="DRAFT">Brouillon</option>
+                      <option value="ACTIVE">Actif</option>
+                      <option value="CLOSED">Clôturé</option>
+                    </select>
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-2 justify-end pt-5 border-t border-gray-50 mt-5">
-                  <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>
+                  <Button type="button" variant="ghost" onClick={resetForms}>
                     Annuler
                   </Button>
                   <Button
@@ -545,10 +690,10 @@ export default function RewardsPage() {
                     variant="primary"
                     className="text-white"
                     disabled={!chalForm.title || !chalForm.starts_at || !chalForm.ends_at}
-                    isLoading={createChal.isPending}
-                    onClick={() => createChal.mutate()}
+                    isLoading={saveChal.isPending}
+                    onClick={() => saveChal.mutate()}
                   >
-                    Créer
+                    {editChal ? 'Enregistrer' : 'Créer'}
                   </Button>
                 </div>
               </div>
@@ -558,6 +703,11 @@ export default function RewardsPage() {
               {loadingChal ? (
                 <div className="py-20 text-center text-gray-400">
                   <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-500 mb-3" />
+                </div>
+              ) : challenges.length === 0 ? (
+                <div className="py-20 text-center text-gray-400">
+                  <Award className="h-12 w-12 mx-auto text-gray-300 mb-3" />
+                  <p className="text-sm font-semibold">Aucun challenge</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -573,7 +723,7 @@ export default function RewardsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {(chalData?.items || []).map((c) => (
+                      {challenges.map((c) => (
                         <tr key={c.id} className={trClass}>
                           <td className="py-4 font-bold text-sm text-gray-900">{c.title}</td>
                           <td className="py-4">
@@ -613,17 +763,31 @@ export default function RewardsPage() {
                                 </Button>
                               )}
                               {canManage && (
-                                <button
-                                  type="button"
-                                  className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all cursor-pointer border-0 inline-flex"
-                                  onClick={() =>
-                                    rewardsApi.deleteChallenge(c.id).then(() =>
-                                      queryClient.invalidateQueries({ queryKey: ['challenges'] }),
-                                    )
-                                  }
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
+                                <>
+                                  <button
+                                    type="button"
+                                    title="Modifier"
+                                    className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all cursor-pointer border-0 inline-flex active:scale-95"
+                                    onClick={() => openEditChal(c)}
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    title="Supprimer"
+                                    className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all cursor-pointer border-0 inline-flex active:scale-95"
+                                    onClick={() =>
+                                      rewardsApi.deleteChallenge(c.id).then(() => {
+                                        toast.success('Challenge supprimé')
+                                        queryClient.invalidateQueries({
+                                          queryKey: ['challenges'],
+                                        })
+                                      })
+                                    }
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </>
                               )}
                             </div>
                           </td>

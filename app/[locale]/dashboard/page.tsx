@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { clientsApi, contractsApi, prospectsApi, walletApi } from '@/lib/api/mobi-assur'
+import { clientsApi, contractsApi, prospectsApi, walletApi, portalClientApi } from '@/lib/api/mobi-assur'
 import Header from '@/components/dashboard/Header'
 import {
   Users,
@@ -14,6 +14,10 @@ import {
   Activity,
   ArrowRight,
   Plus,
+  AlertTriangle,
+  CreditCard,
+  Inbox,
+  Smartphone,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -40,6 +44,11 @@ export default function DashboardOverview() {
   const { data: withdrawals = [] } = useQuery({
     queryKey: ['withdrawals-pending'],
     queryFn: () => walletApi.listPendingWithdrawals(),
+  })
+
+  const { data: portalKpis } = useQuery({
+    queryKey: ['portal-kpis'],
+    queryFn: () => portalClientApi.kpis(),
   })
 
   // Calculations
@@ -91,6 +100,38 @@ export default function DashboardOverview() {
       color: 'indigo',
       description: 'Demandes en attente',
       link: '/dashboard/wallet',
+    },
+    {
+      title: 'Comptes portail',
+      value: portalKpis?.portal_active_clients ?? '—',
+      icon: Smartphone,
+      color: 'blue',
+      description: 'Clients app actifs',
+      link: '/dashboard/clients',
+    },
+    {
+      title: 'Sinistres ouverts',
+      value: portalKpis?.open_claims ?? '—',
+      icon: AlertTriangle,
+      color: 'amber',
+      description: 'File sinistres',
+      link: '/dashboard/sinistres',
+    },
+    {
+      title: 'Paiements pending',
+      value: portalKpis?.pending_client_payments ?? '—',
+      icon: CreditCard,
+      color: 'indigo',
+      description: 'Déclarations client',
+      link: '/dashboard/paiements-declares',
+    },
+    {
+      title: 'Demandes ouvertes',
+      value: portalKpis?.open_requests ?? '—',
+      icon: Inbox,
+      color: 'emerald',
+      description: 'Avenants / support',
+      link: '/dashboard/demandes-clients',
     },
   ]
 

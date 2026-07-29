@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState, use } from 'react'
-import { clientsApi, contractsApi, suggestCarteRoseSerial } from '@/lib/api/mobi-assur'
+import { clientsApi, contractsApi, suggestCarteRoseSerial, portalClientApi } from '@/lib/api/mobi-assur'
 import Header from '@/components/dashboard/Header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,6 +26,7 @@ import {
   X,
   Download,
   Eye,
+  Smartphone,
 } from 'lucide-react'
 import { RoleGuard } from '@/components/auth/RoleGuard'
 
@@ -81,6 +82,22 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
     onError: (err: any) => {
       toast.error(err.message || 'Erreur lors de la mise à jour')
     },
+  })
+
+  const invitePortalMutation = useMutation({
+    mutationFn: () =>
+      portalClientApi.invitePortal({
+        client_id: id,
+        email: client?.email || undefined,
+      }),
+    onSuccess: (res: any) => {
+      toast.success(
+        res?.temporary_password
+          ? `Portail activé — MDP temporaire : ${res.temporary_password}`
+          : 'Invitation portail envoyée',
+      )
+    },
+    onError: (err: any) => toast.error(err.message || "Erreur d'invitation"),
   })
 
   const [editForm, setEditForm] = useState<any>({})
@@ -204,14 +221,31 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
                   <User className="h-4 w-4 text-blue-500" /> Profil Client
                 </CardTitle>
                 {!isEditing ? (
-                  <RoleGuard permission="agency:mutate" fallback={null}>
-                  <button
-                    onClick={startEditing}
-                    className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                  >
-                    <Edit2 className="h-4 w-4" />
-                  </button>
-                  </RoleGuard>
+                  <div className="flex items-center gap-1">
+                    <RoleGuard permission="agency:mutate" fallback={null}>
+                      <button
+                        type="button"
+                        title="Inviter au portail client"
+                        onClick={() => invitePortalMutation.mutate()}
+                        disabled={invitePortalMutation.isPending}
+                        className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                      >
+                        {invitePortalMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Smartphone className="h-4 w-4" />
+                        )}
+                      </button>
+                    </RoleGuard>
+                    <RoleGuard permission="agency:mutate" fallback={null}>
+                    <button
+                      onClick={startEditing}
+                      className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </button>
+                    </RoleGuard>
+                  </div>
                 ) : (
                   <button
                     onClick={() => setIsEditing(false)}

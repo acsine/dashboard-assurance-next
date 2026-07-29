@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { Loader2, Plus, Trash2 } from 'lucide-react'
-import { commissionRatesApi } from '@/lib/api/mobi-assur'
+import { commissionRatesApi, asList, type CommissionRateRule } from '@/lib/api/mobi-assur'
 
 const labelClass = 'text-[10px] font-bold text-gray-500 uppercase tracking-wider block'
 const selectClass =
@@ -57,6 +57,8 @@ export function CommissionRatesPanel() {
     },
     onError: (e: any) => toast.error(e?.message || 'Erreur'),
   })
+
+  const rules = asList<CommissionRateRule>(data)
 
   return (
     <div className="space-y-6">
@@ -189,7 +191,7 @@ export function CommissionRatesPanel() {
           <div className="py-16 text-center text-gray-400">
             <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-500 mb-3" />
           </div>
-        ) : (data?.items || []).length === 0 ? (
+        ) : rules.length === 0 ? (
           <div className="py-16 text-center text-gray-400">
             <p className="text-sm font-semibold">Aucune règle de commission</p>
           </div>
@@ -207,7 +209,7 @@ export function CommissionRatesPanel() {
                 </tr>
               </thead>
               <tbody>
-                {(data?.items || []).map((r) => (
+                {rules.map((r) => (
                   <tr key={r.id} className={trClass}>
                     <td className="py-4 font-bold text-sm text-gray-900">{r.label || '—'}</td>
                     <td className="py-4 text-xs text-slate-600">{r.applies_to}</td>

@@ -10,6 +10,7 @@ import { toast } from 'sonner'
 import { Loader2, Plus, Save, Target, Trash2 } from 'lucide-react'
 import {
   objectivesApi,
+  asList,
   type ObjectiveMetric,
   type TemplateItem,
 } from '@/lib/api/mobi-assur'
@@ -482,7 +483,7 @@ export default function ObjectivesPage() {
                   <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-500 mb-3" />
                   Chargement des agents…
                 </div>
-              ) : (agentsData?.items || []).length === 0 ? (
+              ) : asList(agentsData).length === 0 ? (
                 <div className="py-20 text-center text-gray-400">
                   <Target className="h-12 w-12 mx-auto text-gray-300 mb-3" />
                   <p className="text-sm font-semibold">Aucun agent terrain</p>
@@ -499,7 +500,7 @@ export default function ObjectivesPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {(agentsData?.items || []).map((a: any) => (
+                      {asList<any>(agentsData).map((a: any) => (
                         <tr key={a.agent_id} className={trClass}>
                           <td className="py-4">
                             <span className="font-bold text-sm text-gray-900 block">
@@ -577,7 +578,7 @@ export default function ObjectivesPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {(perfData?.items || []).map((r: any) => (
+                      {asList<any>(perfData).map((r: any) => (
                         <tr key={r.agent_id} className={trClass}>
                           <td className="py-4">
                             <span className="font-bold text-sm text-gray-900">

@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { Building2, Loader2, Plus, Trash2 } from 'lucide-react'
-import { nichesApi, type Niche } from '@/lib/api/mobi-assur'
+import { nichesApi, asList, type Niche } from '@/lib/api/mobi-assur'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { can } from '@/lib/auth/roles'
 
@@ -119,10 +119,10 @@ export default function NichesPage() {
 
   const showAgreements = async (id: string) => {
     const res = await nichesApi.agreements(id)
-    setAgreements(res.items || [])
+    setAgreements(asList(res))
   }
 
-  const niches = data?.items || []
+  const niches = asList<Niche>(data)
 
   return (
     <div className="flex-1 flex flex-col bg-white">

@@ -20,6 +20,9 @@ import {
   Target,
   Building2,
   Gift,
+  AlertTriangle,
+  CreditCard,
+  Inbox,
 } from 'lucide-react'
 import Link from 'next/link'
 import { authApi } from '@/lib/api/mobi-assur'
@@ -74,6 +77,24 @@ export default function Sidebar() {
       name: 'Clients',
       path: '/dashboard/clients',
       icon: Users,
+      roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
+    },
+    {
+      name: 'Sinistres',
+      path: '/dashboard/sinistres',
+      icon: AlertTriangle,
+      roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
+    },
+    {
+      name: 'Paiements déclarés',
+      path: '/dashboard/paiements-declares',
+      icon: CreditCard,
+      roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
+    },
+    {
+      name: 'Demandes clients',
+      path: '/dashboard/demandes-clients',
+      icon: Inbox,
       roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
     },
     {

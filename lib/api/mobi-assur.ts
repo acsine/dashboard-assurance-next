@@ -115,6 +115,15 @@ async function mobiRequest<T>(
   return json as T
 }
 
+/** Normalise une réponse liste (tableau déjà unwrapped ou { items }). */
+export function asList<T>(data: unknown): T[] {
+  if (Array.isArray(data)) return data as T[]
+  if (data && typeof data === 'object' && Array.isArray((data as { items?: unknown }).items)) {
+    return (data as { items: T[] }).items
+  }
+  return []
+}
+
 export async function downloadFileWithAuth(path: string, filename: string): Promise<void> {
   const res = await fetch(`${BFF_BASE}${path}`, { credentials: 'include' })
   if (!res.ok) throw new Error('Erreur lors du téléchargement du document')
@@ -1574,5 +1583,88 @@ export const commissionRatesApi = {
     mobiRequest<CommissionRateRule>(`/settings/commission-rates/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (id: string) =>
     mobiRequest<unknown>(`/settings/commission-rates/${id}`, { method: 'DELETE' }),
+}
+
+// ─── Portail client (sinistres, demandes, paiements déclarés, KPIs) ──────────
+
+export type SinistreStatus =
+  | 'DECLARE'
+  | 'EN_COURS'
+  | 'COMPLEMENT'
+  | 'VALIDE'
+  | 'REJETE'
+  | 'CLOS'
+
+export interface SinistreItem {
+  id: string
+  reference: string
+  client_id: string
+  contract_id?: string | null
+  product_line?: string
+  title: string
+  description?: string | null
+  status: string
+  created_at?: string
+  updated_at?: string
+  documents?: Array<{ id: string; doc_type: string; file_url: string; file_name?: string }>
+  timeline?: Array<{ from_status?: string; to_status: string; note?: string; changed_at?: string }>
+}
+
+export interface ClientRequestItem {
+  id: string
+  client_id: string
+  request_type: string
+  subject: string
+  body?: string | null
+  status: string
+  admin_note?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+export interface PortalKpis {
+  portal_active_clients: number
+  open_requests: number
+  pending_client_payments: number
+  open_claims?: number
+}
+
+export const sinistresApi = {
+  list: (status?: string) => {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : ''
+    return mobiRequest<{ items: SinistreItem[] }>(`/admin/sinistres${qs}`)
+  },
+  get: (id: string) => mobiRequest<SinistreItem>(`/admin/sinistres/${id}`),
+  updateStatus: (id: string, data: { status: string; note?: string }) =>
+    mobiRequest<SinistreItem>(`/admin/sinistres/${id}/status`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+}
+
+export const portalClientApi = {
+  kpis: () => mobiRequest<PortalKpis>('/admin/clients/portal-kpis'),
+  pendingPayments: () =>
+    mobiRequest<{ items: Array<Record<string, unknown>> }>('/admin/clients/pending-payments'),
+  listRequests: (status?: string) => {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : ''
+    return mobiRequest<{ items: ClientRequestItem[] }>(`/admin/clients/requests${qs}`)
+  },
+  updateRequest: (id: string, data: { status: string; admin_note?: string }) =>
+    mobiRequest<ClientRequestItem>(`/admin/clients/requests/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  invitePortal: (data: { client_id: string; email?: string; temporary_password?: string }) =>
+    mobiRequest<Record<string, unknown>>('/admin/clients/invite-portal', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  runReminders: () =>
+    mobiRequest<{ notifications_created: number }>('/admin/clients/payment-reminders/run', {
+      method: 'POST',
+    }),
+  paymentFailures: () =>
+    mobiRequest<{ items: Array<Record<string, unknown>> }>('/admin/clients/payment-failures'),
 }
 
