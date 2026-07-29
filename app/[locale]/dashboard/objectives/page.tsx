@@ -181,30 +181,35 @@ export default function ObjectivesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex-1 flex flex-col bg-white">
       <Header
         title="Objectifs agents"
         subtitle="Template global, overrides par agent et performance"
       />
 
-      <div className="flex flex-wrap gap-2">
-        {(
-          [
-            ['template', 'Template global'],
-            ['agents', 'Par agent'],
-            ['performance', 'Performance'],
-          ] as const
-        ).map(([id, label]) => (
-          <Button
-            key={id}
-            variant={tab === id ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setTab(id)}
-          >
-            {label}
-          </Button>
-        ))}
-      </div>
+      <div className="p-8 space-y-6 flex-1">
+        <div className="flex gap-4 border-b border-gray-100 pb-px">
+          {(
+            [
+              ['template', 'Template global'],
+              ['agents', 'Par agent'],
+              ['performance', 'Performance'],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setTab(id)}
+              className={`pb-4 text-sm font-bold tracking-tight border-b-2 px-1 transition-all cursor-pointer ${
+                tab === id
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
       {tab === 'template' && (
         <div className="space-y-4">
@@ -587,6 +592,7 @@ export default function ObjectivesPage() {
           </Card>
         </div>
       )}
+      </div>
     </div>
   )
 }

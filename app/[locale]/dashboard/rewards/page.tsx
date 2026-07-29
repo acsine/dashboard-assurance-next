@@ -122,22 +122,31 @@ export default function RewardsPage() {
   })
 
   return (
-    <div className="space-y-6">
+    <div className="flex-1 flex flex-col bg-white">
       <Header title="Récompenses" subtitle="Bonus points, conversion et challenges" />
-
-      <div className="flex flex-wrap gap-2">
-        {(
-          [
-            ['bonus', 'Bonus seuils'],
-            ['conversion', 'Conversion points'],
-            ['challenges', 'Challenges'],
-          ] as const
-        ).map(([id, label]) => (
-          <Button key={id} size="sm" variant={tab === id ? 'default' : 'outline'} onClick={() => setTab(id)}>
-            {label}
-          </Button>
-        ))}
-      </div>
+      <div className="p-8 space-y-6 flex-1">
+        <div className="flex gap-4 border-b border-gray-100 pb-px">
+          {(
+            [
+              ['bonus', 'Bonus seuils'],
+              ['conversion', 'Conversion points'],
+              ['challenges', 'Challenges'],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setTab(id)}
+              className={`pb-4 text-sm font-bold tracking-tight border-b-2 px-1 transition-all cursor-pointer ${
+                tab === id
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
       {tab === 'bonus' && (
         <div className="space-y-4">
@@ -310,6 +319,7 @@ export default function RewardsPage() {
           )}
         </div>
       )}
+      </div>
     </div>
   )
 }
