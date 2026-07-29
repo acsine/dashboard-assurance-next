@@ -17,6 +17,9 @@ import {
   Menu,
   Loader2,
   MessageSquare,
+  Target,
+  Building2,
+  Gift,
 } from 'lucide-react'
 import Link from 'next/link'
 import { authApi } from '@/lib/api/mobi-assur'
@@ -89,6 +92,24 @@ export default function Sidebar() {
       name: 'Portefeuille / Wallet',
       path: '/dashboard/wallet',
       icon: Wallet,
+      roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
+    },
+    {
+      name: 'Objectifs agents',
+      path: '/dashboard/objectives',
+      icon: Target,
+      roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
+    },
+    {
+      name: 'Niches',
+      path: '/dashboard/niches',
+      icon: Building2,
+      roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
+    },
+    {
+      name: 'Récompenses',
+      path: '/dashboard/rewards',
+      icon: Gift,
       roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
     },
     {

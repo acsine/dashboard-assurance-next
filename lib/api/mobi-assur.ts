@@ -437,6 +437,30 @@ export interface CreateClientRequest {
   }
 }
 
+export interface ClientDossier {
+  client: Record<string, unknown>
+  contracts: Array<Record<string, unknown>>
+  payments: Array<{
+    id: string
+    amount: number
+    method: string
+    status: string
+    payer_name?: string | null
+    has_reference?: boolean
+    declared_by_client?: boolean
+  }>
+  pending_payments_count: number
+  sinistres: Array<Record<string, unknown>>
+  documents: Array<{
+    id: string
+    doc_type: string
+    file_url: string
+    file_name?: string
+    signed_url?: string | null
+    uploaded_at?: string
+  }>
+}
+
 export const clientsApi = {
   list: (search?: string) => {
     const qs = search ? `?search=${encodeURIComponent(search)}` : ''
@@ -478,9 +502,13 @@ export const clientsApi = {
     const json = await res.json()
     return (json?.data || json) as { url: string }
   },
+  getDossier: (clientId: string) =>
+    mobiRequest<ClientDossier>(`/admin/clients/${clientId}/dossier`),
 }
 
 // ─── Contracts ───────────────────────────────────────────────────────────────
+
+export type PaymentMethod = 'ESPECES' | 'ORANGE_MONEY' | 'MTN_MOMO' | 'CHEQUE' | 'VIREMENT'
 
 export interface Contract {
   id: string
@@ -504,8 +532,12 @@ export interface Payment {
   contract_id: string
   amount: number
   method: PaymentMethod
+  /** Jamais exposé par l'API BO pour les paiements déclarés client */
   reference_externe?: string
-  /** Preuves de paiement (URLs) — requis avant validation admin */
+  payer_name?: string | null
+  declared_by_client?: boolean
+  has_reference?: boolean
+  /** Preuves de paiement (URLs) — requis avant validation admin (sauf match référence) */
   proof_urls?: string[]
   /** Alias legacy / entrée unique normalisée côté API */
   proof_url?: string
@@ -522,7 +554,9 @@ export interface AddPaymentRequest {
   proof_urls?: string[]
 }
 
-export type PaymentMethod = 'ESPECES' | 'ORANGE_MONEY' | 'MTN_MOMO' | 'CHEQUE' | 'VIREMENT'
+export interface ValidatePaymentRequest {
+  received_reference?: string
+}
 
 export function suggestCarteRoseSerial(contractId: string): string {
   const year = new Date().getUTCFullYear()
@@ -569,9 +603,10 @@ export const contractsApi = {
     }),
   listPayments: (contractId: string) =>
     mobiRequest<Payment[]>(`/contracts/${contractId}/payments`),
-  validatePayment: (contractId: string, paymentId: string) =>
+  validatePayment: (contractId: string, paymentId: string, data?: ValidatePaymentRequest) =>
     mobiRequest<Payment>(`/contracts/${contractId}/payments/${paymentId}/validate`, {
       method: 'POST',
+      body: JSON.stringify(data || {}),
     }),
   listDocs: (contractId: string) =>
     mobiRequest<unknown[]>(`/contracts/${contractId}/documents`),
@@ -1376,3 +1411,168 @@ export const countryApi = {
   listAll: () => mobiRequest<unknown[]>('/country/all'),
   addCountry: (data: any) => mobiRequest<unknown>('/country/add', { method: 'POST', body: JSON.stringify(data) }),
 }
+
+// ─── Objectifs / Gamification ─────────────────────────────────────────────────
+
+export interface ObjectiveMetric {
+  id: string
+  agency_id: string
+  code: string
+  label: string
+  period: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ACTIVITY'
+  kind: 'QUANTITATIVE' | 'BOOLEAN'
+  default_points: number
+  default_minimum: number
+  default_target: number
+  is_system: boolean
+  is_active: boolean
+  sort_order: number
+}
+
+export interface TemplateItem {
+  metric_id: string
+  target_value: number
+  points: number
+  minimum: number
+  metric?: ObjectiveMetric | null
+}
+
+export interface ObjectivesTemplate {
+  id: string
+  agency_id: string
+  version: number
+  updated_at?: string | null
+  items: TemplateItem[]
+}
+
+export interface Niche {
+  id: string
+  name: string
+  description?: string | null
+  category?: string | null
+  location?: string | null
+  contact_name?: string | null
+  contact_phone?: string | null
+  special_bonus_amount: number
+  bonus_type: 'FCFA' | 'POINTS'
+  is_active: boolean
+}
+
+export interface Challenge {
+  id: string
+  title: string
+  description?: string | null
+  scope: 'METRIC' | 'PERIOD_TYPE'
+  metric_id?: string | null
+  period?: string | null
+  target_value: number
+  max_winners: number
+  reward_amount: number
+  reward_points: number
+  starts_at: string
+  ends_at: string
+  status: 'DRAFT' | 'ACTIVE' | 'CLOSED'
+}
+
+export interface BonusRule {
+  id: string
+  period: 'DAILY' | 'WEEKLY' | 'MONTHLY'
+  points_threshold: number
+  reward_amount: number
+  label: string
+  is_active: boolean
+}
+
+export interface ConversionRate {
+  id: string
+  points_required: number
+  fcfa_amount: number
+  label?: string | null
+  is_active: boolean
+}
+
+export interface CommissionRateRule {
+  id: string
+  applies_to: 'PROSPECT' | 'CLIENT' | 'CONTRACT'
+  product_type: string
+  product_line: string
+  subscription_type?: string | null
+  rate_mode: 'PERCENT' | 'FIXED'
+  rate_value: number
+  label?: string | null
+  is_active: boolean
+}
+
+export const objectivesApi = {
+  listMetrics: (period?: string) => {
+    const qs = period ? `?period=${period}` : ''
+    return mobiRequest<{ items: ObjectiveMetric[] }>(`/admin/objective-metrics${qs}`)
+  },
+  createMetric: (data: Partial<ObjectiveMetric> & { code: string; label: string; period: string; kind: string }) =>
+    mobiRequest<ObjectiveMetric>('/admin/objective-metrics', { method: 'POST', body: JSON.stringify(data) }),
+  updateMetric: (id: string, data: Partial<ObjectiveMetric>) =>
+    mobiRequest<ObjectiveMetric>(`/admin/objective-metrics/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteMetric: (id: string) =>
+    mobiRequest<unknown>(`/admin/objective-metrics/${id}`, { method: 'DELETE' }),
+  getTemplate: () => mobiRequest<ObjectivesTemplate>('/admin/objectives/template'),
+  putTemplate: (items: { metric_id: string; target_value: number; points: number; minimum: number }[]) =>
+    mobiRequest<unknown>('/admin/objectives/template', { method: 'PUT', body: JSON.stringify({ items }) }),
+  listAgents: (period = 'DAILY') =>
+    mobiRequest<{ items: any[]; period: string }>(`/admin/objectives/agents?period=${period}`),
+  getAgent: (agentId: string) =>
+    mobiRequest<any>(`/admin/objectives/agents/${agentId}`),
+  putAgent: (agentId: string, items: { metric_id: string; target_value: number; points: number; minimum: number }[]) =>
+    mobiRequest<unknown>(`/admin/objectives/agents/${agentId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ items }),
+    }),
+  performance: (period = 'DAILY') =>
+    mobiRequest<{ items: any[]; period: string }>(`/admin/objectives/performance?period=${period}`),
+}
+
+export const nichesApi = {
+  list: () => mobiRequest<{ items: Niche[] }>('/admin/niches'),
+  create: (data: Partial<Niche> & { name: string }) =>
+    mobiRequest<Niche>('/admin/niches', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<Niche>) =>
+    mobiRequest<Niche>(`/admin/niches/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  delete: (id: string) => mobiRequest<unknown>(`/admin/niches/${id}`, { method: 'DELETE' }),
+  agreements: (id: string) => mobiRequest<{ items: any[] }>(`/admin/niches/${id}/agreements`),
+}
+
+export const rewardsApi = {
+  listBonusRules: () => mobiRequest<{ items: BonusRule[] }>('/admin/rewards/bonus-rules'),
+  createBonusRule: (data: Omit<BonusRule, 'id'>) =>
+    mobiRequest<BonusRule>('/admin/rewards/bonus-rules', { method: 'POST', body: JSON.stringify(data) }),
+  updateBonusRule: (id: string, data: Partial<BonusRule>) =>
+    mobiRequest<BonusRule>(`/admin/rewards/bonus-rules/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteBonusRule: (id: string) =>
+    mobiRequest<unknown>(`/admin/rewards/bonus-rules/${id}`, { method: 'DELETE' }),
+  listConversionRates: () => mobiRequest<{ items: ConversionRate[] }>('/admin/rewards/conversion-rates'),
+  createConversionRate: (data: Omit<ConversionRate, 'id'>) =>
+    mobiRequest<ConversionRate>('/admin/rewards/conversion-rates', { method: 'POST', body: JSON.stringify(data) }),
+  updateConversionRate: (id: string, data: Partial<ConversionRate>) =>
+    mobiRequest<ConversionRate>(`/admin/rewards/conversion-rates/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteConversionRate: (id: string) =>
+    mobiRequest<unknown>(`/admin/rewards/conversion-rates/${id}`, { method: 'DELETE' }),
+  listChallenges: () => mobiRequest<{ items: Challenge[] }>('/admin/challenges'),
+  createChallenge: (data: Partial<Challenge> & { title: string; scope: string; starts_at: string; ends_at: string }) =>
+    mobiRequest<Challenge>('/admin/challenges', { method: 'POST', body: JSON.stringify(data) }),
+  updateChallenge: (id: string, data: Partial<Challenge>) =>
+    mobiRequest<Challenge>(`/admin/challenges/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteChallenge: (id: string) =>
+    mobiRequest<unknown>(`/admin/challenges/${id}`, { method: 'DELETE' }),
+  closeChallenge: (id: string) =>
+    mobiRequest<any>(`/admin/challenges/${id}/close`, { method: 'POST' }),
+}
+
+export const commissionRatesApi = {
+  list: () => mobiRequest<{ items: CommissionRateRule[] }>('/settings/commission-rates'),
+  create: (data: Omit<CommissionRateRule, 'id'>) =>
+    mobiRequest<CommissionRateRule>('/settings/commission-rates', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<CommissionRateRule>) =>
+    mobiRequest<CommissionRateRule>(`/settings/commission-rates/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  delete: (id: string) =>
+    mobiRequest<unknown>(`/settings/commission-rates/${id}`, { method: 'DELETE' }),
+}
+

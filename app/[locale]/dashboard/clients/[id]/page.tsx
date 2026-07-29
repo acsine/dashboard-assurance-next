@@ -61,6 +61,12 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
     queryFn: () => contractsApi.list(),
   })
 
+  const { data: dossier } = useQuery({
+    queryKey: ['client-dossier', id],
+    queryFn: () => clientsApi.getDossier(id),
+    retry: false,
+  })
+
   // Filter contracts for this client
   const clientContracts = allContracts.filter((c) => c.client_id === id)
 
@@ -584,6 +590,97 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
 
             {/* Documents générés par contrat */}
             <ClientDocumentsPanel contracts={clientContracts} />
+
+            {dossier && (
+              <Card className="border-none shadow-sm rounded-[2rem] bg-white overflow-hidden mt-6">
+                <CardHeader className="border-b border-gray-50 pb-4">
+                  <CardTitle className="text-sm font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-emerald-500" /> Dossier approfondi
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6 space-y-6">
+                  <div className="grid grid-cols-3 gap-3 text-xs">
+                    <div className="rounded-2xl bg-amber-50 p-3">
+                      <span className="text-gray-400 block">Paiements en attente</span>
+                      <strong className="text-lg">{dossier.pending_payments_count ?? 0}</strong>
+                    </div>
+                    <div className="rounded-2xl bg-blue-50 p-3">
+                      <span className="text-gray-400 block">Sinistres</span>
+                      <strong className="text-lg">{dossier.sinistres?.length ?? 0}</strong>
+                    </div>
+                    <div className="rounded-2xl bg-emerald-50 p-3">
+                      <span className="text-gray-400 block">Documents</span>
+                      <strong className="text-lg">{dossier.documents?.length ?? 0}</strong>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="text-xs font-bold uppercase text-gray-400 mb-2">Sinistres</h4>
+                    {(dossier.sinistres || []).length === 0 ? (
+                      <p className="text-xs text-gray-400">Aucun sinistre</p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {dossier.sinistres.map((s: any) => (
+                          <li key={s.id} className="rounded-xl border border-gray-100 p-3 text-xs">
+                            <strong>{s.reference}</strong> — {s.title}
+                            <span className="ml-2 text-amber-600 font-semibold">{s.status}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  <div>
+                    <h4 className="text-xs font-bold uppercase text-gray-400 mb-2">Paiements</h4>
+                    {(dossier.payments || []).length === 0 ? (
+                      <p className="text-xs text-gray-400">Aucun paiement</p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {dossier.payments.map((p) => (
+                          <li key={p.id} className="rounded-xl border border-gray-100 p-3 text-xs flex justify-between">
+                            <span>
+                              {Number(p.amount).toLocaleString('fr-FR')} FCFA · {p.method}
+                              {p.payer_name ? ` · ${p.payer_name}` : ''}
+                              {p.has_reference ? ' · réf. déclarée' : ''}
+                            </span>
+                            <span className={p.status === 'SUCCESS' ? 'text-green-600 font-bold' : 'text-amber-600 font-bold'}>
+                              {p.status}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  <div>
+                    <h4 className="text-xs font-bold uppercase text-gray-400 mb-2">Documents dossier</h4>
+                    {(dossier.documents || []).length === 0 ? (
+                      <p className="text-xs text-gray-400">Aucun document uploadé</p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {dossier.documents.map((d) => (
+                          <li key={d.id} className="rounded-xl border border-gray-100 p-3 text-xs flex justify-between items-center">
+                            <span>
+                              <strong>{d.doc_type}</strong> {d.file_name || ''}
+                            </span>
+                            {(d.signed_url || d.file_url) && (
+                              <a
+                                href={d.signed_url || d.file_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 font-semibold hover:underline"
+                              >
+                                Ouvrir
+                              </a>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </div>

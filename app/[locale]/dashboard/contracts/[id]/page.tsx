@@ -48,6 +48,8 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
   const [paymentReference, setPaymentReference] = useState('')
   const [proofUrlsText, setProofUrlsText] = useState('')
   const [uploadedProofUrls, setUploadedProofUrls] = useState<string[]>([])
+  const [validatingPaymentId, setValidatingPaymentId] = useState<string | null>(null)
+  const [receivedReference, setReceivedReference] = useState('')
   const [uploadingProof, setUploadingProof] = useState(false)
   const [carteRoseSerial, setCarteRoseSerial] = useState(() => suggestCarteRoseSerial(id))
   const [carteRoseAssigned, setCarteRoseAssigned] = useState(false)
@@ -112,14 +114,19 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
 
   // Validate Payment Mutation
   const validatePaymentMutation = useMutation({
-    // Hardcoded dummy ID since validation requires payment_id, we validate the contract.
-    // In real deployment, you fetch from the payments sub-array or pass IDs.
-    // For V1 fallback, we validate the payment.
-    mutationFn: (paymentId: string) => contractsApi.validatePayment(id, paymentId),
+    mutationFn: ({
+      paymentId,
+      received_reference,
+    }: {
+      paymentId: string
+      received_reference?: string
+    }) => contractsApi.validatePayment(id, paymentId, { received_reference }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contract', id] })
       queryClient.invalidateQueries({ queryKey: ['contract-payments', id] })
-      toast.success('Paiement validé avec succès (Contrat: PAYE)')
+      setValidatingPaymentId(null)
+      setReceivedReference('')
+      toast.success('Paiement validé avec succès')
     },
     onError: (err: any) => {
       toast.error(err.message || 'Erreur lors de la validation du paiement')
@@ -549,21 +556,30 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
                   ) : (
                     payments.map((payment) => {
                       const proofs = paymentProofUrls(payment)
-                      const canValidate = proofs.length > 0
+                      const needsReference =
+                        Boolean(payment.has_reference) || Boolean(payment.declared_by_client)
+                      const canValidate = needsReference || proofs.length > 0
+                      const isValidatingThis = validatingPaymentId === payment.id
                       return (
                       <div key={payment.id} className="rounded-xl border border-gray-100 p-3 text-xs">
                         <div className="flex items-start justify-between gap-2">
                           <div>
                             <strong>{Number(payment.amount).toLocaleString('fr-FR')} FCFA</strong>
                             <span className="ml-2 text-gray-400">{payment.method}</span>
-                            {payment.reference_externe && (
-                              <span className="mt-1 block text-gray-400">Réf. {payment.reference_externe}</span>
+                            {payment.payer_name && (
+                              <span className="mt-1 block text-gray-500">Payeur : {payment.payer_name}</span>
+                            )}
+                            {needsReference && (
+                              <span className="mt-1 block text-amber-600">
+                                Référence déclarée par le client — saisie requise pour valider
+                              </span>
                             )}
                           </div>
                           <span className={payment.status === 'SUCCESS' ? 'font-bold text-green-600' : 'font-bold text-amber-600'}>
                             {payment.status}
                           </span>
                         </div>
+                        {!needsReference && (
                         <div className="mt-2 space-y-1">
                           <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
                             Preuves
@@ -590,21 +606,70 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
                             </ul>
                           )}
                         </div>
+                        )}
                         {payment.status === 'PENDING' && (
                           <RoleGuard permission="payments:manage" fallback={null}>
-                            <button
-                              type="button"
-                              disabled={validatePaymentMutation.isPending || !canValidate}
-                              onClick={() => validatePaymentMutation.mutate(payment.id)}
-                              title={
-                                !canValidate
-                                  ? 'Preuves de paiement requises'
-                                  : 'Valider ce versement'
-                              }
-                              className="mt-3 w-full rounded-lg bg-emerald-600 px-3 py-2 font-semibold text-white disabled:opacity-50"
-                            >
-                              Valider ce versement
-                            </button>
+                            {isValidatingThis && needsReference ? (
+                              <div className="mt-3 space-y-2">
+                                <Input
+                                  value={receivedReference}
+                                  onChange={(e) => setReceivedReference(e.target.value)}
+                                  placeholder="Référence reçue"
+                                  className="text-xs"
+                                />
+                                <div className="flex gap-2">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="primary"
+                                    disabled={
+                                      validatePaymentMutation.isPending || !receivedReference.trim()
+                                    }
+                                    onClick={() =>
+                                      validatePaymentMutation.mutate({
+                                        paymentId: payment.id,
+                                        received_reference: receivedReference.trim(),
+                                      })
+                                    }
+                                    className="flex-1 text-white"
+                                  >
+                                    Confirmer
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setValidatingPaymentId(null)
+                                      setReceivedReference('')
+                                    }}
+                                  >
+                                    Annuler
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={validatePaymentMutation.isPending || !canValidate}
+                                onClick={() => {
+                                  if (needsReference) {
+                                    setValidatingPaymentId(payment.id)
+                                    setReceivedReference('')
+                                    return
+                                  }
+                                  validatePaymentMutation.mutate({ paymentId: payment.id })
+                                }}
+                                title={
+                                  !canValidate
+                                    ? 'Preuves de paiement ou référence requises'
+                                    : 'Valider ce versement'
+                                }
+                                className="mt-3 w-full rounded-lg bg-emerald-600 px-3 py-2 font-semibold text-white disabled:opacity-50"
+                              >
+                                Valider ce versement
+                              </button>
+                            )}
                           </RoleGuard>
                         )}
                       </div>

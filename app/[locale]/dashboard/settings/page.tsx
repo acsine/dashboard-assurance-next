@@ -16,6 +16,7 @@ import {
   ZonesPanel,
 } from '@/components/dashboard/cima-settings'
 import { InsurersPanelContent } from '@/components/dashboard/InsurersPanel'
+import { CommissionRatesPanel } from '@/components/dashboard/CommissionRatesPanel'
 import Header from '@/components/dashboard/Header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,6 +27,7 @@ import { RoleGuard } from '@/components/auth/RoleGuard'
 
 type SettingsTab =
   | 'pricing'
+  | 'commissions'
   | 'categories'
   | 'zones'
   | 'durations'
@@ -37,6 +39,7 @@ type SettingsTab =
 
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'pricing', label: 'Tarification agent' },
+  { id: 'commissions', label: 'Commissions' },
   { id: 'insurers', label: 'Assureurs' },
   { id: 'categories', label: 'Catégories CIMA' },
   { id: 'zones', label: 'Zones' },
@@ -320,6 +323,8 @@ function SettingsContent() {
           </div>
         </form>
         )}
+
+        {activeTab === 'commissions' && <CommissionRatesPanel />}
 
         {activeTab === 'insurers' && (
           <Card className="border-gray-100 shadow-sm bg-white">
