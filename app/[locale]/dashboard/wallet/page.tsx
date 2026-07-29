@@ -2,11 +2,12 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import { walletApi, type AgentWallet, type WithdrawalRequest } from '@/lib/api/mobi-assur'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { walletApi, type WithdrawalRequest } from '@/lib/api/mobi-assur'
 import Header from '@/components/dashboard/Header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
 import {
   Wallet,
@@ -20,6 +21,7 @@ import {
   Phone,
   Mail,
   Hash,
+  ExternalLink,
 } from 'lucide-react'
 import { validateUploadFile } from '@/lib/files/validation'
 import { RoleGuard } from '@/components/auth/RoleGuard'
@@ -112,6 +114,8 @@ function AgentDetailsBlock({ w }: { w: WithdrawalRequest }) {
 
 export default function WalletPage() {
   const queryClient = useQueryClient()
+  const pathname = usePathname()
+  const locale = pathname?.split('/')[1] || 'fr'
   const [activeTab, setActiveTab] = useState<'withdrawals' | 'objectives'>('withdrawals')
 
   const [approvingId, setApprovingId] = useState<string | null>(null)
@@ -127,10 +131,6 @@ export default function WalletPage() {
   const [historySearch, setHistorySearch] = useState('')
   const [debouncedHistorySearch, setDebouncedHistorySearch] = useState('')
   const [historyStatus, setHistoryStatus] = useState('')
-
-  const [editingAgent, setEditingAgent] = useState<AgentWallet | null>(null)
-  const [newObjectiveProspects, setNewObjectiveProspects] = useState('')
-  const [newObjectiveClients, setNewObjectiveClients] = useState('')
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedHistorySearch(historySearch.trim()), 300)
@@ -191,28 +191,6 @@ export default function WalletPage() {
     },
   })
 
-  const updateObjectiveMutation = useMutation({
-    mutationFn: ({
-      agentId,
-      objective_prospects,
-      objective_clients,
-    }: {
-      agentId: string
-      objective_prospects: number
-      objective_clients: number
-    }) => walletApi.setAgentObjective(agentId, { objective_prospects, objective_clients }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agent-wallets'] })
-      toast.success("Objectifs de l'agent mis à jour avec succès")
-      setEditingAgent(null)
-      setNewObjectiveProspects('')
-      setNewObjectiveClients('')
-    },
-    onError: (err: any) => {
-      toast.error(err.message || 'Erreur lors de la mise à jour des objectifs')
-    },
-  })
-
   const resetApproveForm = () => {
     setPaymentRef('')
     setPaymentDate('')
@@ -257,42 +235,6 @@ export default function WalletPage() {
     rejectMutation.mutate({ id, motif: rejectMotif })
   }
 
-  const handleObjectiveSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!editingAgent) return
-    const agentId = editingAgent.agent_id
-    const prospectsRaw = newObjectiveProspects.trim()
-    const clientsRaw = newObjectiveClients.trim()
-    const prospects = prospectsRaw === '' ? NaN : Number(prospectsRaw)
-    const clients = clientsRaw === '' ? NaN : Number(clientsRaw)
-
-    if (!prospectsRaw || !clientsRaw || Number.isNaN(prospects) || Number.isNaN(clients)) {
-      toast.error('Saisissez les deux objectifs (prospects et clients) en nombres valides')
-      return
-    }
-    if (prospects < 0 || clients < 0) {
-      toast.error('Les objectifs doivent être positifs ou nuls')
-      return
-    }
-    updateObjectiveMutation.mutate({
-      agentId,
-      objective_prospects: Math.floor(prospects),
-      objective_clients: Math.floor(clients),
-    })
-  }
-
-  const openObjectiveModal = (agent: AgentWallet) => {
-    setEditingAgent(agent)
-    setNewObjectiveProspects(agent.objective_prospects?.toString() ?? '')
-    setNewObjectiveClients(agent.objective_clients?.toString() ?? '')
-  }
-
-  const closeObjectiveModal = () => {
-    setEditingAgent(null)
-    setNewObjectiveProspects('')
-    setNewObjectiveClients('')
-  }
-
   const safeWithdrawals = Array.isArray(withdrawals) ? withdrawals : []
   const safeHistory = Array.isArray(withdrawalHistory) ? withdrawalHistory : []
   const safeAgentWallets = Array.isArray(agentWallets) ? agentWallets : []
@@ -300,8 +242,8 @@ export default function WalletPage() {
   return (
     <div className="flex-1 flex flex-col bg-white">
       <Header
-        title="Gestion Financière et Objectifs"
-        subtitle="Validez les décaissements, consultez l'historique des retraits et fixez les objectifs des agents."
+        title="Gestion Financière"
+        subtitle="Validez les décaissements et suivez la progression financière des agents."
       />
 
       <div className="p-8 space-y-6 flex-1">
@@ -324,7 +266,7 @@ export default function WalletPage() {
                 : 'border-transparent text-gray-400 hover:text-gray-600'
             }`}
           >
-            Objectifs & Progression des Agents
+            Progression des Agents
           </button>
         </div>
 
@@ -677,7 +619,28 @@ export default function WalletPage() {
             </div>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl border border-gray-100 p-6">
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-blue-100 bg-blue-50/50 px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-bold text-slate-900">
+                  Fixation des objectifs centralisée
+                </p>
+                <p className="text-xs text-slate-600 mt-1">
+                  Les objectifs (journalier, hebdo, mensuel, activités) se gèrent uniquement dans
+                  la page <strong>Objectifs agents</strong> — plus de doublon ici.
+                </p>
+              </div>
+              <Link
+                href={`/${locale}/dashboard/objectives`}
+                className="inline-flex items-center gap-2 px-5 py-3 text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-xl active:scale-95 transition-all shadow-md shadow-blue-500/10 shrink-0"
+              >
+                <Target className="h-4 w-4" />
+                Gérer les objectifs
+                <ExternalLink className="h-3.5 w-3.5 opacity-80" />
+              </Link>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-gray-100 p-6">
             {isLoadingWallets ? (
               <div className="py-20 text-center text-gray-400 font-medium">
                 <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-500 mb-3" />
@@ -688,7 +651,7 @@ export default function WalletPage() {
                 <Target className="h-12 w-12 mx-auto text-gray-300 mb-3" />
                 <p className="text-sm font-semibold">Aucun agent terrain enregistré</p>
                 <p className="text-xs text-gray-500 mt-1">
-                  Créez des comptes d&apos;agents terrain pour définir leurs objectifs.
+                  Créez des comptes d&apos;agents terrain pour suivre leur progression.
                 </p>
               </div>
             ) : (
@@ -712,16 +675,13 @@ export default function WalletPage() {
                         Comm. mois
                       </th>
                       <th className="pb-3 pr-6 text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap min-w-[110px]">
-                        Objectifs
+                        Objectifs mois
                       </th>
                       <th className="pb-3 pr-6 text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap min-w-[120px]">
-                        Progression
+                        Réalisé
                       </th>
-                      <th className="pb-3 pr-6 text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap min-w-[140px]">
+                      <th className="pb-3 pl-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap min-w-[140px]">
                         Accomplissement
-                      </th>
-                      <th className="pb-3 pl-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right whitespace-nowrap min-w-[140px]">
-                        Actions
                       </th>
                     </tr>
                   </thead>
@@ -817,7 +777,7 @@ export default function WalletPage() {
                               </div>
                             </div>
                           </td>
-                          <td className="py-4 pr-6 align-top">
+                          <td className="py-4 pl-2 align-top">
                             <div className="space-y-1.5 w-[130px]">
                               <div className="flex justify-between items-center text-xs gap-2">
                                 <span className="font-extrabold text-slate-900">{progressPct}%</span>
@@ -840,19 +800,6 @@ export default function WalletPage() {
                               </div>
                             </div>
                           </td>
-                          <td className="py-4 pl-2 align-top text-right whitespace-nowrap">
-                            <RoleGuard permission="agency:mutate" fallback={null}>
-                              <Button
-                                onClick={() => openObjectiveModal(w)}
-                                variant="outline"
-                                size="sm"
-                                className="text-xs border-gray-200 hover:bg-gray-50 hover:text-slate-800"
-                              >
-                                <Target className="h-3.5 w-3.5 mr-1.5" />
-                                Fixer l&apos;Objectif
-                              </Button>
-                            </RoleGuard>
-                          </td>
                         </tr>
                       )
                     })}
@@ -860,82 +807,10 @@ export default function WalletPage() {
                 </table>
               </div>
             )}
+            </div>
           </div>
         )}
       </div>
-
-      {editingAgent && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <Card className="w-full max-w-md bg-white border border-gray-100 shadow-2xl rounded-2xl">
-            <CardContent className="pt-6 space-y-4">
-              <div className="pb-2 border-b border-gray-50">
-                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
-                  <Target className="h-4 w-4 text-blue-600" />
-                  Fixer l&apos;objectif
-                </h3>
-                <p className="text-xs text-slate-500 mt-1">
-                  {editingAgent.agent_name}
-                  {editingAgent.agent_phone ? ` · ${editingAgent.agent_phone}` : ''}
-                </p>
-              </div>
-
-              <form onSubmit={handleObjectiveSubmit} className="space-y-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                    Objectif prospects (mois) *
-                  </label>
-                  <Input
-                    type="number"
-                    min={0}
-                    step={1}
-                    placeholder="Ex: 20"
-                    value={newObjectiveProspects}
-                    onChange={(e) => setNewObjectiveProspects(e.target.value)}
-                    className="h-10 text-xs border-gray-200"
-                    required
-                    autoFocus
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                    Objectif clients (mois) *
-                  </label>
-                  <Input
-                    type="number"
-                    min={0}
-                    step={1}
-                    placeholder="Ex: 10"
-                    value={newObjectiveClients}
-                    onChange={(e) => setNewObjectiveClients(e.target.value)}
-                    className="h-10 text-xs border-gray-200"
-                    required
-                  />
-                </div>
-
-                <div className="flex gap-2 justify-end pt-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={closeObjectiveModal}
-                    disabled={updateObjectiveMutation.isPending}
-                  >
-                    Annuler
-                  </Button>
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    disabled={updateObjectiveMutation.isPending}
-                    isLoading={updateObjectiveMutation.isPending}
-                  >
-                    <Check className="h-4 w-4 mr-1.5" />
-                    Enregistrer
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
-      )}
     </div>
   )
 }

@@ -5,9 +5,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import Header from '@/components/dashboard/Header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
-import { Loader2, Plus, Save, Trash2 } from 'lucide-react'
+import { Loader2, Plus, Save, Target, Trash2 } from 'lucide-react'
 import {
   objectivesApi,
   type ObjectiveMetric,
@@ -25,6 +25,12 @@ const PERIODS = [
   { id: 'ACTIVITY', label: 'Activités' },
 ] as const
 
+const selectClass =
+  'flex h-10 w-full rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs transition-colors focus-visible:outline-none'
+const labelClass = 'text-[10px] font-bold text-gray-500 uppercase tracking-wider block'
+const thClass = 'pb-4 text-xs font-bold text-gray-400 uppercase tracking-wider'
+const trClass = 'border-b border-gray-50 last:border-0 hover:bg-gray-50/40 transition-colors'
+
 export default function ObjectivesPage() {
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
@@ -35,6 +41,7 @@ export default function ObjectivesPage() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [editAgent, setEditAgent] = useState<any | null>(null)
   const [agentItems, setAgentItems] = useState<TemplateItem[]>([])
+  const [showAddForm, setShowAddForm] = useState(false)
   const [newMetric, setNewMetric] = useState({
     code: '',
     label: '',
@@ -66,20 +73,10 @@ export default function ObjectivesPage() {
     if (template?.items) setItems(template.items)
   }, [template])
 
-  const grouped = useMemo(() => {
-    const map: Record<string, TemplateItem[]> = {
-      DAILY: [],
-      WEEKLY: [],
-      MONTHLY: [],
-      ACTIVITY: [],
-    }
-    for (const it of items) {
-      const p = it.metric?.period || 'DAILY'
-      if (!map[p]) map[p] = []
-      map[p].push(it)
-    }
-    return map
-  }, [items])
+  const periodItems = useMemo(
+    () => items.filter((it) => (it.metric?.period || 'DAILY') === periodFilter),
+    [items, periodFilter],
+  )
 
   const saveMutation = useMutation({
     mutationFn: () =>
@@ -96,6 +93,7 @@ export default function ObjectivesPage() {
       setConfirmOpen(false)
       queryClient.invalidateQueries({ queryKey: ['objectives-template'] })
       queryClient.invalidateQueries({ queryKey: ['objectives-agents'] })
+      queryClient.invalidateQueries({ queryKey: ['agent-wallets'] })
     },
     onError: (e: any) => toast.error(e?.message || 'Erreur'),
   })
@@ -113,6 +111,7 @@ export default function ObjectivesPage() {
       } as any),
     onSuccess: async () => {
       toast.success('Objectif ajouté')
+      setShowAddForm(false)
       setNewMetric({
         code: '',
         label: '',
@@ -151,6 +150,7 @@ export default function ObjectivesPage() {
       toast.success('Objectifs agent mis à jour')
       setEditAgent(null)
       queryClient.invalidateQueries({ queryKey: ['objectives-agents'] })
+      queryClient.invalidateQueries({ queryKey: ['agent-wallets'] })
     },
     onError: (e: any) => toast.error(e?.message || 'Erreur'),
   })
@@ -168,6 +168,7 @@ export default function ObjectivesPage() {
       ...(detail.daily?.items || []),
       ...(detail.weekly?.items || []),
       ...(detail.monthly?.items || []),
+      ...((detail as any).activity?.items || []),
     ]
     setAgentItems(
       all.map((o: any) => ({
@@ -180,11 +181,30 @@ export default function ObjectivesPage() {
     )
   }
 
+  const PeriodTabs = ({ includeActivity = true }: { includeActivity?: boolean }) => (
+    <div className="flex flex-wrap gap-2">
+      {PERIODS.filter((p) => includeActivity || p.id !== 'ACTIVITY').map((p) => (
+        <button
+          key={p.id}
+          type="button"
+          onClick={() => setPeriodFilter(p.id)}
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer border ${
+            periodFilter === p.id
+              ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/10'
+              : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:text-gray-700'
+          }`}
+        >
+          {p.label}
+        </button>
+      ))}
+    </div>
+  )
+
   return (
     <div className="flex-1 flex flex-col bg-white">
       <Header
         title="Objectifs agents"
-        subtitle="Template global, overrides par agent et performance"
+        subtitle="Définissez le template global ici — les cibles sont ensuite appliquées à tous les agents (modifiables individuellement)."
       />
 
       <div className="p-8 space-y-6 flex-1">
@@ -199,7 +219,10 @@ export default function ObjectivesPage() {
             <button
               key={id}
               type="button"
-              onClick={() => setTab(id)}
+              onClick={() => {
+                setTab(id)
+                if (id !== 'template' && periodFilter === 'ACTIVITY') setPeriodFilter('DAILY')
+              }}
               className={`pb-4 text-sm font-bold tracking-tight border-b-2 px-1 transition-all cursor-pointer ${
                 tab === id
                   ? 'border-blue-600 text-blue-600'
@@ -211,387 +234,516 @@ export default function ObjectivesPage() {
           ))}
         </div>
 
-      {tab === 'template' && (
-        <div className="space-y-4">
-          {canManage && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Ajouter un objectif</CardTitle>
-              </CardHeader>
-              <CardContent className="grid gap-3 md:grid-cols-4">
-                <Input
-                  placeholder="code (snake_case)"
-                  value={newMetric.code}
-                  onChange={(e) => setNewMetric({ ...newMetric, code: e.target.value })}
-                />
-                <Input
-                  placeholder="Libellé"
-                  value={newMetric.label}
-                  onChange={(e) => setNewMetric({ ...newMetric, label: e.target.value })}
-                />
-                <select
-                  className="h-10 rounded-md border px-3 text-sm"
-                  value={newMetric.period}
-                  onChange={(e) => setNewMetric({ ...newMetric, period: e.target.value })}
-                >
-                  {PERIODS.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.label}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  className="h-10 rounded-md border px-3 text-sm"
-                  value={newMetric.kind}
-                  onChange={(e) => setNewMetric({ ...newMetric, kind: e.target.value })}
-                >
-                  <option value="QUANTITATIVE">Quantitatif</option>
-                  <option value="BOOLEAN">Checklist</option>
-                </select>
-                <Input
-                  type="number"
-                  placeholder="Points"
-                  value={newMetric.default_points}
-                  onChange={(e) => setNewMetric({ ...newMetric, default_points: e.target.value })}
-                />
-                <Input
-                  type="number"
-                  placeholder="Minimum"
-                  value={newMetric.default_minimum}
-                  onChange={(e) => setNewMetric({ ...newMetric, default_minimum: e.target.value })}
-                />
-                <Input
-                  type="number"
-                  placeholder="Cible"
-                  value={newMetric.default_target}
-                  onChange={(e) => setNewMetric({ ...newMetric, default_target: e.target.value })}
-                />
-                <Button
-                  onClick={() => createMetricMutation.mutate()}
-                  disabled={!newMetric.code || !newMetric.label || createMetricMutation.isPending}
-                >
-                  <Plus className="mr-2 h-4 w-4" /> Ajouter
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-
-          {isLoading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin" />
+        {tab === 'template' && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-gray-950">Objectifs du template</h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Version v{template?.version ?? 1} — un seul endroit pour fixer les objectifs de
+                  l&apos;agence
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAddForm((v) => !v)}
+                    className="flex items-center gap-2 px-5 py-3 text-sm font-semibold bg-white border border-gray-200 hover:bg-gray-50 text-gray-800 rounded-xl active:scale-95 transition-all cursor-pointer"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Nouvel objectif
+                  </button>
+                )}
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmOpen(true)}
+                    disabled={saveMutation.isPending}
+                    className="flex items-center gap-2 px-5 py-3 text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-xl active:scale-95 transition-all shadow-md shadow-blue-500/10 cursor-pointer border-0 disabled:opacity-50"
+                  >
+                    <Save className="h-4 w-4" />
+                    Appliquer à tous les agents
+                  </button>
+                )}
+              </div>
             </div>
-          ) : (
-            PERIODS.map((p) => (
-              <Card key={p.id}>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="text-base">{p.label}</CardTitle>
-                  <span className="text-xs text-muted-foreground">
-                    v{template?.version ?? 1}
-                  </span>
-                </CardHeader>
-                <CardContent className="overflow-x-auto">
-                  <table className="w-full text-sm">
+
+            <PeriodTabs />
+
+            {canManage && showAddForm && (
+              <div className="w-full bg-white rounded-2xl border border-gray-100 p-6">
+                <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider border-b border-gray-50 pb-2 mb-4">
+                  Créer un objectif
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                  <div className="space-y-1">
+                    <label className={labelClass}>Code *</label>
+                    <Input
+                      placeholder="ex: field_visits"
+                      value={newMetric.code}
+                      onChange={(e) => setNewMetric({ ...newMetric, code: e.target.value })}
+                      className="h-10 text-xs border-gray-200"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelClass}>Libellé *</label>
+                    <Input
+                      placeholder="Ex: Visites terrain"
+                      value={newMetric.label}
+                      onChange={(e) => setNewMetric({ ...newMetric, label: e.target.value })}
+                      className="h-10 text-xs border-gray-200"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelClass}>Période</label>
+                    <select
+                      className={selectClass}
+                      value={newMetric.period}
+                      onChange={(e) => setNewMetric({ ...newMetric, period: e.target.value })}
+                    >
+                      {PERIODS.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelClass}>Type</label>
+                    <select
+                      className={selectClass}
+                      value={newMetric.kind}
+                      onChange={(e) => setNewMetric({ ...newMetric, kind: e.target.value })}
+                    >
+                      <option value="QUANTITATIVE">Quantitatif</option>
+                      <option value="BOOLEAN">Checklist</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelClass}>Cible</label>
+                    <Input
+                      type="number"
+                      value={newMetric.default_target}
+                      onChange={(e) =>
+                        setNewMetric({ ...newMetric, default_target: e.target.value })
+                      }
+                      className="h-10 text-xs border-gray-200"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelClass}>Points</label>
+                    <Input
+                      type="number"
+                      value={newMetric.default_points}
+                      onChange={(e) =>
+                        setNewMetric({ ...newMetric, default_points: e.target.value })
+                      }
+                      className="h-10 text-xs border-gray-200"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelClass}>Minimum</label>
+                    <Input
+                      type="number"
+                      value={newMetric.default_minimum}
+                      onChange={(e) =>
+                        setNewMetric({ ...newMetric, default_minimum: e.target.value })
+                      }
+                      className="h-10 text-xs border-gray-200"
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 justify-end pt-5 border-t border-gray-50 mt-5">
+                  <Button type="button" variant="ghost" onClick={() => setShowAddForm(false)}>
+                    Annuler
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    className="text-white"
+                    disabled={
+                      !newMetric.code || !newMetric.label || createMetricMutation.isPending
+                    }
+                    isLoading={createMetricMutation.isPending}
+                    onClick={() => createMetricMutation.mutate()}
+                  >
+                    Ajouter
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-white rounded-2xl border border-gray-100 p-6">
+              {isLoading ? (
+                <div className="py-20 text-center text-gray-400 font-medium">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-500 mb-3" />
+                  Chargement du template…
+                </div>
+              ) : periodItems.length === 0 ? (
+                <div className="py-20 text-center text-gray-400">
+                  <Target className="h-12 w-12 mx-auto text-gray-300 mb-3" />
+                  <p className="text-sm font-semibold">Aucun objectif pour cette période</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="border-b text-left text-xs uppercase text-muted-foreground">
-                        <th className="py-2">Objectif</th>
-                        <th className="py-2">Cible</th>
-                        <th className="py-2">Points</th>
-                        <th className="py-2">Minimum</th>
-                        <th className="py-2" />
+                      <tr className="border-b border-gray-100">
+                        <th className={thClass}>Objectif</th>
+                        <th className={thClass}>Cible</th>
+                        <th className={thClass}>Points</th>
+                        <th className={thClass}>Minimum</th>
+                        <th className={`${thClass} text-right`}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {(grouped[p.id] || []).map((it) => (
-                        <tr key={it.metric_id} className="border-b">
-                          <td className="py-2">
-                            <div className="font-medium">{it.metric?.label || it.metric_id}</div>
-                            <div className="text-xs text-muted-foreground">{it.metric?.code}</div>
+                      {periodItems.map((it) => (
+                        <tr key={it.metric_id} className={trClass}>
+                          <td className="py-4">
+                            <span className="font-bold text-sm text-gray-900 block">
+                              {it.metric?.label || it.metric_id}
+                            </span>
+                            <span className="text-[10px] text-gray-400 block font-mono">
+                              {it.metric?.code}
+                              {it.metric?.kind === 'BOOLEAN' ? ' · checklist' : ''}
+                            </span>
                           </td>
-                          <td className="py-2">
+                          <td className="py-4">
                             <Input
                               type="number"
-                              className="w-24"
                               value={it.target_value}
                               onChange={(e) =>
                                 updateItem(it.metric_id, 'target_value', Number(e.target.value))
                               }
                               disabled={!canManage}
+                              className="h-10 w-24 text-xs border-gray-200"
                             />
                           </td>
-                          <td className="py-2">
+                          <td className="py-4">
                             <Input
                               type="number"
-                              className="w-24"
                               value={it.points}
                               onChange={(e) =>
                                 updateItem(it.metric_id, 'points', Number(e.target.value))
                               }
                               disabled={!canManage}
+                              className="h-10 w-24 text-xs border-gray-200"
                             />
                           </td>
-                          <td className="py-2">
+                          <td className="py-4">
                             <Input
                               type="number"
-                              className="w-24"
                               value={it.minimum}
                               onChange={(e) =>
                                 updateItem(it.metric_id, 'minimum', Number(e.target.value))
                               }
                               disabled={!canManage}
+                              className="h-10 w-24 text-xs border-gray-200"
                             />
                           </td>
-                          <td className="py-2">
-                            {canManage && it.metric && !it.metric.is_system && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
+                          <td className="py-4 text-right">
+                            {canManage && it.metric && !it.metric.is_system ? (
+                              <button
+                                type="button"
                                 onClick={() => deleteMetricMutation.mutate(it.metric_id)}
+                                className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all cursor-pointer border-0 inline-flex items-center justify-center active:scale-95"
+                                title="Supprimer"
                               >
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                              </Button>
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            ) : (
+                              <span className="text-[10px] text-gray-400 font-medium">Système</span>
                             )}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                </CardContent>
-              </Card>
-            ))
-          )}
-
-          {canManage && (
-            <Button onClick={() => setConfirmOpen(true)} disabled={saveMutation.isPending}>
-              <Save className="mr-2 h-4 w-4" />
-              Enregistrer et appliquer à tous les agents
-            </Button>
-          )}
-        </div>
-      )}
-
-      {tab === 'agents' && (
-        <div className="space-y-4">
-          <div className="flex gap-2">
-            {PERIODS.filter((p) => p.id !== 'ACTIVITY').map((p) => (
-              <Button
-                key={p.id}
-                size="sm"
-                variant={periodFilter === p.id ? 'default' : 'outline'}
-                onClick={() => setPeriodFilter(p.id)}
-              >
-                {p.label}
-              </Button>
-            ))}
+                </div>
+              )}
+            </div>
           </div>
-          {loadingAgents ? (
-            <Loader2 className="mx-auto h-6 w-6 animate-spin" />
-          ) : (
-            <Card>
-              <CardContent className="overflow-x-auto pt-6">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-xs uppercase text-muted-foreground">
-                      <th className="py-2">Agent</th>
-                      <th className="py-2">Points</th>
-                      <th className="py-2">Sous minimum</th>
-                      <th className="py-2" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(agentsData?.items || []).map((a: any) => (
-                      <tr key={a.agent_id} className="border-b">
-                        <td className="py-2">
-                          <div className="font-medium">{a.agent_name}</div>
-                          <div className="text-xs text-muted-foreground">{a.agent_email}</div>
-                        </td>
-                        <td className="py-2">{a.points_balance}</td>
-                        <td className="py-2">
-                          <span
-                            className={
-                              a.below_minimum_count > 0 ? 'text-red-600 font-medium' : ''
-                            }
-                          >
-                            {a.below_minimum_count}
-                          </span>
-                        </td>
-                        <td className="py-2">
-                          {canManage && (
-                            <Button size="sm" variant="outline" onClick={() => openAgentEdit(a)}>
-                              Modifier
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
+        )}
 
-      {tab === 'performance' && (
-        <div className="space-y-4">
-          <div className="flex gap-2">
-            {PERIODS.filter((p) => p.id !== 'ACTIVITY').map((p) => (
-              <Button
-                key={p.id}
-                size="sm"
-                variant={periodFilter === p.id ? 'default' : 'outline'}
-                onClick={() => setPeriodFilter(p.id)}
-              >
-                {p.label}
-              </Button>
-            ))}
-          </div>
-          {loadingPerf ? (
-            <Loader2 className="mx-auto h-6 w-6 animate-spin" />
-          ) : (
-            <Card>
-              <CardContent className="overflow-x-auto pt-6">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-xs uppercase text-muted-foreground">
-                      <th className="py-2">Agent</th>
-                      <th className="py-2">Points période</th>
-                      <th className="py-2">OK</th>
-                      <th className="py-2">Sous minimum</th>
-                      <th className="py-2">Total métriques</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(perfData?.items || []).map((r: any) => (
-                      <tr key={r.agent_id} className="border-b">
-                        <td className="py-2 font-medium">{r.agent_name}</td>
-                        <td className="py-2">{r.points_period}</td>
-                        <td className="py-2">{r.metrics_ok}</td>
-                        <td className="py-2 text-red-600">{r.metrics_below}</td>
-                        <td className="py-2">{r.metrics_total}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
-
-      {confirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <Card className="w-full max-w-md">
-            <CardHeader>
-              <CardTitle>Confirmer l&apos;application</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Cela réinitialisera les objectifs de tous les agents avec les valeurs du template
-                (y compris les overrides individuels).
+        {tab === 'agents' && (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-base font-bold text-gray-950">Overrides par agent</h3>
+              <p className="text-xs text-gray-500 mt-1">
+                Modifiez uniquement un agent si besoin — le template global reste la source
+                principale
               </p>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setConfirmOpen(false)}>
-                  Annuler
-                </Button>
-                <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
-                  {saveMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    'Confirmer'
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+            </div>
+            <PeriodTabs includeActivity={false} />
+            <div className="bg-white rounded-2xl border border-gray-100 p-6">
+              {loadingAgents ? (
+                <div className="py-20 text-center text-gray-400 font-medium">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-500 mb-3" />
+                  Chargement des agents…
+                </div>
+              ) : (agentsData?.items || []).length === 0 ? (
+                <div className="py-20 text-center text-gray-400">
+                  <Target className="h-12 w-12 mx-auto text-gray-300 mb-3" />
+                  <p className="text-sm font-semibold">Aucun agent terrain</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-100">
+                        <th className={thClass}>Agent</th>
+                        <th className={thClass}>Points</th>
+                        <th className={thClass}>Sous minimum</th>
+                        <th className={`${thClass} text-right`}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(agentsData?.items || []).map((a: any) => (
+                        <tr key={a.agent_id} className={trClass}>
+                          <td className="py-4">
+                            <span className="font-bold text-sm text-gray-900 block">
+                              {a.agent_name}
+                            </span>
+                            <span className="text-[10px] text-gray-400 block">
+                              {a.agent_email || a.agent_id?.substring?.(0, 8)}
+                            </span>
+                          </td>
+                          <td className="py-4">
+                            <span className="font-extrabold text-sm text-slate-800">
+                              {a.points_balance ?? 0}
+                            </span>
+                          </td>
+                          <td className="py-4">
+                            <span
+                              className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                                a.below_minimum_count > 0
+                                  ? 'bg-red-50 text-red-700'
+                                  : 'bg-green-50 text-green-700'
+                              }`}
+                            >
+                              {a.below_minimum_count ?? 0}
+                            </span>
+                          </td>
+                          <td className="py-4 text-right">
+                            {canManage ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-xs border-gray-200"
+                                onClick={() => openAgentEdit(a)}
+                              >
+                                Modifier
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-gray-400">Lecture seule</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
-      {editAgent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <Card className="max-h-[90vh] w-full max-w-3xl overflow-y-auto">
-            <CardHeader>
-              <CardTitle>Objectifs — {editAgent.agent_name}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-xs uppercase text-muted-foreground">
-                    <th className="py-2">Objectif</th>
-                    <th className="py-2">Période</th>
-                    <th className="py-2">Cible</th>
-                    <th className="py-2">Points</th>
-                    <th className="py-2">Minimum</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {agentItems.map((it) => (
-                    <tr key={it.metric_id} className="border-b">
-                      <td className="py-2">{(it.metric as ObjectiveMetric)?.label}</td>
-                      <td className="py-2">{(it.metric as ObjectiveMetric)?.period}</td>
-                      <td className="py-2">
-                        <Input
-                          type="number"
-                          className="w-20"
-                          value={it.target_value}
-                          onChange={(e) =>
-                            setAgentItems((prev) =>
-                              prev.map((x) =>
-                                x.metric_id === it.metric_id
-                                  ? { ...x, target_value: Number(e.target.value) }
-                                  : x,
-                              ),
-                            )
-                          }
-                        />
-                      </td>
-                      <td className="py-2">
-                        <Input
-                          type="number"
-                          className="w-20"
-                          value={it.points}
-                          onChange={(e) =>
-                            setAgentItems((prev) =>
-                              prev.map((x) =>
-                                x.metric_id === it.metric_id
-                                  ? { ...x, points: Number(e.target.value) }
-                                  : x,
-                              ),
-                            )
-                          }
-                        />
-                      </td>
-                      <td className="py-2">
-                        <Input
-                          type="number"
-                          className="w-20"
-                          value={it.minimum}
-                          onChange={(e) =>
-                            setAgentItems((prev) =>
-                              prev.map((x) =>
-                                x.metric_id === it.metric_id
-                                  ? { ...x, minimum: Number(e.target.value) }
-                                  : x,
-                              ),
-                            )
-                          }
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setEditAgent(null)}>
-                  Annuler
-                </Button>
-                <Button onClick={() => agentSaveMutation.mutate()} disabled={agentSaveMutation.isPending}>
-                  Enregistrer
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+        {tab === 'performance' && (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-base font-bold text-gray-950">Performance période</h3>
+              <p className="text-xs text-gray-500 mt-1">
+                Suivi des objectifs atteints vs sous le seuil minimum
+              </p>
+            </div>
+            <PeriodTabs includeActivity={false} />
+            <div className="bg-white rounded-2xl border border-gray-100 p-6">
+              {loadingPerf ? (
+                <div className="py-20 text-center text-gray-400 font-medium">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-500 mb-3" />
+                  Chargement de la performance…
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-100">
+                        <th className={thClass}>Agent</th>
+                        <th className={thClass}>Points période</th>
+                        <th className={thClass}>OK</th>
+                        <th className={thClass}>Sous minimum</th>
+                        <th className={thClass}>Total métriques</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(perfData?.items || []).map((r: any) => (
+                        <tr key={r.agent_id} className={trClass}>
+                          <td className="py-4">
+                            <span className="font-bold text-sm text-gray-900">
+                              {r.agent_name}
+                            </span>
+                          </td>
+                          <td className="py-4 font-extrabold text-sm text-slate-800">
+                            {r.points_period ?? 0}
+                          </td>
+                          <td className="py-4">
+                            <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-green-50 text-green-700">
+                              {r.metrics_ok ?? 0}
+                            </span>
+                          </td>
+                          <td className="py-4">
+                            <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-red-50 text-red-700">
+                              {r.metrics_below ?? 0}
+                            </span>
+                          </td>
+                          <td className="py-4 text-sm text-slate-700">{r.metrics_total ?? 0}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {confirmOpen && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <Card className="w-full max-w-md bg-white border border-gray-100 shadow-2xl rounded-2xl">
+              <CardContent className="pt-6 space-y-4">
+                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider pb-2 border-b border-gray-50">
+                  Confirmer l&apos;application
+                </h3>
+                <p className="text-xs text-gray-500">
+                  Les objectifs de tous les agents seront remplacés par ce template (y compris les
+                  overrides individuels).
+                </p>
+                <div className="flex gap-2 justify-end pt-2">
+                  <Button type="button" variant="ghost" onClick={() => setConfirmOpen(false)}>
+                    Annuler
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    className="text-white"
+                    disabled={saveMutation.isPending}
+                    isLoading={saveMutation.isPending}
+                    onClick={() => saveMutation.mutate()}
+                  >
+                    Confirmer
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {editAgent && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <Card className="w-full max-w-3xl bg-white border border-gray-100 shadow-2xl rounded-2xl max-h-[90vh] overflow-y-auto">
+              <CardContent className="pt-6 space-y-4">
+                <div className="pb-2 border-b border-gray-50">
+                  <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                    <Target className="h-4 w-4 text-blue-600" />
+                    Objectifs — {editAgent.agent_name}
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Override individuel (sans modifier le template global)
+                  </p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-100">
+                        <th className={thClass}>Objectif</th>
+                        <th className={thClass}>Période</th>
+                        <th className={thClass}>Cible</th>
+                        <th className={thClass}>Points</th>
+                        <th className={thClass}>Minimum</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {agentItems.map((it) => (
+                        <tr key={it.metric_id} className={trClass}>
+                          <td className="py-3 text-sm font-semibold text-gray-900">
+                            {(it.metric as ObjectiveMetric)?.label}
+                          </td>
+                          <td className="py-3 text-xs text-gray-500">
+                            {(it.metric as ObjectiveMetric)?.period}
+                          </td>
+                          <td className="py-3">
+                            <Input
+                              type="number"
+                              value={it.target_value}
+                              onChange={(e) =>
+                                setAgentItems((prev) =>
+                                  prev.map((x) =>
+                                    x.metric_id === it.metric_id
+                                      ? { ...x, target_value: Number(e.target.value) }
+                                      : x,
+                                  ),
+                                )
+                              }
+                              className="h-10 w-20 text-xs border-gray-200"
+                            />
+                          </td>
+                          <td className="py-3">
+                            <Input
+                              type="number"
+                              value={it.points}
+                              onChange={(e) =>
+                                setAgentItems((prev) =>
+                                  prev.map((x) =>
+                                    x.metric_id === it.metric_id
+                                      ? { ...x, points: Number(e.target.value) }
+                                      : x,
+                                  ),
+                                )
+                              }
+                              className="h-10 w-20 text-xs border-gray-200"
+                            />
+                          </td>
+                          <td className="py-3">
+                            <Input
+                              type="number"
+                              value={it.minimum}
+                              onChange={(e) =>
+                                setAgentItems((prev) =>
+                                  prev.map((x) =>
+                                    x.metric_id === it.metric_id
+                                      ? { ...x, minimum: Number(e.target.value) }
+                                      : x,
+                                  ),
+                                )
+                              }
+                              className="h-10 w-20 text-xs border-gray-200"
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex gap-2 justify-end pt-2">
+                  <Button type="button" variant="ghost" onClick={() => setEditAgent(null)}>
+                    Annuler
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    className="text-white"
+                    disabled={agentSaveMutation.isPending}
+                    isLoading={agentSaveMutation.isPending}
+                    onClick={() => agentSaveMutation.mutate()}
+                  >
+                    Enregistrer
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   )

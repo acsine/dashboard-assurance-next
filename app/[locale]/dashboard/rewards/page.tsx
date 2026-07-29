@@ -5,20 +5,26 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import Header from '@/components/dashboard/Header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
-import { Loader2, Plus, Trash2 } from 'lucide-react'
+import { Award, Loader2, Plus, Trash2 } from 'lucide-react'
 import { rewardsApi, objectivesApi } from '@/lib/api/mobi-assur'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { can } from '@/lib/auth/roles'
 
 type Tab = 'bonus' | 'conversion' | 'challenges'
 
+const labelClass = 'text-[10px] font-bold text-gray-500 uppercase tracking-wider block'
+const selectClass =
+  'flex h-10 w-full rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs transition-colors focus-visible:outline-none'
+const thClass = 'pb-4 text-xs font-bold text-gray-400 uppercase tracking-wider'
+const trClass = 'border-b border-gray-50 last:border-0 hover:bg-gray-50/40 transition-colors'
+
 export default function RewardsPage() {
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
   const canManage = can(user?.role, 'settings:manage')
   const [tab, setTab] = useState<Tab>('bonus')
+  const [showForm, setShowForm] = useState(false)
 
   const [bonusForm, setBonusForm] = useState({
     period: 'DAILY',
@@ -78,6 +84,7 @@ export default function RewardsPage() {
       }),
     onSuccess: () => {
       toast.success('Bonus créé')
+      setShowForm(false)
       queryClient.invalidateQueries({ queryKey: ['bonus-rules'] })
     },
     onError: (e: any) => toast.error(e?.message || 'Erreur'),
@@ -93,6 +100,7 @@ export default function RewardsPage() {
       }),
     onSuccess: () => {
       toast.success('Taux créé')
+      setShowForm(false)
       queryClient.invalidateQueries({ queryKey: ['conversion-rates'] })
     },
     onError: (e: any) => toast.error(e?.message || 'Erreur'),
@@ -116,16 +124,41 @@ export default function RewardsPage() {
       }),
     onSuccess: () => {
       toast.success('Challenge créé')
+      setShowForm(false)
       queryClient.invalidateQueries({ queryKey: ['challenges'] })
     },
     onError: (e: any) => toast.error(e?.message || 'Erreur'),
   })
 
+  const tabLabels: Record<Tab, string> = {
+    bonus: 'Nouveau bonus',
+    conversion: 'Nouveau taux',
+    challenges: 'Nouveau challenge',
+  }
+
   return (
     <div className="flex-1 flex flex-col bg-white">
-      <Header title="Récompenses" subtitle="Bonus points, conversion et challenges" />
+      <Header
+        title="Récompenses"
+        subtitle="Bonus de seuils, conversion points → FCFA et challenges agents."
+      />
+
       <div className="p-8 space-y-6 flex-1">
-        <div className="flex gap-4 border-b border-gray-100 pb-px">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <h3 className="text-base font-bold text-gray-950">Programme de récompenses</h3>
+          {canManage && (
+            <button
+              type="button"
+              onClick={() => setShowForm((v) => !v)}
+              className="flex items-center gap-2 px-5 py-3 text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-xl active:scale-95 transition-all shadow-md shadow-blue-500/10 cursor-pointer border-0 shrink-0 self-start sm:self-auto"
+            >
+              <Plus className="h-4 w-4" />
+              {tabLabels[tab]}
+            </button>
+          )}
+        </div>
+
+        <div className="flex gap-4 border-b border-gray-100 pb-px w-full">
           {(
             [
               ['bonus', 'Bonus seuils'],
@@ -136,7 +169,10 @@ export default function RewardsPage() {
             <button
               key={id}
               type="button"
-              onClick={() => setTab(id)}
+              onClick={() => {
+                setTab(id)
+                setShowForm(false)
+              }}
               className={`pb-4 text-sm font-bold tracking-tight border-b-2 px-1 transition-all cursor-pointer ${
                 tab === id
                   ? 'border-blue-600 text-blue-600'
@@ -148,177 +184,458 @@ export default function RewardsPage() {
           ))}
         </div>
 
-      {tab === 'bonus' && (
-        <div className="space-y-4">
-          {canManage && (
-            <Card>
-              <CardHeader><CardTitle className="text-base">Nouveau bonus</CardTitle></CardHeader>
-              <CardContent className="grid gap-3 md:grid-cols-4">
-                <select className="h-10 rounded-md border px-3 text-sm" value={bonusForm.period} onChange={(e) => setBonusForm({ ...bonusForm, period: e.target.value })}>
-                  <option value="DAILY">Journalier</option>
-                  <option value="WEEKLY">Hebdomadaire</option>
-                  <option value="MONTHLY">Mensuel</option>
-                </select>
-                <Input type="number" placeholder="Seuil points" value={bonusForm.points_threshold} onChange={(e) => setBonusForm({ ...bonusForm, points_threshold: e.target.value })} />
-                <Input type="number" placeholder="Récompense FCFA" value={bonusForm.reward_amount} onChange={(e) => setBonusForm({ ...bonusForm, reward_amount: e.target.value })} />
-                <Input placeholder="Libellé" value={bonusForm.label} onChange={(e) => setBonusForm({ ...bonusForm, label: e.target.value })} />
-                <Button onClick={() => createBonus.mutate()}><Plus className="mr-2 h-4 w-4" />Créer</Button>
-              </CardContent>
-            </Card>
-          )}
-          {loadingBonus ? <Loader2 className="mx-auto h-6 w-6 animate-spin" /> : (
-            <Card>
-              <CardContent className="pt-6 overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-xs uppercase text-muted-foreground text-left">
-                      <th className="py-2">Libellé</th><th>Période</th><th>Seuil</th><th>Récompense</th><th />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(bonusData?.items || []).map((r) => (
-                      <tr key={r.id} className="border-b">
-                        <td className="py-2">{r.label}</td>
-                        <td>{r.period}</td>
-                        <td>{r.points_threshold} pts</td>
-                        <td>{r.reward_amount} FCFA</td>
-                        <td>
-                          {canManage && (
-                            <Button size="sm" variant="ghost" onClick={() => rewardsApi.deleteBonusRule(r.id).then(() => queryClient.invalidateQueries({ queryKey: ['bonus-rules'] }))}>
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
+        {tab === 'bonus' && (
+          <div className="space-y-6">
+            {canManage && showForm && (
+              <div className="w-full bg-white rounded-2xl border border-gray-100 p-6">
+                <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider border-b border-gray-50 pb-2 mb-4">
+                  Créer un bonus seuil
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                  <div className="space-y-1">
+                    <label className={labelClass}>Période</label>
+                    <select
+                      className={selectClass}
+                      value={bonusForm.period}
+                      onChange={(e) => setBonusForm({ ...bonusForm, period: e.target.value })}
+                    >
+                      <option value="DAILY">Journalier</option>
+                      <option value="WEEKLY">Hebdomadaire</option>
+                      <option value="MONTHLY">Mensuel</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelClass}>Seuil points</label>
+                    <Input
+                      type="number"
+                      value={bonusForm.points_threshold}
+                      onChange={(e) =>
+                        setBonusForm({ ...bonusForm, points_threshold: e.target.value })
+                      }
+                      className="h-10 text-xs border-gray-200"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelClass}>Récompense FCFA</label>
+                    <Input
+                      type="number"
+                      value={bonusForm.reward_amount}
+                      onChange={(e) =>
+                        setBonusForm({ ...bonusForm, reward_amount: e.target.value })
+                      }
+                      className="h-10 text-xs border-gray-200"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelClass}>Libellé</label>
+                    <Input
+                      value={bonusForm.label}
+                      onChange={(e) => setBonusForm({ ...bonusForm, label: e.target.value })}
+                      className="h-10 text-xs border-gray-200"
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 justify-end pt-5 border-t border-gray-50 mt-5">
+                  <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>
+                    Annuler
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    className="text-white"
+                    isLoading={createBonus.isPending}
+                    onClick={() => createBonus.mutate()}
+                  >
+                    Créer
+                  </Button>
+                </div>
+              </div>
+            )}
 
-      {tab === 'conversion' && (
-        <div className="space-y-4">
-          {canManage && (
-            <Card>
-              <CardHeader><CardTitle className="text-base">Nouveau taux de conversion</CardTitle></CardHeader>
-              <CardContent className="grid gap-3 md:grid-cols-4">
-                <Input type="number" placeholder="Points requis" value={convForm.points_required} onChange={(e) => setConvForm({ ...convForm, points_required: e.target.value })} />
-                <Input type="number" placeholder="FCFA" value={convForm.fcfa_amount} onChange={(e) => setConvForm({ ...convForm, fcfa_amount: e.target.value })} />
-                <Input placeholder="Libellé" value={convForm.label} onChange={(e) => setConvForm({ ...convForm, label: e.target.value })} />
-                <Button onClick={() => createConv.mutate()}><Plus className="mr-2 h-4 w-4" />Créer</Button>
-              </CardContent>
-            </Card>
-          )}
-          {loadingConv ? <Loader2 className="mx-auto h-6 w-6 animate-spin" /> : (
-            <Card>
-              <CardContent className="pt-6 overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-xs uppercase text-muted-foreground text-left">
-                      <th className="py-2">Libellé</th><th>Points</th><th>FCFA</th><th />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(convData?.items || []).map((r) => (
-                      <tr key={r.id} className="border-b">
-                        <td className="py-2">{r.label || '—'}</td>
-                        <td>{r.points_required}</td>
-                        <td>{r.fcfa_amount}</td>
-                        <td>
-                          {canManage && (
-                            <Button size="sm" variant="ghost" onClick={() => rewardsApi.deleteConversionRate(r.id).then(() => queryClient.invalidateQueries({ queryKey: ['conversion-rates'] }))}>
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
-                          )}
-                        </td>
+            <div className="bg-white rounded-2xl border border-gray-100 p-6">
+              {loadingBonus ? (
+                <div className="py-20 text-center text-gray-400">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-500 mb-3" />
+                </div>
+              ) : (bonusData?.items || []).length === 0 ? (
+                <div className="py-20 text-center text-gray-400">
+                  <Award className="h-12 w-12 mx-auto text-gray-300 mb-3" />
+                  <p className="text-sm font-semibold">Aucun bonus défini</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-100">
+                        <th className={thClass}>Libellé</th>
+                        <th className={thClass}>Période</th>
+                        <th className={thClass}>Seuil</th>
+                        <th className={thClass}>Récompense</th>
+                        <th className={`${thClass} text-right`}>Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
+                    </thead>
+                    <tbody>
+                      {(bonusData?.items || []).map((r) => (
+                        <tr key={r.id} className={trClass}>
+                          <td className="py-4 font-bold text-sm text-gray-900">{r.label}</td>
+                          <td className="py-4 text-xs text-slate-600">{r.period}</td>
+                          <td className="py-4 font-extrabold text-sm">{r.points_threshold} pts</td>
+                          <td className="py-4 font-extrabold text-sm text-emerald-700">
+                            {Number(r.reward_amount).toLocaleString('fr-FR')} FCFA
+                          </td>
+                          <td className="py-4 text-right">
+                            {canManage && (
+                              <button
+                                type="button"
+                                className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all cursor-pointer border-0 inline-flex"
+                                onClick={() =>
+                                  rewardsApi.deleteBonusRule(r.id).then(() =>
+                                    queryClient.invalidateQueries({ queryKey: ['bonus-rules'] }),
+                                  )
+                                }
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
-      {tab === 'challenges' && (
-        <div className="space-y-4">
-          {canManage && (
-            <Card>
-              <CardHeader><CardTitle className="text-base">Nouveau challenge</CardTitle></CardHeader>
-              <CardContent className="grid gap-3 md:grid-cols-3">
-                <Input placeholder="Titre *" value={chalForm.title} onChange={(e) => setChalForm({ ...chalForm, title: e.target.value })} />
-                <select className="h-10 rounded-md border px-3 text-sm" value={chalForm.scope} onChange={(e) => setChalForm({ ...chalForm, scope: e.target.value })}>
-                  <option value="METRIC">Objectif précis</option>
-                  <option value="PERIOD_TYPE">Type d&apos;objectifs</option>
-                </select>
-                {chalForm.scope === 'METRIC' ? (
-                  <select className="h-10 rounded-md border px-3 text-sm" value={chalForm.metric_id} onChange={(e) => setChalForm({ ...chalForm, metric_id: e.target.value })}>
-                    <option value="">Choisir une métrique</option>
-                    {(metricsData?.items || []).map((m) => (
-                      <option key={m.id} value={m.id}>{m.label} ({m.period})</option>
-                    ))}
-                  </select>
-                ) : (
-                  <select className="h-10 rounded-md border px-3 text-sm" value={chalForm.period} onChange={(e) => setChalForm({ ...chalForm, period: e.target.value })}>
-                    <option value="DAILY">Journalier</option>
-                    <option value="WEEKLY">Hebdomadaire</option>
-                    <option value="MONTHLY">Mensuel</option>
-                  </select>
-                )}
-                <Input type="number" placeholder="Cible" value={chalForm.target_value} onChange={(e) => setChalForm({ ...chalForm, target_value: e.target.value })} />
-                <Input type="number" placeholder="Top N places" value={chalForm.max_winners} onChange={(e) => setChalForm({ ...chalForm, max_winners: e.target.value })} />
-                <Input type="number" placeholder="Récompense FCFA" value={chalForm.reward_amount} onChange={(e) => setChalForm({ ...chalForm, reward_amount: e.target.value })} />
-                <Input type="number" placeholder="Récompense points" value={chalForm.reward_points} onChange={(e) => setChalForm({ ...chalForm, reward_points: e.target.value })} />
-                <Input type="datetime-local" value={chalForm.starts_at} onChange={(e) => setChalForm({ ...chalForm, starts_at: e.target.value })} />
-                <Input type="datetime-local" value={chalForm.ends_at} onChange={(e) => setChalForm({ ...chalForm, ends_at: e.target.value })} />
-                <Button onClick={() => createChal.mutate()} disabled={!chalForm.title || !chalForm.starts_at || !chalForm.ends_at}>
-                  <Plus className="mr-2 h-4 w-4" />Créer
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-          {loadingChal ? <Loader2 className="mx-auto h-6 w-6 animate-spin" /> : (
-            <Card>
-              <CardContent className="pt-6 overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-xs uppercase text-muted-foreground text-left">
-                      <th className="py-2">Titre</th><th>Statut</th><th>Cible</th><th>Top</th><th>Récompense</th><th />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(chalData?.items || []).map((c) => (
-                      <tr key={c.id} className="border-b">
-                        <td className="py-2 font-medium">{c.title}</td>
-                        <td>{c.status}</td>
-                        <td>{c.target_value}</td>
-                        <td>{c.max_winners}</td>
-                        <td>{c.reward_amount} FCFA / {c.reward_points} pts</td>
-                        <td className="flex gap-2 py-2">
-                          {canManage && c.status !== 'CLOSED' && (
-                            <Button size="sm" variant="outline" onClick={() => rewardsApi.closeChallenge(c.id).then(() => { toast.success('Challenge clôturé'); queryClient.invalidateQueries({ queryKey: ['challenges'] }) })}>
-                              Clôturer
-                            </Button>
-                          )}
-                          {canManage && (
-                            <Button size="sm" variant="ghost" onClick={() => rewardsApi.deleteChallenge(c.id).then(() => queryClient.invalidateQueries({ queryKey: ['challenges'] }))}>
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
-                          )}
-                        </td>
+        {tab === 'conversion' && (
+          <div className="space-y-6">
+            {canManage && showForm && (
+              <div className="w-full bg-white rounded-2xl border border-gray-100 p-6">
+                <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider border-b border-gray-50 pb-2 mb-4">
+                  Créer un taux de conversion
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+                  <div className="space-y-1">
+                    <label className={labelClass}>Points requis</label>
+                    <Input
+                      type="number"
+                      value={convForm.points_required}
+                      onChange={(e) =>
+                        setConvForm({ ...convForm, points_required: e.target.value })
+                      }
+                      className="h-10 text-xs border-gray-200"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelClass}>Montant FCFA</label>
+                    <Input
+                      type="number"
+                      value={convForm.fcfa_amount}
+                      onChange={(e) => setConvForm({ ...convForm, fcfa_amount: e.target.value })}
+                      className="h-10 text-xs border-gray-200"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelClass}>Libellé</label>
+                    <Input
+                      value={convForm.label}
+                      onChange={(e) => setConvForm({ ...convForm, label: e.target.value })}
+                      className="h-10 text-xs border-gray-200"
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 justify-end pt-5 border-t border-gray-50 mt-5">
+                  <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>
+                    Annuler
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    className="text-white"
+                    isLoading={createConv.isPending}
+                    onClick={() => createConv.mutate()}
+                  >
+                    Créer
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-white rounded-2xl border border-gray-100 p-6">
+              {loadingConv ? (
+                <div className="py-20 text-center text-gray-400">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-500 mb-3" />
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-100">
+                        <th className={thClass}>Libellé</th>
+                        <th className={thClass}>Points</th>
+                        <th className={thClass}>FCFA</th>
+                        <th className={`${thClass} text-right`}>Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
+                    </thead>
+                    <tbody>
+                      {(convData?.items || []).map((r) => (
+                        <tr key={r.id} className={trClass}>
+                          <td className="py-4 font-bold text-sm text-gray-900">
+                            {r.label || '—'}
+                          </td>
+                          <td className="py-4 font-extrabold text-sm">{r.points_required}</td>
+                          <td className="py-4 font-extrabold text-sm text-emerald-700">
+                            {Number(r.fcfa_amount).toLocaleString('fr-FR')} FCFA
+                          </td>
+                          <td className="py-4 text-right">
+                            {canManage && (
+                              <button
+                                type="button"
+                                className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all cursor-pointer border-0 inline-flex"
+                                onClick={() =>
+                                  rewardsApi.deleteConversionRate(r.id).then(() =>
+                                    queryClient.invalidateQueries({
+                                      queryKey: ['conversion-rates'],
+                                    }),
+                                  )
+                                }
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {tab === 'challenges' && (
+          <div className="space-y-6">
+            {canManage && showForm && (
+              <div className="w-full bg-white rounded-2xl border border-gray-100 p-6">
+                <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider border-b border-gray-50 pb-2 mb-4">
+                  Créer un challenge
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+                  <div className="space-y-1">
+                    <label className={labelClass}>Titre *</label>
+                    <Input
+                      value={chalForm.title}
+                      onChange={(e) => setChalForm({ ...chalForm, title: e.target.value })}
+                      className="h-10 text-xs border-gray-200"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelClass}>Portée</label>
+                    <select
+                      className={selectClass}
+                      value={chalForm.scope}
+                      onChange={(e) => setChalForm({ ...chalForm, scope: e.target.value })}
+                    >
+                      <option value="METRIC">Objectif précis</option>
+                      <option value="PERIOD_TYPE">Type d&apos;objectifs</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelClass}>
+                      {chalForm.scope === 'METRIC' ? 'Métrique' : 'Période'}
+                    </label>
+                    {chalForm.scope === 'METRIC' ? (
+                      <select
+                        className={selectClass}
+                        value={chalForm.metric_id}
+                        onChange={(e) =>
+                          setChalForm({ ...chalForm, metric_id: e.target.value })
+                        }
+                      >
+                        <option value="">Choisir…</option>
+                        {(metricsData?.items || []).map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.label} ({m.period})
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <select
+                        className={selectClass}
+                        value={chalForm.period}
+                        onChange={(e) => setChalForm({ ...chalForm, period: e.target.value })}
+                      >
+                        <option value="DAILY">Journalier</option>
+                        <option value="WEEKLY">Hebdomadaire</option>
+                        <option value="MONTHLY">Mensuel</option>
+                      </select>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelClass}>Cible</label>
+                    <Input
+                      type="number"
+                      value={chalForm.target_value}
+                      onChange={(e) =>
+                        setChalForm({ ...chalForm, target_value: e.target.value })
+                      }
+                      className="h-10 text-xs border-gray-200"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelClass}>Top N places</label>
+                    <Input
+                      type="number"
+                      value={chalForm.max_winners}
+                      onChange={(e) =>
+                        setChalForm({ ...chalForm, max_winners: e.target.value })
+                      }
+                      className="h-10 text-xs border-gray-200"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelClass}>Récompense FCFA</label>
+                    <Input
+                      type="number"
+                      value={chalForm.reward_amount}
+                      onChange={(e) =>
+                        setChalForm({ ...chalForm, reward_amount: e.target.value })
+                      }
+                      className="h-10 text-xs border-gray-200"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelClass}>Récompense points</label>
+                    <Input
+                      type="number"
+                      value={chalForm.reward_points}
+                      onChange={(e) =>
+                        setChalForm({ ...chalForm, reward_points: e.target.value })
+                      }
+                      className="h-10 text-xs border-gray-200"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelClass}>Début</label>
+                    <Input
+                      type="datetime-local"
+                      value={chalForm.starts_at}
+                      onChange={(e) => setChalForm({ ...chalForm, starts_at: e.target.value })}
+                      className="h-10 text-xs border-gray-200"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelClass}>Fin</label>
+                    <Input
+                      type="datetime-local"
+                      value={chalForm.ends_at}
+                      onChange={(e) => setChalForm({ ...chalForm, ends_at: e.target.value })}
+                      className="h-10 text-xs border-gray-200"
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 justify-end pt-5 border-t border-gray-50 mt-5">
+                  <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>
+                    Annuler
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    className="text-white"
+                    disabled={!chalForm.title || !chalForm.starts_at || !chalForm.ends_at}
+                    isLoading={createChal.isPending}
+                    onClick={() => createChal.mutate()}
+                  >
+                    Créer
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-white rounded-2xl border border-gray-100 p-6">
+              {loadingChal ? (
+                <div className="py-20 text-center text-gray-400">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-500 mb-3" />
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-100">
+                        <th className={thClass}>Titre</th>
+                        <th className={thClass}>Statut</th>
+                        <th className={thClass}>Cible</th>
+                        <th className={thClass}>Top</th>
+                        <th className={thClass}>Récompense</th>
+                        <th className={`${thClass} text-right`}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(chalData?.items || []).map((c) => (
+                        <tr key={c.id} className={trClass}>
+                          <td className="py-4 font-bold text-sm text-gray-900">{c.title}</td>
+                          <td className="py-4">
+                            <span
+                              className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                                c.status === 'ACTIVE'
+                                  ? 'bg-green-50 text-green-700'
+                                  : c.status === 'CLOSED'
+                                    ? 'bg-slate-100 text-slate-600'
+                                    : 'bg-amber-50 text-amber-700'
+                              }`}
+                            >
+                              {c.status}
+                            </span>
+                          </td>
+                          <td className="py-4 text-sm font-semibold">{c.target_value}</td>
+                          <td className="py-4 text-sm">{c.max_winners}</td>
+                          <td className="py-4 text-xs text-slate-700">
+                            {Number(c.reward_amount).toLocaleString('fr-FR')} FCFA
+                            {c.reward_points ? ` / ${c.reward_points} pts` : ''}
+                          </td>
+                          <td className="py-4 text-right">
+                            <div className="flex gap-2 justify-end">
+                              {canManage && c.status !== 'CLOSED' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs border-gray-200"
+                                  onClick={() =>
+                                    rewardsApi.closeChallenge(c.id).then(() => {
+                                      toast.success('Challenge clôturé')
+                                      queryClient.invalidateQueries({ queryKey: ['challenges'] })
+                                    })
+                                  }
+                                >
+                                  Clôturer
+                                </Button>
+                              )}
+                              {canManage && (
+                                <button
+                                  type="button"
+                                  className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all cursor-pointer border-0 inline-flex"
+                                  onClick={() =>
+                                    rewardsApi.deleteChallenge(c.id).then(() =>
+                                      queryClient.invalidateQueries({ queryKey: ['challenges'] }),
+                                    )
+                                  }
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

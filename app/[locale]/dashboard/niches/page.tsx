@@ -5,9 +5,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import Header from '@/components/dashboard/Header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
-import { Loader2, Plus, Trash2 } from 'lucide-react'
+import { Building2, Loader2, Plus, Trash2 } from 'lucide-react'
 import { nichesApi, type Niche } from '@/lib/api/mobi-assur'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { can } from '@/lib/auth/roles'
@@ -23,12 +23,19 @@ const emptyForm = {
   bonus_type: 'FCFA' as 'FCFA' | 'POINTS',
 }
 
+const labelClass = 'text-[10px] font-bold text-gray-500 uppercase tracking-wider block'
+const selectClass =
+  'flex h-10 w-full rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs transition-colors focus-visible:outline-none'
+const thClass = 'pb-4 text-xs font-bold text-gray-400 uppercase tracking-wider'
+const trClass = 'border-b border-gray-50 last:border-0 hover:bg-gray-50/40 transition-colors'
+
 export default function NichesPage() {
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
   const canManage = can(user?.role, 'settings:manage')
   const [form, setForm] = useState(emptyForm)
   const [edit, setEdit] = useState<Niche | null>(null)
+  const [showForm, setShowForm] = useState(false)
   const [agreements, setAgreements] = useState<any[] | null>(null)
 
   const { data, isLoading } = useQuery({
@@ -52,6 +59,7 @@ export default function NichesPage() {
     onSuccess: () => {
       toast.success('Niche créée')
       setForm(emptyForm)
+      setShowForm(false)
       queryClient.invalidateQueries({ queryKey: ['niches'] })
     },
     onError: (e: any) => toast.error(e?.message || 'Erreur'),
@@ -72,6 +80,7 @@ export default function NichesPage() {
     onSuccess: () => {
       toast.success('Niche mise à jour')
       setEdit(null)
+      setShowForm(false)
       setForm(emptyForm)
       queryClient.invalidateQueries({ queryKey: ['niches'] })
     },
@@ -89,6 +98,7 @@ export default function NichesPage() {
 
   const openEdit = (n: Niche) => {
     setEdit(n)
+    setShowForm(true)
     setForm({
       name: n.name,
       description: n.description || '',
@@ -101,168 +111,273 @@ export default function NichesPage() {
     })
   }
 
+  const resetForm = () => {
+    setEdit(null)
+    setShowForm(false)
+    setForm(emptyForm)
+  }
+
   const showAgreements = async (id: string) => {
     const res = await nichesApi.agreements(id)
     setAgreements(res.items || [])
   }
 
+  const niches = data?.items || []
+
   return (
     <div className="flex-1 flex flex-col bg-white">
-      <Header title="Niches" subtitle="Associations, auto-écoles et autres points de volume" />
+      <Header
+        title="Niches"
+        subtitle="Associations, auto-écoles et autres points de volume à fort potentiel client."
+      />
+
       <div className="p-8 space-y-6 flex-1">
-        {canManage && (
-          <Card className="border-gray-100 shadow-sm bg-white max-w-2xl">
-            <CardHeader>
-              <CardTitle className="text-base">{edit ? 'Modifier la niche' : 'Nouvelle niche'}</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-3 md:grid-cols-3">
-              <Input
-                placeholder="Nom *"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="h-10 text-xs border-gray-200"
-              />
-              <Input
-                placeholder="Catégorie (ex. moto-taxi)"
-                value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value })}
-                className="h-10 text-xs border-gray-200"
-              />
-              <Input
-                placeholder="Localisation"
-                value={form.location}
-                onChange={(e) => setForm({ ...form, location: e.target.value })}
-                className="h-10 text-xs border-gray-200"
-              />
-              <Input
-                placeholder="Contact"
-                value={form.contact_name}
-                onChange={(e) => setForm({ ...form, contact_name: e.target.value })}
-                className="h-10 text-xs border-gray-200"
-              />
-              <Input
-                placeholder="Téléphone"
-                value={form.contact_phone}
-                onChange={(e) => setForm({ ...form, contact_phone: e.target.value })}
-                className="h-10 text-xs border-gray-200"
-              />
-              <Input
-                placeholder="Description"
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                className="h-10 text-xs border-gray-200"
-              />
-              <Input
-                type="number"
-                placeholder="Prime spéciale"
-                value={form.special_bonus_amount}
-                onChange={(e) => setForm({ ...form, special_bonus_amount: e.target.value })}
-                className="h-10 text-xs border-gray-200"
-              />
-              <select
-                className="h-10 rounded-xl border border-gray-200 bg-white px-4 text-xs"
-                value={form.bonus_type}
-                onChange={(e) => setForm({ ...form, bonus_type: e.target.value as 'FCFA' | 'POINTS' })}
-              >
-                <option value="FCFA">Prime FCFA</option>
-                <option value="POINTS">Prime points</option>
-              </select>
-              <div className="flex gap-2 md:col-span-3">
-                <Button
-                  onClick={() => (edit ? updateMutation.mutate() : createMutation.mutate())}
-                  disabled={!form.name.trim()}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  {edit ? 'Enregistrer' : 'Créer'}
-                </Button>
-                {edit && (
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setEdit(null)
-                      setForm(emptyForm)
-                    }}
-                  >
-                    Annuler
-                  </Button>
-                )}
+        <div className="flex justify-between items-center">
+          <h3 className="text-base font-bold text-gray-950">Catalogue des niches</h3>
+          {canManage && (
+            <button
+              type="button"
+              onClick={() => {
+                setEdit(null)
+                setForm(emptyForm)
+                setShowForm((v) => !v)
+              }}
+              className="flex items-center gap-2 px-5 py-3 text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-xl active:scale-95 transition-all shadow-md shadow-blue-500/10 cursor-pointer border-0"
+            >
+              <Plus className="h-4 w-4" />
+              Nouvelle niche
+            </button>
+          )}
+        </div>
+
+        {canManage && showForm && (
+          <div className="w-full bg-white rounded-2xl border border-gray-100 p-6">
+            <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider border-b border-gray-50 pb-2 mb-4">
+              {edit ? 'Modifier la niche' : 'Créer une niche'}
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+              <div className="space-y-1">
+                <label className={labelClass}>Nom *</label>
+                <Input
+                  placeholder="Ex: Association moto-taxi Bepanda"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  className="h-10 text-xs border-gray-200"
+                />
               </div>
-            </CardContent>
-          </Card>
+              <div className="space-y-1">
+                <label className={labelClass}>Catégorie</label>
+                <Input
+                  placeholder="Ex: moto-taxi"
+                  value={form.category}
+                  onChange={(e) => setForm({ ...form, category: e.target.value })}
+                  className="h-10 text-xs border-gray-200"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className={labelClass}>Localisation</label>
+                <Input
+                  placeholder="Ex: Douala, Bepanda"
+                  value={form.location}
+                  onChange={(e) => setForm({ ...form, location: e.target.value })}
+                  className="h-10 text-xs border-gray-200"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className={labelClass}>Contact</label>
+                <Input
+                  placeholder="Nom du contact"
+                  value={form.contact_name}
+                  onChange={(e) => setForm({ ...form, contact_name: e.target.value })}
+                  className="h-10 text-xs border-gray-200"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className={labelClass}>Téléphone</label>
+                <Input
+                  placeholder="Ex: 677000000"
+                  value={form.contact_phone}
+                  onChange={(e) => setForm({ ...form, contact_phone: e.target.value })}
+                  className="h-10 text-xs border-gray-200"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className={labelClass}>Description</label>
+                <Input
+                  placeholder="Notes / détails"
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  className="h-10 text-xs border-gray-200"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className={labelClass}>Prime spéciale</label>
+                <Input
+                  type="number"
+                  value={form.special_bonus_amount}
+                  onChange={(e) => setForm({ ...form, special_bonus_amount: e.target.value })}
+                  className="h-10 text-xs border-gray-200"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className={labelClass}>Type de prime</label>
+                <select
+                  className={selectClass}
+                  value={form.bonus_type}
+                  onChange={(e) =>
+                    setForm({ ...form, bonus_type: e.target.value as 'FCFA' | 'POINTS' })
+                  }
+                >
+                  <option value="FCFA">Prime FCFA</option>
+                  <option value="POINTS">Prime points</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 justify-end pt-5 border-t border-gray-50 mt-5">
+              <Button type="button" variant="ghost" onClick={resetForm}>
+                Annuler
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                className="text-white"
+                disabled={
+                  !form.name.trim() || createMutation.isPending || updateMutation.isPending
+                }
+                isLoading={createMutation.isPending || updateMutation.isPending}
+                onClick={() => (edit ? updateMutation.mutate() : createMutation.mutate())}
+              >
+                {edit ? 'Enregistrer' : 'Créer'}
+              </Button>
+            </div>
+          </div>
         )}
 
-        {isLoading ? (
-          <div className="py-20 text-center">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto" />
-          </div>
-        ) : (
-          <Card className="border-gray-100 shadow-sm bg-white">
-            <CardContent className="overflow-x-auto pt-6">
-              <table className="w-full text-sm">
+        <div className="bg-white rounded-2xl border border-gray-100 p-6">
+          {isLoading ? (
+            <div className="py-20 text-center text-gray-400 font-medium">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-500 mb-3" />
+              Chargement des niches…
+            </div>
+          ) : niches.length === 0 ? (
+            <div className="py-20 text-center text-gray-400">
+              <Building2 className="h-12 w-12 mx-auto text-gray-300 mb-3" />
+              <p className="text-sm font-semibold">Aucune niche enregistrée</p>
+              <p className="text-xs text-gray-500 mt-1">
+                Ajoutez une association ou un point de volume pour démarrer.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b text-left text-xs uppercase text-muted-foreground">
-                    <th className="py-2">Nom</th>
-                    <th className="py-2">Catégorie</th>
-                    <th className="py-2">Prime</th>
-                    <th className="py-2">Statut</th>
-                    <th className="py-2" />
+                  <tr className="border-b border-gray-100">
+                    <th className={thClass}>Nom</th>
+                    <th className={thClass}>Catégorie</th>
+                    <th className={thClass}>Prime</th>
+                    <th className={thClass}>Statut</th>
+                    <th className={`${thClass} text-right`}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(data?.items || []).map((n) => (
-                    <tr key={n.id} className="border-b">
-                      <td className="py-2">
-                        <div className="font-medium">{n.name}</div>
-                        <div className="text-xs text-muted-foreground">{n.location}</div>
+                  {niches.map((n) => (
+                    <tr key={n.id} className={trClass}>
+                      <td className="py-4">
+                        <span className="font-bold text-sm text-gray-900 block">{n.name}</span>
+                        <span className="text-[10px] text-gray-400 block">
+                          {n.location || '—'}
+                          {n.contact_name ? ` · ${n.contact_name}` : ''}
+                        </span>
                       </td>
-                      <td className="py-2">{n.category || '—'}</td>
-                      <td className="py-2">
-                        {n.special_bonus_amount} {n.bonus_type}
+                      <td className="py-4 text-xs text-slate-700">{n.category || '—'}</td>
+                      <td className="py-4">
+                        <span className="font-extrabold text-sm text-slate-800">
+                          {Number(n.special_bonus_amount || 0).toLocaleString('fr-FR')}{' '}
+                          {n.bonus_type}
+                        </span>
                       </td>
-                      <td className="py-2">{n.is_active ? 'Actif' : 'Inactif'}</td>
-                      <td className="py-2 flex gap-2">
-                        <Button size="sm" variant="outline" onClick={() => showAgreements(n.id)}>
-                          Accords
-                        </Button>
-                        {canManage && (
-                          <>
-                            <Button size="sm" variant="outline" onClick={() => openEdit(n)}>
-                              Modifier
-                            </Button>
-                            <Button size="sm" variant="ghost" onClick={() => deleteMutation.mutate(n.id)}>
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
-                          </>
-                        )}
+                      <td className="py-4">
+                        <span
+                          className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                            n.is_active
+                              ? 'bg-green-50 text-green-700'
+                              : 'bg-red-50 text-red-700'
+                          }`}
+                        >
+                          {n.is_active ? 'Actif' : 'Inactif'}
+                        </span>
+                      </td>
+                      <td className="py-4 text-right">
+                        <div className="flex gap-2 justify-end">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-xs border-gray-200"
+                            onClick={() => showAgreements(n.id)}
+                          >
+                            Accords
+                          </Button>
+                          {canManage && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-xs border-gray-200"
+                                onClick={() => openEdit(n)}
+                              >
+                                Modifier
+                              </Button>
+                              <button
+                                type="button"
+                                onClick={() => deleteMutation.mutate(n.id)}
+                                className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all cursor-pointer border-0 inline-flex items-center justify-center active:scale-95"
+                                title="Supprimer"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </CardContent>
-          </Card>
-        )}
+            </div>
+          )}
+        </div>
 
         {agreements && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <Card className="w-full max-w-lg">
-              <CardHeader>
-                <CardTitle>Accords agents</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <Card className="w-full max-w-lg bg-white border border-gray-100 shadow-2xl rounded-2xl">
+              <CardContent className="pt-6 space-y-4">
+                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider pb-2 border-b border-gray-50">
+                  Accords agents
+                </h3>
                 {agreements.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Aucun accord signé</p>
+                  <p className="text-xs text-gray-500 py-6 text-center">Aucun accord signé</p>
                 ) : (
-                  agreements.map((a) => (
-                    <div key={a.id} className="flex justify-between border-b py-2 text-sm">
-                      <span>{a.agent_name || a.agent_id}</span>
-                      <span>{a.status}</span>
-                    </div>
-                  ))
+                  <div className="space-y-2 max-h-72 overflow-y-auto">
+                    {agreements.map((a) => (
+                      <div
+                        key={a.id}
+                        className="flex justify-between items-center rounded-xl border border-gray-100 px-4 py-3"
+                      >
+                        <span className="text-sm font-semibold text-gray-900">
+                          {a.agent_name || a.agent_id}
+                        </span>
+                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700">
+                          {a.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 )}
-                <Button variant="outline" onClick={() => setAgreements(null)}>
-                  Fermer
-                </Button>
+                <div className="flex justify-end pt-2">
+                  <Button type="button" variant="primary" className="text-white" onClick={() => setAgreements(null)}>
+                    Fermer
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </div>
