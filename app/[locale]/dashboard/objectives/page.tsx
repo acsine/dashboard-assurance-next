@@ -511,8 +511,11 @@ export default function ObjectivesPage() {
                             </span>
                           </td>
                           <td className="py-4">
-                            <span className="font-extrabold text-sm text-slate-800">
-                              {a.points_balance ?? 0}
+                            <span className="font-extrabold text-sm text-slate-800 block">
+                              {a.total_points_awarded ?? a.points_period ?? 0} pts
+                            </span>
+                            <span className="text-[10px] text-slate-400 block font-semibold">
+                              (Solde: {a.points_balance ?? 0} pts)
                             </span>
                           </td>
                           <td className="py-4">
@@ -585,8 +588,13 @@ export default function ObjectivesPage() {
                               {r.agent_name}
                             </span>
                           </td>
-                          <td className="py-4 font-extrabold text-sm text-slate-800">
-                            {r.points_period ?? 0}
+                          <td className="py-4">
+                            <span className="font-extrabold text-sm text-slate-800 block">
+                              {r.points_period ?? 0} pts
+                            </span>
+                            <span className="text-[10px] text-slate-400 block font-semibold">
+                              (Solde: {r.points_balance ?? 0} pts)
+                            </span>
                           </td>
                           <td className="py-4">
                             <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-green-50 text-green-700">

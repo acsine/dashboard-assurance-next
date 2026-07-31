@@ -50,7 +50,7 @@ export default function Sidebar() {
     try {
       await authApi.logout().catch(() => undefined)
       logout()
-      router.replace('/login')
+      window.location.href = '/'
     } catch {
       setIsLoggingOut(false)
     }

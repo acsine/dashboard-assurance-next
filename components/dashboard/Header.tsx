@@ -4,9 +4,10 @@ import { useState } from 'react'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { useSidebarStore } from '@/lib/stores/sidebar-store'
 import { useSupportNotificationsStore } from '@/lib/stores/support-notifications-store'
-import { Bell, HelpCircle, Search, Menu, MessageSquare, CheckCheck } from 'lucide-react'
+import { Bell, HelpCircle, Search, Menu, MessageSquare, CheckCheck, LogOut, Loader2 } from 'lucide-react'
 import { Input } from '../ui/input'
 import { usePathname, useRouter } from 'next/navigation'
+import { authApi } from '@/lib/api/mobi-assur'
 
 interface HeaderProps {
   title?: string
@@ -14,13 +15,26 @@ interface HeaderProps {
 }
 
 export default function Header({ title, subtitle }: HeaderProps) {
-  const { user } = useAuthStore()
+  const { user, logout: logoutStore } = useAuthStore()
   const { toggleMobileOpen } = useSidebarStore()
   const { items, unreadCount, markAllRead, markTicketRead } = useSupportNotificationsStore()
   const [open, setOpen] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
   const locale = pathname?.split('/')[1] || 'fr'
+
+  const handleHeaderLogout = async () => {
+    if (isLoggingOut) return
+    setIsLoggingOut(true)
+    try {
+      await authApi.logout().catch(() => undefined)
+      logoutStore()
+      window.location.href = `/${locale}`
+    } catch {
+      setIsLoggingOut(false)
+    }
+  }
 
   const openTicket = (ticketId: string) => {
     markTicketRead(ticketId)
@@ -158,6 +172,22 @@ export default function Header({ title, subtitle }: HeaderProps) {
             {user?.full_name?.substring(0, 2).toUpperCase() || 'AD'}
           </div>
         </div>
+
+        {/* Bouton de Déconnexion visible & direct vers la landing page */}
+        <button
+          onClick={handleHeaderLogout}
+          disabled={isLoggingOut}
+          title="Se déconnecter et retourner à l'accueil"
+          className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-extrabold text-xs transition-all border border-red-200 shadow-sm cursor-pointer active:scale-95 shrink-0"
+        >
+          {isLoggingOut ? (
+            <Loader2 className="h-4 w-4 animate-spin text-red-600" />
+          ) : (
+            <LogOut className="h-4 w-4 text-red-600" />
+          )}
+          <span className="hidden sm:inline">Déconnexion</span>
+        </button>
+
       </div>
     </header>
   )

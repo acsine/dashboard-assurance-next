@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import { clientsApi } from '@/lib/api/mobi-assur'
+import { clientsApi, asList } from '@/lib/api/mobi-assur'
 import Header from '@/components/dashboard/Header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,7 +18,7 @@ export default function ClientsPage() {
     queryFn: () => clientsApi.list(search),
   })
 
-  const safeClients = Array.isArray(clients) ? clients : []
+  const safeClients = asList<any>(clients)
 
   return (
     <div className="flex-1 flex flex-col bg-white">
