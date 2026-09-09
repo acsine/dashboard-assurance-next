@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 @font-face {
   font-family: 'Poppins';
@@ -33,7 +34,10 @@
 }
 
 body {
-  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  font-family: 'Fira Sans', 'Inter', 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  -webkit-font-smoothing: antialiased;
 }
 
 /* RTL Support */
@@ -65,10 +69,10 @@ body {
   margin-left: 0;
 }
 
-/* Additional utility classes if needed */
+/* UI/UX Pro Max Custom Utilities */
 @layer utilities {
   .text-balance {
-      text-wrap: balance;
+    text-wrap: balance;
   }
 
   .scrollbar-hide {
@@ -77,6 +81,32 @@ body {
   }
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
+  }
+
+  .glass-card {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+  }
+
+  .glass-header {
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(226, 232, 240, 0.7);
+  }
+
+  .pro-shadow-sm {
+    box-shadow: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
+  }
+
+  .pro-shadow-md {
+    box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
+  }
+
+  .pro-shadow-lg {
+    box-shadow: 0 12px 24px -4px rgba(15, 23, 42, 0.12), 0 4px 8px -2px rgba(15, 23, 42, 0.06);
   }
 }
 
@@ -91,10 +121,25 @@ div.fixed.inset-0 [class*="overflow-auto"]::-webkit-scrollbar {
   display: none;
 }
 
-/* Base CSS variables */
+/* Base UI/UX Pro Max CSS variables */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --color-primary: #1E40AF;
+  --color-on-primary: #FFFFFF;
+  --color-secondary: #3B82F6;
+  --color-on-secondary: #FFFFFF;
+  --color-accent: #D97706;
+  --color-on-accent: #FFFFFF;
+  --color-background: #F8FAFC;
+  --color-foreground: #0F172A;
+  --color-card: #FFFFFF;
+  --color-card-foreground: #0F172A;
+  --color-muted: #E2E8F0;
+  --color-muted-foreground: #64748B;
+  --color-border: #E2E8F0;
+  --color-ring: #1E40AF;
+
+  --background: #FFFFFF;
+  --foreground: #0F172A;
 
   /* Cultural Theme Variables - Default (Western) */
   --cultural-error: 239 68 68; /* red-500 */

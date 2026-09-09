@@ -143,44 +143,78 @@ export default function DashboardOverview() {
         subtitle="Supervision en temps réel du réseau national d'assurance Bethel Comprehensive Insurance."
       />
 
-      <div className="p-8 space-y-8 flex-1">
+      <div className="p-6 sm:p-8 space-y-8 flex-1">
+
+        {/* Quick Actions Bar */}
+        <div className="bg-white/90 backdrop-blur-xl p-4 sm:p-5 rounded-2xl border border-slate-200/80 pro-shadow-sm flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-blue-50 text-blue-700 rounded-xl font-bold">
+              <Activity className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-900">Actions Rapides Opérationnelles</h3>
+              <p className="text-xs font-medium text-slate-500">Accès direct aux tâches fréquentes</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <Link href="/dashboard/contracts">
+              <button className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold bg-blue-700 hover:bg-blue-800 text-white rounded-xl transition-all pro-shadow-sm cursor-pointer active:scale-[0.98]">
+                <Plus className="h-4 w-4" />
+                Nouvelle Police
+              </button>
+            </Link>
+            <Link href="/dashboard/sinistres">
+              <button className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl transition-all cursor-pointer">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                Déclarer Sinistre
+              </button>
+            </Link>
+            <Link href="/dashboard/paiements-declares">
+              <button className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl transition-all cursor-pointer">
+                <CreditCard className="h-4 w-4 text-indigo-600" />
+                Valider Paiement
+              </button>
+            </Link>
+          </div>
+        </div>
+
         {/* KPI Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {kpis.map((kpi, i) => (
             <div
               key={i}
-              className="bg-white/90 backdrop-blur-xl p-6 rounded-3xl border border-white/60 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group"
+              className="bg-white/95 backdrop-blur-xl p-5 sm:p-6 rounded-2xl border border-slate-200/80 pro-shadow-sm hover:pro-shadow-lg hover:-translate-y-1 transition-all duration-200 flex flex-col justify-between group"
             >
               <div className="flex justify-between items-start">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
+                <span className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider block">
                   {kpi.title}
                 </span>
                 <span
-                  className={`p-2.5 rounded-2xl text-sm transition-colors ${
+                  className={`p-2.5 rounded-xl text-sm transition-all duration-200 ${
                     kpi.color === 'blue'
-                      ? 'bg-blue-50 text-blue-600 group-hover:bg-blue-500 group-hover:text-white group-hover:shadow-lg group-hover:shadow-blue-500/30'
+                      ? 'bg-blue-50 text-blue-700 group-hover:bg-blue-700 group-hover:text-white'
                       : kpi.color === 'emerald'
-                      ? 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-500 group-hover:text-white group-hover:shadow-lg group-hover:shadow-emerald-500/30'
+                      ? 'bg-emerald-50 text-emerald-700 group-hover:bg-emerald-700 group-hover:text-white'
                       : kpi.color === 'amber'
-                      ? 'bg-amber-50 text-amber-600 group-hover:bg-amber-500 group-hover:text-white group-hover:shadow-lg group-hover:shadow-amber-500/30'
-                      : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-500 group-hover:text-white group-hover:shadow-lg group-hover:shadow-indigo-500/30'
+                      ? 'bg-amber-50 text-amber-700 group-hover:bg-amber-700 group-hover:text-white'
+                      : 'bg-indigo-50 text-indigo-700 group-hover:bg-indigo-700 group-hover:text-white'
                   }`}
                 >
                   <kpi.icon className="h-5 w-5" />
                 </span>
               </div>
-              <div className="mt-5">
-                <span className="text-3xl font-extrabold text-slate-900 tracking-tight leading-tight">
+              <div className="mt-4">
+                <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-tight block">
                   {kpi.value}
                 </span>
-                <p className="text-xs font-medium text-slate-500 mt-1.5">{kpi.description}</p>
+                <p className="text-xs font-medium text-slate-500 mt-1">{kpi.description}</p>
               </div>
-              <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+              <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between">
                 <Link
                   href={kpi.link}
-                  className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1.5"
+                  className="text-xs font-bold text-blue-700 hover:text-blue-900 flex items-center gap-1.5 transition-colors"
                 >
-                  Gérer
+                  Consulter
                   <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
                 </Link>
               </div>
@@ -191,70 +225,70 @@ export default function DashboardOverview() {
         {/* Dashboard Content Blocks */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 flex-1">
           {/* Contracts List Column */}
-          <div className="xl:col-span-2 bg-white/90 backdrop-blur-xl rounded-3xl border border-white/60 shadow-sm p-6 flex flex-col justify-between">
+          <div className="xl:col-span-2 bg-white/95 backdrop-blur-xl rounded-2xl border border-slate-200/80 pro-shadow-sm p-6 flex flex-col justify-between">
             <div>
-              <div className="flex justify-between items-start mb-6">
+              <div className="flex justify-between items-center mb-6">
                 <div>
-                  <h3 className="font-extrabold text-slate-900 text-lg tracking-tight">Polices d'Assurances Récentes</h3>
-                  <p className="text-xs font-medium text-slate-500 mt-1.5">
-                    Dernières cotisations et devis de l'agence.
+                  <h3 className="font-extrabold text-slate-900 text-base sm:text-lg tracking-tight">Polices d'Assurances Récentes</h3>
+                  <p className="text-xs font-medium text-slate-500 mt-0.5">
+                    Dernières cotisations et devis émis par l'agence.
                   </p>
                 </div>
-                <Link href="/dashboard/contracts/new">
-                  <button className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-xl active:scale-95 transition-all shadow-md shadow-blue-500/10 cursor-pointer">
-                    <Plus className="h-3.5 w-3.5" />
-                    Nouvelle police
+                <Link href="/dashboard/contracts">
+                  <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer">
+                    Voir tout
+                    <ArrowUpRight className="h-3.5 w-3.5" />
                   </button>
                 </Link>
               </div>
 
               {safeContracts.length === 0 ? (
-                <div className="py-12 text-center text-gray-400">
-                  <FileText className="h-10 w-10 mx-auto text-gray-300 mb-3" />
-                  <p className="text-sm">Aucun contrat ou devis enregistré</p>
+                <div className="py-12 text-center text-slate-400">
+                  <FileText className="h-10 w-10 mx-auto text-slate-300 mb-3" />
+                  <p className="text-sm font-medium">Aucun contrat ou devis enregistré</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="border-b border-gray-100">
-                        <th className="pb-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                      <tr className="border-b border-slate-100">
+                        <th className="pb-3 px-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                           N° Police / Produit
                         </th>
-                        <th className="pb-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
-                          Type
+                        <th className="pb-3 px-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                          Formule
                         </th>
-                        <th className="pb-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                        <th className="pb-3 px-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                           Prime TTC
                         </th>
-                        <th className="pb-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                        <th className="pb-3 px-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                           Statut
                         </th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-slate-50">
                       {safeContracts.slice(0, 5).map((contract) => (
-                        <tr key={contract.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors group">
-                          <td className="py-4 px-2 rounded-l-xl">
-                            <span className="font-bold text-sm text-slate-900 block group-hover:text-blue-600 transition-colors">
+                        <tr key={contract.id} className="hover:bg-slate-50/80 transition-colors group">
+                          <td className="py-3.5 px-2">
+                            <span className="font-extrabold text-sm text-slate-900 block group-hover:text-blue-700 transition-colors">
                               {contract.id.substring(0, 8).toUpperCase()}
                             </span>
-                            <span className="text-xs font-medium text-slate-500 block mt-1">
+                            <span className="text-xs font-medium text-slate-500 block mt-0.5">
                               {contract.product_type}
                             </span>
                           </td>
-                          <td className="py-4 px-2 text-sm font-medium text-slate-600">
+                          <td className="py-3.5 px-2 text-xs font-semibold text-slate-600">
                             {contract.subscription_type}
                           </td>
-                          <td className="py-4 px-2 font-extrabold text-sm text-slate-900">
+                          <td className="py-3.5 px-2 font-extrabold text-xs text-slate-900">
                             {(contract.prime_ttc || 0).toLocaleString('fr-FR')} FCFA
                           </td>
-                          <td className="py-4 px-2 rounded-r-xl">
+                          <td className="py-3.5 px-2">
                             <span
-                              className={`px-3 py-1.5 rounded-full text-xs font-bold shadow-sm ${
+                              className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-block border ${
                                 contract.status === 'PAYE'
-                                  ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-500/20'
-                                  : 'bg-amber-50 text-amber-700 ring-1 ring-amber-500/20'
+                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200/80'
+                                  : 'bg-amber-50 text-amber-800 border-amber-200/80'
                               }`}
                             >
                               {contract.status}
@@ -269,67 +303,72 @@ export default function DashboardOverview() {
             </div>
 
             {safeContracts.length > 5 && (
-              <div className="mt-6 pt-4 border-t border-gray-50 text-center">
+              <div className="mt-6 pt-4 border-t border-slate-100 text-center">
                 <Link
                   href="/dashboard/contracts"
-                  className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+                  className="text-xs font-bold text-blue-700 hover:text-blue-900 transition-colors"
                 >
-                  Voir tous les contrats
+                  Voir l'intégralité des contrats →
                 </Link>
               </div>
             )}
           </div>
 
           {/* Activity / Logs Column */}
-          <div className="bg-white/90 backdrop-blur-xl rounded-3xl border border-white/60 shadow-sm p-6 flex flex-col justify-between">
+          <div className="bg-white/95 backdrop-blur-xl rounded-2xl border border-slate-200/80 pro-shadow-sm p-6 flex flex-col justify-between">
             <div>
-              <h3 className="font-extrabold text-slate-900 text-lg tracking-tight mb-8 flex items-center gap-2">
-                <Activity className="h-5 w-5 text-blue-600" />
-                Statut du Réseau
+              <h3 className="font-extrabold text-slate-900 text-base sm:text-lg tracking-tight mb-6 flex items-center gap-2">
+                <Activity className="h-5 w-5 text-blue-700" />
+                Statut du Réseau National
               </h3>
 
-              <div className="space-y-6">
-                <div className="space-y-2.5">
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span className="text-slate-500">API Gateway</span>
-                    <span className="text-emerald-600 font-bold">Opérationnel</span>
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs font-bold">
+                    <span className="text-slate-600">API Gateway MobiAssur</span>
+                    <span className="text-emerald-700 font-extrabold inline-flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 bg-emerald-600 rounded-full animate-ping" />
+                      Opérationnel
+                    </span>
                   </div>
-                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner">
-                    <div className="h-full bg-emerald-500 rounded-full w-[99.8%] shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                  </div>
-                </div>
-
-                <div className="space-y-2.5">
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span className="text-slate-500">Service Contrats</span>
-                    <span className="text-emerald-600 font-bold">Opérationnel</span>
-                  </div>
-                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner">
-                    <div className="h-full bg-emerald-500 rounded-full w-full shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-600 rounded-full w-[99.8%]" />
                   </div>
                 </div>
 
-                <div className="space-y-2.5">
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span className="text-slate-500">Synchronisation Mobile</span>
-                    <span className="text-amber-500 font-bold">Actif (323/324)</span>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs font-bold">
+                    <span className="text-slate-600">Service Émission Polices</span>
+                    <span className="text-emerald-700 font-extrabold inline-flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 bg-emerald-600 rounded-full animate-ping" />
+                      Opérationnel
+                    </span>
                   </div>
-                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner">
-                    <div className="h-full bg-amber-500 rounded-full w-[95%] shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
+                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-600 rounded-full w-full" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs font-bold">
+                    <span className="text-slate-600">Synchro App Mobile</span>
+                    <span className="text-amber-700 font-extrabold">Actif (323/324)</span>
+                  </div>
+                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-amber-500 rounded-full w-[95%]" />
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="mt-8 p-4 bg-gradient-to-br from-blue-50/80 to-blue-100/50 rounded-2xl border border-blue-200/60 shadow-sm flex items-start gap-3 transition-all hover:shadow-md hover:border-blue-300/50">
-              <div className="bg-blue-600/10 p-1.5 rounded-lg shrink-0">
-                <AlertCircle className="h-5 w-5 text-blue-600" />
+            <div className="mt-6 p-4 bg-gradient-to-br from-blue-50 to-slate-50 rounded-xl border border-blue-200/80 pro-shadow-sm flex items-start gap-3">
+              <div className="bg-blue-700/10 p-2 rounded-lg shrink-0">
+                <AlertCircle className="h-5 w-5 text-blue-700" />
               </div>
               <div>
-                <h4 className="text-xs font-extrabold text-blue-900">V1 de Bethel Comprehensive Insurance</h4>
-                <p className="text-[11px] text-blue-700/90 mt-1.5 leading-relaxed font-medium">
-                  Cette version intègre les modules d'émission de polices, validation de retraits et
-                  configuration des barèmes.
+                <h4 className="text-xs font-extrabold text-slate-900">MobiAssur Management System</h4>
+                <p className="text-[11px] text-slate-600 mt-1 leading-relaxed font-medium">
+                  Plateforme certifiée conforme aux exigences CIMA et de résilience réseau des opérations d'assurance.
                 </p>
               </div>
             </div>

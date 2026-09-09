@@ -233,20 +233,25 @@ export default function Sidebar() {
                   href={item.path}
                   onClick={(e) => handleNavigation(item.path, e)}
                   title={isCollapsed && !isMobileOpen ? item.name : undefined}
-                  className={`flex min-h-12 items-center ${isCollapsed && !isMobileOpen ? 'justify-center' : 'justify-between'} px-4 py-3 rounded-xl text-[15px] font-bold tracking-[-0.01em] transition-all whitespace-nowrap ${
+                  className={`group relative flex min-h-12 items-center ${isCollapsed && !isMobileOpen ? 'justify-center' : 'justify-between'} px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 whitespace-nowrap cursor-pointer ${
                     isActive
-                      ? 'bg-blue-50 text-blue-700 shadow-sm shadow-blue-100 ring-1 ring-blue-100'
-                      : 'text-slate-700 opacity-75 hover:bg-slate-100 hover:text-slate-950 hover:opacity-100'
+                      ? 'bg-blue-700 text-white pro-shadow-sm font-bold'
+                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
                   }`}
                 >
                   <div className={`flex items-center ${isCollapsed && !isMobileOpen ? 'justify-center' : 'gap-3'}`}>
                     {isNavigatingThis ? (
-                      <Loader2 className={`h-[21px] w-[21px] shrink-0 animate-spin ${isActive ? 'text-blue-600' : 'text-blue-500'}`} strokeWidth={2.25} />
+                      <Loader2 className={`h-5 w-5 shrink-0 animate-spin ${isActive ? 'text-white' : 'text-blue-600'}`} strokeWidth={2.2} />
                     ) : (
-                      <item.icon className={`h-[21px] w-[21px] shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-500'}`} strokeWidth={2.25} />
+                      <item.icon className={`h-5 w-5 shrink-0 transition-transform duration-200 group-hover:scale-105 ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-blue-600'}`} strokeWidth={2.2} />
                     )}
-                    {(!isCollapsed || isMobileOpen) && <span>{item.name}</span>}
+                    {(!isCollapsed || isMobileOpen) && (
+                      <span className="truncate">{item.name}</span>
+                    )}
                   </div>
+                  {isActive && (!isCollapsed || isMobileOpen) && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                  )}
                 </Link>
               )
             })}

@@ -43,40 +43,43 @@ export default function Header({ title, subtitle }: HeaderProps) {
   }
 
   return (
-    <header className="min-h-[5.5rem] py-4 bg-white/80 backdrop-blur-xl border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-40 gap-4 transition-all">
+    <header className="min-h-[5rem] py-3.5 glass-header flex flex-col md:flex-row md:items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-40 gap-4 transition-all duration-200 pro-shadow-sm">
       <div className="flex items-center gap-3 w-full md:w-auto md:flex-1 min-w-0">
         <button
           onClick={toggleMobileOpen}
-          className="md:hidden p-2 -ml-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+          className="md:hidden p-2 -ml-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors"
         >
           <Menu className="h-6 w-6" />
         </button>
 
         <div className="flex-1 min-w-0">
           {title && (
-            <h2 className="text-xl md:text-2xl font-extrabold text-slate-900 leading-tight truncate pr-4">
+            <h2 className="text-xl md:text-2xl font-extrabold text-slate-900 leading-tight truncate pr-4 tracking-tight">
               {title}
             </h2>
           )}
           {subtitle && (
-            <p className="text-xs md:text-sm text-slate-500 mt-1.5 truncate">{subtitle}</p>
+            <p className="text-xs md:text-sm text-slate-500 mt-1 truncate font-medium">{subtitle}</p>
           )}
         </div>
       </div>
 
-      <div className="flex items-center gap-4 lg:gap-6 shrink-0">
+      <div className="flex items-center gap-3 lg:gap-5 shrink-0">
         <div className="relative w-full sm:w-64 lg:w-80 hidden sm:block">
-          <Search className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 h-4.5 w-4.5 self-center mt-3" />
+          <Search className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 h-4 w-4 self-center mt-3" />
           <Input
             type="search"
-            placeholder="Rechercher des clients, polices..."
-            className="pl-10 h-10 text-xs border-gray-200 focus:border-blue-500 rounded-xl"
+            placeholder="Rechercher clients, polices, sinistres..."
+            className="pl-9 pr-12 h-10 text-xs border-slate-200/90 focus:border-blue-600 focus:ring-blue-600/20 rounded-xl bg-slate-50/60 focus:bg-white transition-all"
           />
+          <kbd className="absolute right-2.5 top-2.5 hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold text-slate-400 bg-slate-100 border border-slate-200 rounded-md">
+            ⌘K
+          </kbd>
         </div>
 
-        <div className="bg-blue-50 border border-blue-100 text-blue-700 text-xs px-3 py-1.5 rounded-full font-semibold hidden lg:flex items-center gap-2">
-          <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-ping" />
-          Bethel Comprehensive Insurance Live Mode
+        <div className="bg-blue-50/90 border border-blue-200/80 text-blue-800 text-xs px-3 py-1.5 rounded-full font-bold hidden lg:flex items-center gap-2 shadow-2xs">
+          <span className="w-2 h-2 bg-blue-600 rounded-full animate-ping" />
+          Bethel Insurance Live Mode
         </div>
 
         <div className="flex items-center gap-2 relative">
