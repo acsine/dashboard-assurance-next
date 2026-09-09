@@ -81,9 +81,9 @@ export function CommissionRatesPanel() {
       </div>
 
       {showForm && (
-        <Card className="border-gray-100 shadow-sm bg-white max-w-3xl">
+        <Card className="bg-white/95 backdrop-blur-xl border-slate-200/80 shadow-xs rounded-2xl max-w-3xl">
           <CardContent className="pt-6">
-            <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider border-b border-gray-50 pb-2 mb-4">
+            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2 mb-4">
               Ajouter une règle
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -134,7 +134,7 @@ export function CommissionRatesPanel() {
                   placeholder="Optionnel"
                   value={form.subscription_type}
                   onChange={(e) => setForm({ ...form, subscription_type: e.target.value })}
-                  className="h-10 text-xs border-gray-200"
+                  className="h-10 text-xs border-slate-200"
                 />
               </div>
               <div className="space-y-1">
@@ -156,7 +156,7 @@ export function CommissionRatesPanel() {
                   placeholder={form.rate_mode === 'PERCENT' ? '0.10 ou 10' : 'Montant FCFA'}
                   value={form.rate_value}
                   onChange={(e) => setForm({ ...form, rate_value: e.target.value })}
-                  className="h-10 text-xs border-gray-200"
+                  className="h-10 text-xs border-slate-200"
                 />
               </div>
               <div className="space-y-1 sm:col-span-2 lg:col-span-3">
@@ -164,7 +164,7 @@ export function CommissionRatesPanel() {
                 <Input
                   value={form.label}
                   onChange={(e) => setForm({ ...form, label: e.target.value })}
-                  className="h-10 text-xs border-gray-200"
+                  className="h-10 text-xs border-slate-200"
                 />
               </div>
             </div>
@@ -175,7 +175,7 @@ export function CommissionRatesPanel() {
               <Button
                 type="button"
                 variant="primary"
-                className="text-white"
+                className="text-white shadow-xs"
                 isLoading={createMutation.isPending}
                 onClick={() => createMutation.mutate()}
               >
@@ -186,47 +186,47 @@ export function CommissionRatesPanel() {
         </Card>
       )}
 
-      <div className="bg-white rounded-2xl border border-gray-100 p-6">
+      <div className="bg-white/95 backdrop-blur-xl rounded-2xl border border-slate-200/80 shadow-xs p-6">
         {isLoading ? (
-          <div className="py-16 text-center text-gray-400">
+          <div className="py-16 text-center text-slate-400">
             <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-500 mb-3" />
           </div>
         ) : rules.length === 0 ? (
-          <div className="py-16 text-center text-gray-400">
+          <div className="py-16 text-center text-slate-400">
             <p className="text-sm font-semibold">Aucune règle de commission</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-gray-100">
-                  <th className={thClass}>Libellé</th>
-                  <th className={thClass}>Appliqué à</th>
-                  <th className={thClass}>Produit</th>
-                  <th className={thClass}>Mode</th>
-                  <th className={thClass}>Valeur</th>
-                  <th className={`${thClass} text-right`}>Actions</th>
+                <tr className="border-b border-slate-100 bg-slate-50/80 text-[11px]">
+                  <th className="py-3 px-3 font-bold text-slate-500 uppercase tracking-wider">Libellé</th>
+                  <th className="py-3 px-3 font-bold text-slate-500 uppercase tracking-wider">Appliqué à</th>
+                  <th className="py-3 px-3 font-bold text-slate-500 uppercase tracking-wider">Produit</th>
+                  <th className="py-3 px-3 font-bold text-slate-500 uppercase tracking-wider">Mode</th>
+                  <th className="py-3 px-3 font-bold text-slate-500 uppercase tracking-wider">Valeur</th>
+                  <th className="py-3 px-3 font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100">
                 {rules.map((r) => (
-                  <tr key={r.id} className={trClass}>
-                    <td className="py-4 font-bold text-sm text-gray-900">{r.label || '—'}</td>
-                    <td className="py-4 text-xs text-slate-600">{r.applies_to}</td>
-                    <td className="py-4 text-xs text-slate-600">
+                  <tr key={r.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="py-3.5 px-3 font-bold text-sm text-slate-900">{r.label || '—'}</td>
+                    <td className="py-3.5 px-3 text-xs text-slate-600 font-medium">{r.applies_to}</td>
+                    <td className="py-3.5 px-3 text-xs text-slate-600 font-medium">
                       {r.product_type} / {r.product_line}
                       {r.subscription_type ? ` / ${r.subscription_type}` : ''}
                     </td>
-                    <td className="py-4 text-xs">{r.rate_mode}</td>
-                    <td className="py-4 font-extrabold text-sm text-slate-800">
+                    <td className="py-3.5 px-3 text-xs font-semibold text-slate-700">{r.rate_mode}</td>
+                    <td className="py-3.5 px-3 font-extrabold text-sm text-slate-900">
                       {r.rate_mode === 'PERCENT'
                         ? `${(Number(r.rate_value) * 100).toFixed(2)} %`
                         : `${Number(r.rate_value).toLocaleString('fr-FR')} FCFA`}
                     </td>
-                    <td className="py-4 text-right">
+                    <td className="py-3.5 px-3 text-right">
                       <button
                         type="button"
-                        className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all cursor-pointer border-0 inline-flex"
+                        className="p-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 transition-all cursor-pointer border-0 inline-flex"
                         onClick={() =>
                           commissionRatesApi.delete(r.id).then(() => {
                             toast.success('Règle supprimée')

@@ -146,23 +146,23 @@ function SettingsContent() {
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-white">
+    <div className="flex flex-col gap-8 p-6 md:p-8 bg-slate-50/50 min-h-screen">
       <Header
         title="Paramètres de tarification"
         subtitle="Guide agent, assureurs, zones CIMA A/B/C, frais légaux et code de validation."
       />
 
-      <div className="px-8 pt-6">
+      <div className="bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-slate-200/80 shadow-xs">
         <div className="flex flex-wrap gap-2">
           {TABS.map((tab) => (
             <button
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`px-3 py-2 rounded-xl text-[11px] font-bold border transition-colors ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs ${
                 activeTab === tab.id
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  ? 'bg-blue-600 text-white shadow-blue-600/20'
+                  : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
               }`}
             >
               {tab.label}
@@ -171,13 +171,13 @@ function SettingsContent() {
         </div>
       </div>
 
-      <div className="p-8 space-y-6 max-w-5xl flex-1">
+      <div className="space-y-6 max-w-5xl">
         {activeTab === 'pricing' && (
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Guide */}
-          <Card className="border-gray-100 shadow-sm bg-white">
-            <CardHeader className="pb-4 border-b border-gray-50">
-              <CardTitle className="text-sm font-bold uppercase tracking-wider text-gray-400">
+          <Card className="bg-white/95 backdrop-blur-xl border-slate-200/80 shadow-xs rounded-2xl">
+            <CardHeader className="pb-4 border-b border-slate-100">
+              <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-400">
                 Guide de tarification (agents)
               </CardTitle>
             </CardHeader>

@@ -46,58 +46,62 @@ export default function SinistresPage() {
   const detail = detailQ.data || selected
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <Header title="Sinistres" subtitle="File d'attente portail client" />
+    <div className="flex-1 flex flex-col bg-transparent">
+      <Header title="Gestion des Sinistres" subtitle="File d'attente et instruction des déclarations de sinistres du portail client" />
 
-      <div className="flex flex-wrap gap-2 items-center">
-        <select
-          className="h-10 rounded-xl border border-gray-200 bg-white px-3 text-sm"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="">Tous les statuts</option>
-          {STATUSES.map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
-        <span className="text-xs text-gray-500">{items.length} sinistre(s)</span>
-      </div>
+      <div className="p-6 sm:p-8 space-y-6 flex-1">
+        <div className="bg-white/95 backdrop-blur-xl p-4 sm:p-5 rounded-2xl border border-slate-200/80 pro-shadow-sm flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <select
+              className="h-11 rounded-xl border border-slate-200 bg-slate-50/50 px-4 text-xs font-semibold text-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:bg-white"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="">Tous les statuts ({items.length})</option>
+              {STATUSES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+            <span className="text-xs font-bold text-slate-500">{items.length} dossier(s) trouvé(s)</span>
+          </div>
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card className="border-gray-100 shadow-sm">
-          <CardContent className="p-0">
-            {isLoading ? (
-              <div className="flex justify-center py-12">
-                <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-              </div>
-            ) : items.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 py-12 text-gray-400">
-                <AlertTriangle className="h-8 w-8" />
-                <p className="text-sm">Aucun sinistre</p>
-              </div>
-            ) : (
-              <ul className="divide-y divide-gray-50 max-h-[70vh] overflow-auto">
-                {items.map((s) => (
-                  <li key={s.id}>
-                    <button
-                      type="button"
-                      className={`w-full text-left px-4 py-3 hover:bg-gray-50/80 transition-colors ${
-                        selected?.id === s.id ? 'bg-blue-50/60' : ''
-                      }`}
-                      onClick={() => setSelected(s)}
-                    >
-                      <div className="flex justify-between gap-2">
-                        <span className="font-semibold text-slate-800 text-sm">{s.reference}</span>
-                        <span className="text-[10px] font-bold uppercase tracking-wide text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
-                          {s.status}
-                        </span>
-                      </div>
-                      <p className="text-sm text-slate-600 mt-0.5 truncate">{s.title}</p>
-                      <p className="text-[11px] text-gray-400 mt-1">{s.created_at}</p>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="border-slate-200/80 bg-white/95 backdrop-blur-xl pro-shadow-sm overflow-hidden">
+            <CardContent className="p-0">
+              {isLoading ? (
+                <div className="flex justify-center py-16">
+                  <Loader2 className="h-6 w-6 animate-spin text-blue-700" />
+                </div>
+              ) : items.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-16 text-slate-400">
+                  <AlertTriangle className="h-10 w-10 text-slate-300 mb-1" />
+                  <p className="text-sm font-extrabold text-slate-800">Aucun dossier de sinistre</p>
+                  <p className="text-xs text-slate-500">Aucune déclaration ne correspond aux critères.</p>
+                </div>
+              ) : (
+                <ul className="divide-y divide-slate-100 max-h-[70vh] overflow-auto">
+                  {items.map((s) => (
+                    <li key={s.id}>
+                      <button
+                        type="button"
+                        className={`w-full text-left px-5 py-4 hover:bg-slate-50 transition-colors cursor-pointer ${
+                          selected?.id === s.id ? 'bg-blue-50/80 border-l-4 border-blue-700' : ''
+                        }`}
+                        onClick={() => setSelected(s)}
+                      >
+                        <div className="flex justify-between items-center gap-2">
+                          <span className="font-extrabold text-slate-900 text-sm">{s.reference}</span>
+                          <span className="text-[11px] font-extrabold uppercase tracking-wide text-amber-800 bg-amber-50 border border-amber-200/80 px-2.5 py-0.5 rounded-full">
+                            {s.status}
+                          </span>
+                        </div>
+                        <p className="text-xs font-semibold text-slate-700 mt-1 truncate">{s.title}</p>
+                        <p className="text-[10px] text-slate-400 font-medium mt-1">Déclaré le : {s.created_at}</p>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
             )}
           </CardContent>
         </Card>

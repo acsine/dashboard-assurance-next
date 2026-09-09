@@ -948,66 +948,71 @@ export default function ProspectsPage() {
   }, [safeProspects, recontactProspects, search, agentNameById, tab])
 
   return (
-    <div className="flex-1 flex flex-col bg-white">
+    <div className="flex flex-col gap-8 p-6 md:p-8 bg-slate-50/50 min-h-screen">
       <Header
         title="Prospects & Conversions"
         subtitle="Consultez les prospects, marquez les intéressés avec devis CIMA et validez les conversions."
       />
 
-      <div className="p-8 space-y-6 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setTab('all')}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border transition-colors ${
-              tab === 'all'
-                ? 'bg-blue-600 text-white border-blue-600'
-                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-            }`}
-          >
-            <Users className="h-3.5 w-3.5" />
-            Tous les prospects ({safeProspects.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab('pending')}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border transition-colors ${
-              tab === 'pending'
-                ? 'bg-blue-600 text-white border-blue-600'
-                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-            }`}
-          >
-            <Clock className="h-3.5 w-3.5" />
-            Conversions en attente ({safePendingRequests.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab('recontact')}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border transition-colors ${
-              tab === 'recontact'
-                ? 'bg-amber-600 text-white border-amber-600'
-                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-            }`}
-          >
-            <BellRing className="h-3.5 w-3.5" />
-            Relance J-30 — fin contrat concurrent ({recontactProspects.length})
-          </button>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between flex-wrap gap-4 bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setTab('all')}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs ${
+                tab === 'all'
+                  ? 'bg-blue-600 text-white shadow-blue-600/20'
+                  : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+              }`}
+            >
+              <Users className="h-3.5 w-3.5" />
+              Tous les prospects ({safeProspects.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('pending')}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs ${
+                tab === 'pending'
+                  ? 'bg-blue-600 text-white shadow-blue-600/20'
+                  : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+              }`}
+            >
+              <Clock className="h-3.5 w-3.5" />
+              Conversions en attente ({safePendingRequests.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('recontact')}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs ${
+                tab === 'recontact'
+                  ? 'bg-amber-500 text-white shadow-amber-500/20'
+                  : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+              }`}
+            >
+              <BellRing className="h-3.5 w-3.5" />
+              Relance J-30 — fin contrat ({recontactProspects.length})
+            </button>
+          </div>
+
+          {(tab === 'all' || tab === 'recontact') && (
+            <Input
+              placeholder="Rechercher nom, téléphone, CNI, statut…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-9 text-xs border-slate-200 w-full sm:w-72 bg-white"
+            />
+          )}
         </div>
 
         {tab === 'all' || tab === 'recontact' ? (
-          <div className="bg-white rounded-2xl border border-gray-100 p-6 space-y-4">
+          <div className="bg-white/95 backdrop-blur-xl rounded-2xl border border-slate-200/80 shadow-xs p-6 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <h3 className="text-sm font-bold text-slate-900">
                 {tab === 'recontact'
                   ? 'À relancer : fin de contrat chez un autre prestataire (≤ 30 jours) — pour en faire un client'
                   : "Prospects de l'agence"}
               </h3>
-              <Input
-                placeholder="Rechercher nom, téléphone, CNI, statut…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="h-10 text-xs border-gray-200 w-full sm:w-72"
-              />
             </div>
 
             {loadingProspects ? (

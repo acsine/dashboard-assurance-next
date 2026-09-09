@@ -240,40 +240,42 @@ export default function WalletPage() {
   const safeAgentWallets = Array.isArray(agentWallets) ? agentWallets : []
 
   return (
-    <div className="flex-1 flex flex-col bg-white">
+    <div className="flex flex-col gap-8 p-6 md:p-8 bg-slate-50/50 min-h-screen">
       <Header
         title="Gestion Financière"
         subtitle="Validez les décaissements et suivez la progression financière des agents."
       />
 
-      <div className="p-8 space-y-6 flex-1">
-        <div className="flex gap-4 border-b border-gray-100 pb-px">
-          <button
-            onClick={() => setActiveTab('withdrawals')}
-            className={`pb-4 text-sm font-bold tracking-tight border-b-2 px-1 transition-all cursor-pointer ${
-              activeTab === 'withdrawals'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-400 hover:text-gray-600'
-            }`}
-          >
-            Validation des Retraits ({safeWithdrawals.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('objectives')}
-            className={`pb-4 text-sm font-bold tracking-tight border-b-2 px-1 transition-all cursor-pointer ${
-              activeTab === 'objectives'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-400 hover:text-gray-600'
-            }`}
-          >
-            Progression des Agents
-          </button>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between flex-wrap gap-4 bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveTab('withdrawals')}
+              className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-2xs ${
+                activeTab === 'withdrawals'
+                  ? 'bg-blue-600 text-white shadow-blue-600/20'
+                  : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+              }`}
+            >
+              Validation des Retraits ({safeWithdrawals.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('objectives')}
+              className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-2xs ${
+                activeTab === 'objectives'
+                  ? 'bg-blue-600 text-white shadow-blue-600/20'
+                  : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+              }`}
+            >
+              Progression des Agents
+            </button>
+          </div>
         </div>
 
         {activeTab === 'withdrawals' ? (
           <div className="space-y-8">
-            <div className="bg-white rounded-2xl border border-gray-100 p-6">
-              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-4">
+            <div className="bg-white/95 backdrop-blur-xl rounded-2xl border border-slate-200/80 shadow-xs p-6">
+              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-4">
                 Demandes en attente
               </h3>
               {isLoadingWithdrawals ? (
