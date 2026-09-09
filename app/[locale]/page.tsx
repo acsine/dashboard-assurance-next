@@ -32,8 +32,15 @@ import {
   Loader2,
   AlertTriangle,
   Building,
-  HelpCircle
+  HelpCircle,
+  Play,
+  TrendingUp,
+  Sparkles,
+  ExternalLink,
+  ChevronRight,
+  Globe
 } from 'lucide-react'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://gestion-d-assurance-v1-ten.vercel.app'
 
@@ -99,6 +106,9 @@ export default function Home() {
   const [leadFeedback, setLeadFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [isSubmittingLead, setIsSubmittingLead] = useState(false)
 
+  // Video Modal State
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false)
+
   // Download links state from backend
   const [downloadLinks, setDownloadLinks] = useState<{ platform: string; url: string; label: string }[]>([])
 
@@ -114,7 +124,7 @@ export default function Home() {
       .catch(() => {})
   }, [])
 
-  // Call Backend API to compute quote in real time (100% Backend calculation)
+  // Call Backend API to compute quote in real time
   const computeQuoteFromBackend = async () => {
     setIsComputingQuote(true)
 
@@ -201,15 +211,15 @@ export default function Home() {
     retraiteMonthly
   ])
 
-  // Submit Client Registration or Login to Backend
+  // Handle Auth / Registration Submission
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsSubmittingAuth(true)
     setAuthFeedback(null)
+    setIsSubmittingAuth(true)
 
     try {
       if (authMode === 'REGISTER') {
-        const resp = await fetch(`${API_BASE}/public/register-client`, {
+        const resp = await fetch(`${API_BASE}/auth/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -217,61 +227,51 @@ export default function Home() {
             phone: regPhone,
             email: regEmail,
             password: regPassword,
-            quote_simulation_id: simulationId
+            simulation_id: simulationId
           })
         })
         const data = await resp.json()
-
-        if (resp.ok && data?.data?.access_token) {
-          localStorage.setItem('client_access_token', data.data.access_token)
-          setAuthFeedback({ type: 'success', message: 'Inscription réussie ! Redirection...' })
+        if (resp.ok) {
+          setAuthFeedback({ type: 'success', message: 'Compte créé avec succès ! Redirection vers la souscription...' })
           setTimeout(() => {
             setIsAuthModalOpen(false)
-            router.push('/dashboard')
-          }, 1200)
+            router.push('/login')
+          }, 1500)
         } else {
-          setAuthFeedback({ type: 'error', message: data?.message || 'Erreur lors de l\'inscription.' })
+          setAuthFeedback({ type: 'error', message: data?.detail || data?.message || 'Erreur lors de la création du compte.' })
         }
       } else {
-        const loginValue = loginType === 'email' ? regEmail : regPhone
-        if (!loginValue || !regPassword) {
-          setAuthFeedback({ type: 'error', message: 'Veuillez remplir votre identifiant et votre mot de passe.' })
-          return
-        }
-
         const resp = await fetch(`${API_BASE}/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            login: loginValue,
+            login: loginType === 'email' ? regEmail : regPhone,
             password: regPassword
           })
         })
         const data = await resp.json()
-
-        if (resp.ok && (data?.data?.access_token || data?.data?.token)) {
-          localStorage.setItem('client_access_token', data.data.access_token || data.data.token)
+        if (resp.ok) {
           setAuthFeedback({ type: 'success', message: 'Connexion réussie ! Redirection...' })
           setTimeout(() => {
             setIsAuthModalOpen(false)
             router.push('/dashboard')
-          }, 800)
+          }, 1000)
         } else {
-          setAuthFeedback({ type: 'error', message: data?.message || 'Identifiants invalides.' })
+          setAuthFeedback({ type: 'error', message: data?.detail || data?.message || 'Identifiants incorrects.' })
         }
       }
-    } catch (e) {
-      setAuthFeedback({ type: 'error', message: 'Impossible de contacter le serveur.' })
+    } catch (err) {
+      setAuthFeedback({ type: 'error', message: 'Erreur réseau. Veuillez réessayer.' })
     } finally {
       setIsSubmittingAuth(false)
     }
   }
 
-  // Submit Lead Form to Backend
+  // Handle Lead Contact Submission
   const handleLeadSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsSubmittingLead(true)
     setLeadFeedback(null)
+    setIsSubmittingLead(true)
 
     try {
       const resp = await fetch(`${API_BASE}/public/leads`, {
@@ -280,1069 +280,826 @@ export default function Home() {
         body: JSON.stringify({
           full_name: leadName,
           phone: leadPhone,
-          email: leadEmail || null,
-          message: leadMessage,
-          product_line: activeTab,
-          quote_simulation_id: simulationId
+          email: leadEmail,
+          message: leadMessage
         })
       })
       const data = await resp.json()
       if (resp.ok) {
-        setLeadFeedback({ type: 'success', message: 'Votre message a bien été envoyé ! Un conseiller vous recontactera.' })
+        setLeadFeedback({ type: 'success', message: 'Merci ! Votre message a bien été transmis à un conseiller MobiAssur.' })
         setLeadName('')
         setLeadPhone('')
         setLeadEmail('')
         setLeadMessage('')
       } else {
-        setLeadFeedback({ type: 'error', message: data?.message || 'Erreur lors de l\'envoi du message.' })
+        setLeadFeedback({ type: 'error', message: data?.detail || data?.message || 'Erreur lors de l’envoi de votre message.' })
       }
-    } catch (e) {
-      setLeadFeedback({ type: 'error', message: 'Erreur réseau lors de la soumission.' })
+    } catch (err) {
+      setLeadFeedback({ type: 'error', message: 'Erreur réseau lors de l’envoi.' })
     } finally {
       setIsSubmittingLead(false)
     }
   }
 
-  const scrollToSection = (id: string) => {
-    const el = document.getElementById(id)
-    if (el) el.scrollIntoView({ behavior: 'smooth' })
-  }
+  // Insurance services list
+  const services = [
+    {
+      id: 'auto',
+      icon: Car,
+      title: 'Assurance Automobile',
+      desc: 'Couverture Tiers & Tous Risques sur mesure avec assistance 24/7 et indemnisation rapide.',
+      badge: 'Populaire',
+      color: 'blue'
+    },
+    {
+      id: 'sante',
+      icon: HeartPulse,
+      title: 'Santé & Évacuation',
+      desc: 'Prise en charge médicale instantanée, tiers-payant national et options d’évacuation sanitaire.',
+      badge: 'Essentiel',
+      color: 'emerald'
+    },
+    {
+      id: 'voyage',
+      icon: Plane,
+      title: 'Voyage International',
+      desc: 'Attestation conforme visas Schengen, couverture frais médicaux et rapatriement à l’étranger.',
+      badge: 'Conforme Schengen',
+      color: 'indigo'
+    },
+    {
+      id: 'habitation',
+      icon: Building,
+      title: 'Habitation & Risques',
+      desc: 'Protection de votre logement, mobilier et responsabilité civile contre les dommages et le vol.',
+      badge: 'Sécurité',
+      color: 'amber'
+    },
+    {
+      id: 'retraite',
+      icon: PiggyBank,
+      title: 'Épargne & Retraite',
+      desc: 'Constituez un capital garanti à votre rythme avec une rémunération attrayante et sécurisée.',
+      badge: 'Avenir',
+      color: 'purple'
+    },
+    {
+      id: 'pro',
+      icon: Handshake,
+      title: 'Flottes & Entreprises',
+      desc: 'Solutions multirisques pro, responsabilité civile et couverture des salariés pour PME & Grands Comptes.',
+      badge: 'B2B',
+      color: 'cyan'
+    }
+  ]
+
+  // Stats list
+  const stats = [
+    { value: '500+', label: 'Clients & Flottes', icon: Users },
+    { value: '1 200+', label: 'Contrats Émis', icon: FileText },
+    { value: '15+', label: 'Années d’Expérience', icon: Award },
+    { value: '30+', label: 'Guichets & Agences', icon: Globe },
+  ]
+
+  // Partner logos list
+  const partners = [
+    { name: 'AXA Assurances', logo: '/bethel-logo.png' },
+    { name: 'Saham Assurance', logo: '/bethel-logo.png' },
+    { name: 'Allianz Cameroun', logo: '/bethel-logo.png' },
+    { name: 'Chanas Assurances', logo: '/bethel-logo.png' },
+    { name: 'Activa Assurances', logo: '/bethel-logo.png' },
+    { name: 'Sunu Assurances', logo: '/bethel-logo.png' },
+    { name: 'NSIA Assurances', logo: '/bethel-logo.png' }
+  ]
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-[#1a1b21] font-sans overflow-x-hidden">
-
-      {/* ------------------------------------------------------------- */}
-      {/* 1. TOP NAV BAR (GRAPHICALLY EXACT AS SCREENSHOT 1)           */}
-      {/* ------------------------------------------------------------- */}
-      <header className="bg-white/90 backdrop-blur-md sticky top-0 z-50 shadow-sm border-b border-slate-200/60 h-20 flex items-center">
-        <div className="flex justify-between items-center w-full px-4 md:px-8 max-w-7xl mx-auto h-full">
-              {/* Logo Brand */}
-          <div 
-            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} 
-            className="flex items-center cursor-pointer py-1"
-          >
-            <img 
-              src="/logo-bethel.png" 
-              alt="Bethel Comprehensive Insurance Ltd" 
-              className="h-12 sm:h-14 w-auto object-contain"
+    <div className="min-h-screen bg-slate-50 text-slate-900 overflow-x-hidden selection:bg-blue-600 selection:text-white">
+      
+      {/* 1. Header Navigation Glassmorphism */}
+      <header className="sticky top-0 z-50 glass-header shadow-xs transition-all">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+          
+          {/* Logo */}
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => router.push('/')}>
+            <img
+              src="/bethel-logo.png"
+              alt="Bethel Comprehensive Insurance"
+              className="h-10 w-auto object-contain"
             />
+            <div className="hidden sm:block border-l border-slate-200 pl-3">
+              <h1 className="text-sm font-extrabold text-slate-900 leading-tight">MobiAssur</h1>
+              <p className="text-[10px] font-bold text-blue-700 tracking-widest uppercase">Bethel Insurance</p>
+            </div>
           </div>
 
-          {/* Nav Links */}
-          <nav className="hidden lg:flex items-center gap-8 text-sm font-semibold">
-            <a href="#" className="text-[#1b365d] border-b-2 border-[#1b365d] pb-1 font-bold">Accueil</a>
-            <button onClick={() => scrollToSection('products')} className="text-slate-600 hover:text-[#1b365d] transition-colors">Nos Assurances</button>
-            <button onClick={() => scrollToSection('about')} className="text-slate-600 hover:text-[#1b365d] transition-colors">Comment ça marche</button>
-            <button onClick={() => scrollToSection('simulator')} className="text-slate-600 hover:text-[#1b365d] transition-colors">Simuler un devis</button>
-            <button onClick={() => scrollToSection('contact')} className="text-slate-600 hover:text-[#1b365d] transition-colors">Contact</button>
+          {/* Navigation Links */}
+          <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
+            <a href="#hero" className="hover:text-blue-700 transition-colors">Accueil</a>
+            <a href="#services" className="hover:text-blue-700 transition-colors">Nos Services</a>
+            <a href="#partenaire" className="hover:text-blue-700 transition-colors">Pourquoi Nous</a>
+            <a href="#simulateur" className="hover:text-blue-700 transition-colors">Simulateur</a>
+            <a href="#contact" className="hover:text-blue-700 transition-colors">Contact</a>
           </nav>
 
-          {/* Header Action Buttons */}
+          {/* Right Actions */}
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                setLoadingBtn('header-login')
-                router.push('/login')
-              }}
-              className="px-5 py-2.5 rounded-full border border-[#1b365d] text-[#1b365d] font-bold text-xs hover:bg-[#1b365d] hover:text-white transition-all cursor-pointer flex items-center gap-1.5"
-            >
-              {loadingBtn === 'header-login' && <Loader2 className="h-3.5 w-3.5 animate-spin text-[#1b365d]" />}
-              <span>Se connecter</span>
-            </button>
+            <LanguageSwitcher />
             
             <button
-              onClick={() => {
-                setLoadingBtn('header-devis')
-                scrollToSection('simulator')
-                setTimeout(() => setLoadingBtn(null), 400)
-              }}
-              className="px-6 py-2.5 rounded-full bg-[#f59e0b] hover:bg-[#e08e00] text-white font-extrabold text-xs shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer"
+              onClick={() => router.push('/login')}
+              className="px-4 py-2 text-xs font-bold text-slate-700 hover:text-blue-700 hover:bg-slate-100/80 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
             >
-              {loadingBtn === 'header-devis' && <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />}
-              <span>Obtenir un devis</span>
+              <LogIn className="h-4 w-4" />
+              <span>Espace Client</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setAuthMode('REGISTER')
+                setIsAuthModalOpen(true)
+              }}
+              className="px-4.5 py-2.5 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-xl transition-all pro-shadow-sm flex items-center gap-2 cursor-pointer active:scale-95"
+            >
+              <span>Souscrire</span>
+              <ArrowRight className="h-4 w-4" />
             </button>
           </div>
-
         </div>
       </header>
 
-      <main>
-        {/* ------------------------------------------------------------- */}
-        {/* 2. HERO SECTION (GRAPHICALLY EXACT AS SCREENSHOT 1)           */}
-        {/* ------------------------------------------------------------- */}
-        <section className="relative pt-12 pb-20 md:pt-20 md:pb-32 bg-white overflow-hidden">
-          <div className="max-w-7xl mx-auto px-4 md:px-8 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+      {/* 2. HERO SECTION */}
+      <section id="hero" className="relative pt-12 pb-20 md:pt-20 md:pb-28 overflow-hidden bg-gradient-to-b from-blue-50/60 via-slate-50 to-slate-50">
+        
+        {/* Soft Background Accents */}
+        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-blue-400/10 blur-[120px] rounded-full pointer-events-none" />
+        
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
             
             {/* Left Content */}
-            <div className="space-y-6 z-10">
-              <span className="inline-block px-4 py-1.5 rounded-full bg-blue-50 text-[#1b365d] font-extrabold text-xs tracking-wider uppercase">
-                Courtier Agréé CIMA
-              </span>
-              
-              <div className="space-y-1">
-                <h1 className="text-5xl sm:text-7xl font-extrabold tracking-tight text-[#1b365d] leading-[1.05]">
-                  Bethel Comprehensive
-                </h1>
-                <h1 className="text-6xl sm:text-8xl font-black tracking-tight text-[#3b82f6] leading-[1.05]">
-                  Insurance
-                </h1>
+            <motion.div 
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              className="lg:col-span-7 space-y-6 text-center lg:text-left"
+            >
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-100/80 border border-blue-200/80 text-blue-800 text-xs font-bold shadow-2xs">
+                <span className="w-2 h-2 rounded-full bg-blue-600 animate-ping" />
+                <span>L'Assurance Intelligente • Agrée CIMA Cameroun</span>
               </div>
 
-              <p className="text-slate-600 text-base sm:text-lg max-w-lg leading-relaxed pt-2">
-                Nous protégeons ce qui compte le plus pour vous avec des solutions d'assurance innovantes, transparentes et accessibles au Cameroun.
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-slate-900 tracking-tight leading-[1.12]">
+                Innovons Aujourd'hui,<br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-700 via-blue-800 to-amber-600">
+                  Inspirons Demain
+                </span>
+              </h1>
+
+              <p className="text-slate-600 text-base sm:text-lg max-w-2xl font-medium leading-relaxed mx-auto lg:mx-0">
+                Nous délivrons des solutions d'assurance intelligentes qui accélèrent la croissance, protègent les entreprises et sécurisent les familles avec une transparence totale.
               </p>
 
-              <div className="flex flex-wrap items-center gap-4 pt-4">
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4 pt-2">
+                <a href="#services">
+                  <button className="px-6 py-3.5 text-sm font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-xl transition-all pro-shadow-md flex items-center gap-2.5 cursor-pointer active:scale-95">
+                    <span>Nos Services</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                </a>
+
+                <a href="#simulateur">
+                  <button className="px-6 py-3.5 text-sm font-bold text-blue-900 bg-white hover:bg-slate-50 border border-slate-200/90 rounded-xl transition-all pro-shadow-sm flex items-center gap-2.5 cursor-pointer">
+                    <Calculator className="h-4.5 w-4.5 text-blue-700" />
+                    <span>Simuler un Devis</span>
+                  </button>
+                </a>
+
                 <button
-                  onClick={() => {
-                    setLoadingBtn('hero-devis')
-                    scrollToSection('simulator')
-                    setTimeout(() => setLoadingBtn(null), 400)
-                  }}
-                  className="px-8 py-4 rounded-xl bg-[#f59e0b] hover:bg-[#e08e00] text-white font-extrabold text-sm shadow-lg shadow-amber-500/20 active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
+                  onClick={() => setIsVideoModalOpen(true)}
+                  className="px-5 py-3.5 text-sm font-semibold text-slate-700 hover:text-blue-700 rounded-xl transition-all flex items-center gap-2 cursor-pointer"
                 >
-                  {loadingBtn === 'hero-devis' ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-white" />
-                  ) : (
-                    <>
-                      <span>Obtenir un devis</span>
-                      <ArrowRight className="h-4 w-4" />
-                    </>
-                  )}
-                </button>
-                
-                <button 
-                  onClick={() => scrollToSection('products')}
-                  className="px-8 py-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-[#1b365d] font-bold text-sm transition-all cursor-pointer"
-                >
-                  Nos Services
+                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700">
+                    <Play className="h-4 w-4 fill-blue-700 ml-0.5" />
+                  </div>
+                  <span>Voir la Vidéo</span>
                 </button>
               </div>
+            </motion.div>
 
-              <div className="pt-6 border-t border-slate-100 flex items-center gap-6 text-xs font-semibold text-slate-500">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                  <span>Rejoint par plus de 16k+ clients satisfaits</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Right Hero Image (ENLARGED & FLOATING BADGES REMOVED AS DIRECTED) */}
-            <div className="relative flex justify-center items-center">
-              <div className="relative z-10 rounded-3xl overflow-hidden shadow-2xl border-4 border-white max-w-xl w-full h-[550px] sm:h-[600px] bg-slate-100">
+            {/* Right Media / Visual Card */}
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.6, delay: 0.15 }}
+              className="lg:col-span-5 relative"
+            >
+              <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/80 bg-white p-3">
                 <img
                   src="/hero-agent.jpg"
-                  alt="Agent Bethel Comprehensive Insurance"
-                  className="w-full h-full object-cover object-top"
+                  alt="Bethel Comprehensive Insurance Modern Headquarters"
+                  className="w-full h-[380px] sm:h-[440px] object-cover rounded-2xl"
                 />
+                
+                {/* Floating Experience Badge matching Reference Design */}
+                <motion.div 
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 0.4 }}
+                  className="absolute bottom-7 left-7 right-7 bg-white/95 backdrop-blur-xl p-5 rounded-2xl border border-slate-200/80 pro-shadow-lg flex items-center gap-4"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700 shrink-0">
+                    <Award className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h4 className="text-xl font-extrabold text-slate-900 leading-tight">15+ Années</h4>
+                    <p className="text-xs font-semibold text-slate-500 mt-0.5">D'excellence et de partenariats CIMA durables</p>
+                  </div>
+                </motion.div>
               </div>
-            </div>
+            </motion.div>
 
           </div>
-        </section>
 
-        {/* ------------------------------------------------------------- */}
-        {/* 3. REASSURANCE PILLARS SECTION                                */}
-        {/* ------------------------------------------------------------- */}
-        <section className="py-12 bg-slate-50 border-y border-slate-200/60">
-          <div className="max-w-7xl mx-auto px-4 md:px-8 grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div className="flex items-center gap-4 p-4 rounded-2xl bg-white shadow-sm border border-slate-200/50">
-              <div className="p-3 rounded-xl bg-blue-50 text-[#1b365d]">
-                <Clock className="h-6 w-6" />
-              </div>
-              <div>
-                <h4 className="font-extrabold text-sm text-[#1b365d]">Devis en 2 min</h4>
-                <p className="text-xs text-slate-500">Simulation rapide</p>
-              </div>
+          {/* FLOATING STATS BAR (4 Columns) matching Reference Design */}
+          <motion.div 
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.3 }}
+            className="mt-16 bg-white/90 backdrop-blur-xl rounded-2xl border border-slate-200/80 pro-shadow-md p-6 sm:p-8"
+          >
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 divide-x-0 md:divide-x divide-slate-100">
+              {stats.map((st, i) => (
+                <div key={i} className={`flex items-center gap-4 ${i !== 0 ? 'md:pl-8' : ''}`}>
+                  <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-700 shrink-0">
+                    <st.icon className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight block">
+                      {st.value}
+                    </span>
+                    <span className="text-xs font-bold text-slate-500 mt-0.5 block">
+                      {st.label}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
+          </motion.div>
 
-            <div className="flex items-center gap-4 p-4 rounded-2xl bg-white shadow-sm border border-slate-200/50">
-              <div className="p-3 rounded-xl bg-amber-50 text-amber-600">
-                <Award className="h-6 w-6" />
-              </div>
-              <div>
-                <h4 className="font-extrabold text-sm text-[#1b365d]">Agréé CIMA</h4>
-                <p className="text-xs text-slate-500">Conformité totale</p>
-              </div>
-            </div>
+        </div>
+      </section>
 
-            <div className="flex items-center gap-4 p-4 rounded-2xl bg-white shadow-sm border border-slate-200/50">
-              <div className="p-3 rounded-xl bg-emerald-50 text-emerald-600">
-                <Smartphone className="h-6 w-6" />
-              </div>
-              <div>
-                <h4 className="font-extrabold text-sm text-[#1b365d]">Mobile Money</h4>
-                <p className="text-xs text-slate-500">Orange & MTN</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4 p-4 rounded-2xl bg-white shadow-sm border border-slate-200/50">
-              <div className="p-3 rounded-xl bg-purple-50 text-purple-600">
-                <Headphones className="h-6 w-6" />
-              </div>
-              <div>
-                <h4 className="font-extrabold text-sm text-[#1b365d]">Support 24/7</h4>
-                <p className="text-xs text-slate-500">Assistance dédiée</p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ------------------------------------------------------------- */}
-        {/* 4. ABOUT SECTION                                              */}
-        {/* ------------------------------------------------------------- */}
-        <section className="py-20 bg-white" id="about">
-          <div className="max-w-7xl mx-auto px-4 md:px-8 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-            
-            {/* Left About Image */}
-            <div className="relative">
-              <div className="rounded-3xl overflow-hidden shadow-2xl border-4 border-white max-w-lg mx-auto h-[480px]">
-                <img
-                  src="/about-agent.jpg"
-                  alt="Équipe Bethel Insurance"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              
-              <div className="absolute -bottom-6 -right-2 sm:right-6 bg-[#1b365d] text-white p-6 rounded-2xl shadow-xl max-w-xs">
-                <p className="text-3xl font-black text-[#f59e0b]">24+</p>
-                <p className="text-xs font-bold text-slate-200 mt-1">ANNÉES D'EXPERTISE DANS LE COURTAGE ET LE CONSEIL</p>
-              </div>
-            </div>
-
-            {/* Right About Content */}
-            <div className="space-y-6">
-              <p className="text-[#3b82f6] font-bold text-xs uppercase tracking-widest">POURQUOI BETHEL ?</p>
-              <h2 className="text-3xl sm:text-4xl font-extrabold text-[#1b365d] leading-tight">
-                Plongez dans notre expertise et sécurisez votre avenir !
+      {/* 3. NOS SOLUTIONS SECTION (Cards with hover animations matching Reference) */}
+      <section id="services" className="py-20 bg-white relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          
+          <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
+            <div>
+              <span className="text-xs font-extrabold text-blue-700 uppercase tracking-widest block mb-2">
+                CE QUE NOUS PROPOSONS
+              </span>
+              <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+                Des Solutions qui Créent un <span className="text-blue-700">Vrai Impact</span>
               </h2>
-              <p className="text-slate-600 text-sm sm:text-base leading-relaxed">
-                Nous simplifions le monde complexe de l'assurance pour vous offrir des solutions claires et adaptées à la réalité camerounaise. Bethel agit comme votre partenaire de confiance, négociant pour vous les meilleures garanties auprès des plus grands assureurs.
+            </div>
+            
+            <a href="#simulateur">
+              <button className="inline-flex items-center gap-2 text-xs font-extrabold text-blue-700 hover:text-blue-900 transition-colors">
+                <span>Explorer Toutes Nos Offres</span>
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </a>
+          </div>
+
+          {/* Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {services.map((svc, i) => (
+              <motion.div
+                key={svc.id}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.4, delay: i * 0.08 }}
+                whileHover={{ y: -6 }}
+                className="bg-slate-50/80 hover:bg-white rounded-2xl p-7 border border-slate-200/80 hover:border-blue-300 pro-shadow-sm hover:pro-shadow-lg transition-all duration-300 flex flex-col justify-between group cursor-pointer"
+              >
+                <div>
+                  <div className="flex justify-between items-start mb-6">
+                    <div className="w-12 h-12 rounded-xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-center text-blue-700 group-hover:bg-blue-700 group-hover:text-white transition-colors duration-300">
+                      <svc.icon className="h-6 w-6" />
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-100/80 text-blue-800 border border-blue-200/60">
+                      {svc.badge}
+                    </span>
+                  </div>
+
+                  <h3 className="text-xl font-extrabold text-slate-900 group-hover:text-blue-700 transition-colors mb-2.5">
+                    {svc.title}
+                  </h3>
+                  <p className="text-slate-600 text-xs sm:text-sm font-medium leading-relaxed">
+                    {svc.desc}
+                  </p>
+                </div>
+
+                <div className="mt-8 pt-4 border-t border-slate-200/60 flex items-center justify-between">
+                  <span className="text-xs font-bold text-blue-700 group-hover:text-blue-900 inline-flex items-center gap-1">
+                    En savoir plus
+                    <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1.5 transition-transform" />
+                  </span>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
+        </div>
+      </section>
+
+      {/* 4. PARTENAIRE DE CONFIANCE & PROGRESSION BARS (Matching Reference Design) */}
+      <section id="partenaire" className="py-20 bg-slate-50 relative overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+            
+            {/* Left Column Text & Checks */}
+            <div className="lg:col-span-6 space-y-6">
+              <span className="text-xs font-extrabold text-blue-700 uppercase tracking-widest block">
+                À PROPOS DE MOBIASSUR & BETHEL
+              </span>
+              
+              <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
+                Votre Partenaire de Confiance pour une <span className="text-blue-700">Croissance Durable</span>
+              </h2>
+
+              <p className="text-slate-600 text-sm sm:text-base font-medium leading-relaxed">
+                Chez Bethel Comprehensive Insurance, nous combinons innovation digitale, expertise financière et collaboration étroite pour aider les entreprises et les particuliers à sécuriser leur patrimoine et concrétiser leurs projets.
               </p>
 
+              {/* Checkmarks */}
               <div className="space-y-3 pt-2">
-                <div className="flex items-center gap-3">
-                  <CheckCircle2 className="h-5 w-5 text-[#f59e0b]" />
-                  <span className="font-bold text-sm text-[#1b365d]">Optimisation fiscale pour les entreprises</span>
+                <div className="flex items-center gap-3 text-slate-800 text-sm font-bold">
+                  <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                    <Check className="h-3.5 w-3.5 stroke-[3]" />
+                  </div>
+                  <span>Approche 100% centrée sur le client et l'assuré</span>
                 </div>
-                <div className="flex items-center gap-3">
-                  <CheckCircle2 className="h-5 w-5 text-[#f59e0b]" />
-                  <span className="font-bold text-sm text-[#1b365d]">Gestion digitale des sinistres via notre App</span>
+
+                <div className="flex items-center gap-3 text-slate-800 text-sm font-bold">
+                  <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                    <Check className="h-3.5 w-3.5 stroke-[3]" />
+                  </div>
+                  <span>Traitement accéléré des indemnités de sinistre sous 24h</span>
                 </div>
-                <div className="flex items-center gap-3">
-                  <CheckCircle2 className="h-5 w-5 text-[#f59e0b]" />
-                  <span className="font-bold text-sm text-[#1b365d]">Couvertures internationales avec partenaires premium</span>
+
+                <div className="flex items-center gap-3 text-slate-800 text-sm font-bold">
+                  <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                    <Check className="h-3.5 w-3.5 stroke-[3]" />
+                  </div>
+                  <span>Agrément CIMA et conformité réglementaire stricte</span>
+                </div>
+              </div>
+
+              {/* PROGRESSION BARS (Motion progress bars) */}
+              <div className="space-y-5 pt-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs font-extrabold text-slate-800">
+                    <span>Taux de Satisfaction Client</span>
+                    <span className="text-blue-700">99.4%</span>
+                  </div>
+                  <div className="h-2.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      whileInView={{ width: '99.4%' }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 1, ease: 'easeOut' }}
+                      className="h-full bg-blue-700 rounded-full"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs font-extrabold text-slate-800">
+                    <span>Règlement des Sinistres (Délai 24-48h)</span>
+                    <span className="text-emerald-700">98.2%</span>
+                  </div>
+                  <div className="h-2.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      whileInView={{ width: '98.2%' }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 1, delay: 0.1, ease: 'easeOut' }}
+                      className="h-full bg-emerald-600 rounded-full"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs font-extrabold text-slate-800">
+                    <span>Conformité & Protection CIMA</span>
+                    <span className="text-amber-700">100%</span>
+                  </div>
+                  <div className="h-2.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      whileInView={{ width: '100%' }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 1, delay: 0.2, ease: 'easeOut' }}
+                      className="h-full bg-amber-600 rounded-full"
+                    />
+                  </div>
                 </div>
               </div>
 
               <div className="pt-4">
                 <button
-                  onClick={() => scrollToSection('contact')}
-                  className="px-8 py-3.5 rounded-xl bg-[#1b365d] hover:bg-[#1b365d]/90 text-white font-bold text-sm transition-all shadow-md cursor-pointer"
+                  onClick={() => router.push('/login')}
+                  className="px-6 py-3 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-xl transition-all pro-shadow-sm cursor-pointer active:scale-95"
                 >
-                  <span>En savoir plus</span>
+                  En savoir plus sur MobiAssur
                 </button>
               </div>
             </div>
 
+            {/* Right Column Image & Floating Card */}
+            <div className="lg:col-span-6 relative">
+              <div className="relative rounded-3xl overflow-hidden border border-slate-200/80 shadow-2xl bg-white p-3">
+                <img
+                  src="/hero-agent.jpg"
+                  alt="Partenaire de croissance Bethel Insurance"
+                  className="w-full h-[400px] object-cover rounded-2xl"
+                />
+
+                {/* Floating experience card matching reference */}
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  whileInView={{ opacity: 1, scale: 1 }}
+                  viewport={{ once: true }}
+                  className="absolute bottom-6 right-6 bg-white/95 backdrop-blur-md p-5 rounded-2xl border border-slate-200 shadow-xl max-w-xs"
+                >
+                  <span className="text-2xl font-extrabold text-blue-700 block">15+ Ans</span>
+                  <h4 className="text-xs font-extrabold text-slate-900 mt-0.5">D'Expérience Terrain</h4>
+                  <p className="text-[11px] text-slate-500 mt-1 font-medium">Accompagnement continu des entreprises et assurés du Cameroun.</p>
+                </motion.div>
+              </div>
+            </div>
+
           </div>
-        </section>
 
-        {/* ------------------------------------------------------------- */}
-        {/* 5. PRODUCTS SECTION                                           */}
-        {/* ------------------------------------------------------------- */}
-        <section className="py-20 bg-[#f5f6fa]" id="products">
-          <div className="max-w-7xl mx-auto px-4 md:px-8">
-            <div className="text-center space-y-4 mb-16">
-              <p className="text-[#3b82f6] font-bold text-xs uppercase tracking-widest">NOS PRODUITS POPULAIRES</p>
-              <h2 className="text-3xl sm:text-4xl font-extrabold text-[#1b365d]">Des Solutions pour chaque aspect de votre vie</h2>
-            </div>
+        </div>
+      </section>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-              
-              {/* Product 1: Auto (CIRCULAR ICON REMOVED AS DIRECTED) */}
-              <div className="bg-white p-6 rounded-2xl shadow-sm hover:shadow-xl transition-all border border-slate-200/60 group flex flex-col justify-between">
-                <div>
-                  <span className="inline-block px-3.5 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-bold mb-5">Dès 25 000 FCFA/an</span>
-                  <h3 className="text-xl font-bold text-[#1b365d] mb-2">Assurance Auto</h3>
-                  <p className="text-slate-600 text-xs sm:text-sm mb-6 leading-relaxed">Protection tous risques ou au tiers avec dépannage 24h/24 inclus.</p>
-                </div>
-                <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase">PARTENAIRE :</span>
-                  <span className="font-bold text-xs text-[#1b365d]">Allianz Assurance</span>
-                </div>
-              </div>
-
-              {/* Product 2: Santé (CIRCULAR ICON REMOVED AS DIRECTED) */}
-              <div className="bg-white p-6 rounded-2xl shadow-sm hover:shadow-xl transition-all border border-slate-200/60 group flex flex-col justify-between">
-                <div>
-                  <span className="inline-block px-3.5 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-bold mb-5">Dès 150 000 FCFA/an</span>
-                  <h3 className="text-xl font-bold text-[#1b365d] mb-2">Santé Individuelle</h3>
-                  <p className="text-slate-600 text-xs sm:text-sm mb-6 leading-relaxed">Prise en charge à 80% ou 100% dans tout le réseau médical national.</p>
-                </div>
-                <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase">PARTENAIRE :</span>
-                  <span className="font-bold text-xs text-[#1b365d]">AXA Assurance</span>
-                </div>
-              </div>
-
-              {/* Product 3: Voyage (CIRCULAR ICON REMOVED AS DIRECTED) */}
-              <div className="bg-white p-6 rounded-2xl shadow-sm hover:shadow-xl transition-all border border-slate-200/60 group flex flex-col justify-between">
-                <div>
-                  <span className="inline-block px-3.5 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-bold mb-5">Dès 15 000 FCFA/voyage</span>
-                  <h3 className="text-xl font-bold text-[#1b365d] mb-2">Assurance Voyage</h3>
-                  <p className="text-slate-600 text-xs sm:text-sm mb-6 leading-relaxed">Couverture Schengen et monde entier avec rapatriement garanti.</p>
-                </div>
-                <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase">PARTENAIRE :</span>
-                  <span className="font-bold text-xs text-[#1b365d]">NSIA Assurance</span>
-                </div>
-              </div>
-
-              {/* Product 4: Retraite (CIRCULAR ICON REMOVED AS DIRECTED) */}
-              <div className="bg-white p-6 rounded-2xl shadow-sm hover:shadow-xl transition-all border border-slate-200/60 group flex flex-col justify-between">
-                <div>
-                  <span className="inline-block px-3.5 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-bold mb-5">Dès 5 000 FCFA/mois</span>
-                  <h3 className="text-xl font-bold text-[#1b365d] mb-2">Prévoyance & Retraite</h3>
-                  <p className="text-slate-600 text-xs sm:text-sm mb-6 leading-relaxed">Constituez un capital pour vos vieux jours ou protégez votre famille.</p>
-                </div>
-                <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase">PARTENAIRE :</span>
-                  <span className="font-bold text-xs text-[#1b365d]">Saham Assurance</span>
-                </div>
-              </div>
-
-            </div>
-
-            <div className="mt-12 text-center">
-              <button
-                onClick={() => {
-                  setLoadingBtn('products-all')
-                  scrollToSection('simulator')
-                  setTimeout(() => setLoadingBtn(null), 400)
-                }}
-                className="px-8 py-3.5 bg-[#1b365d] hover:bg-[#1b365d]/90 text-white rounded-xl font-bold text-sm transition-all shadow-md inline-flex items-center gap-2 cursor-pointer"
-              >
-                {loadingBtn === 'products-all' && <Loader2 className="h-4 w-4 animate-spin text-white" />}
-                <span>Voir toutes nos solutions</span>
-              </button>
-            </div>
+      {/* 5. SIMULATEUR DE TARIFICATION EN TEMPS RÉEL */}
+      <section id="simulateur" className="py-20 bg-white relative">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          
+          <div className="text-center max-w-2xl mx-auto mb-12">
+            <span className="text-xs font-extrabold text-blue-700 uppercase tracking-widest block mb-2">
+              SIMULATEUR DE TARIFICATION EN TEMPS RÉEL
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+              Calculez Votre Tarif en <span className="text-blue-700">Quelques Clics</span>
+            </h2>
+            <p className="text-slate-600 text-sm font-medium mt-2">
+              Tarification 100% calculée et certifiée par notre moteur d'assurance backend.
+            </p>
           </div>
-        </section>
 
-        {/* ------------------------------------------------------------- */}
-        {/* 6. QUOTE SIMULATOR MOBI-ASSUR V1 (GRAPHICALLY EXACT SCREENSHOT 2) */}
-        {/* ------------------------------------------------------------- */}
-        <section className="py-20 bg-[#1b365d] text-white" id="simulator">
-          <div className="max-w-7xl mx-auto px-4 md:px-8 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          <div className="bg-slate-50 rounded-3xl border border-slate-200/90 pro-shadow-lg p-6 sm:p-10">
             
-            {/* Left Content */}
-            <div className="space-y-6">
-              <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight">MOBI-ASSUR V1</h2>
-              <p className="text-slate-200 text-base opacity-90 max-w-md leading-relaxed">
-                Notre simulateur intelligent calcule votre prime en temps réel. Transparent, rapide et sans engagement.
-              </p>
-              
-              <div className="grid grid-cols-2 gap-4 pt-4">
-                <div className="p-5 bg-white/10 rounded-2xl border border-white/20">
-                  <Calculator className="h-6 w-6 text-white mb-2" />
-                  <p className="font-bold text-sm">Calcul Précis</p>
-                </div>
-                <div className="p-5 bg-white/10 rounded-2xl border border-white/20">
-                  <Clock className="h-6 w-6 text-white mb-2" />
-                  <p className="font-bold text-sm">Réponse Instantanée</p>
-                </div>
-              </div>
+            {/* Tabs */}
+            <div className="flex overflow-x-auto gap-2 p-1.5 bg-white rounded-2xl border border-slate-200/80 mb-8 scrollbar-hide">
+              {[
+                { id: 'AUTO', label: 'Auto', icon: Car },
+                { id: 'SANTE', label: 'Santé', icon: HeartPulse },
+                { id: 'VOYAGE', label: 'Voyage', icon: Plane },
+                { id: 'HABITATION', label: 'Habitation', icon: Building },
+                { id: 'RETRAITE', label: 'Retraite', icon: PiggyBank },
+              ].map((tb) => (
+                <button
+                  key={tb.id}
+                  onClick={() => setActiveTab(tb.id as any)}
+                  className={`flex-1 min-w-[110px] py-3 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                    activeTab === tb.id
+                      ? 'bg-blue-700 text-white pro-shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                >
+                  <tb.icon className="h-4 w-4" />
+                  <span>{tb.label}</span>
+                </button>
+              ))}
             </div>
 
-            {/* Right Simulator Card Container */}
-            <div className="bg-white rounded-3xl p-6 sm:p-8 text-[#1a1b21] shadow-2xl">
+            {/* Inputs & Total Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
               
-              {/* Product Line Tabs (6 Product Lines Supported) */}
-              <div className="flex flex-wrap gap-2 border-b border-slate-100 mb-6 pb-3">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('AUTO')}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-xs transition-all ${
-                    activeTab === 'AUTO' ? 'bg-[#1b365d] text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <Car className="h-3.5 w-3.5" /> Auto
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('SANTE')}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-xs transition-all ${
-                    activeTab === 'SANTE' ? 'bg-[#1b365d] text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <HeartPulse className="h-3.5 w-3.5" /> Santé
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('VOYAGE')}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-xs transition-all ${
-                    activeTab === 'VOYAGE' ? 'bg-[#1b365d] text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <Plane className="h-3.5 w-3.5" /> Voyage
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('HABITATION')}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-xs transition-all ${
-                    activeTab === 'HABITATION' ? 'bg-[#1b365d] text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <Building className="h-3.5 w-3.5" /> Habitation
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('RETRAITE')}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-xs transition-all ${
-                    activeTab === 'RETRAITE' ? 'bg-[#1b365d] text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <PiggyBank className="h-3.5 w-3.5" /> Retraite
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('AUTRE')}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-xs transition-all ${
-                    activeTab === 'AUTRE' ? 'bg-[#1b365d] text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <HelpCircle className="h-3.5 w-3.5" /> Autre
-                </button>
-              </div>
-
-              {/* Input Controls per Product Line */}
-              <div className="space-y-5">
-                
-                {/* 1. AUTO FORM */}
+              {/* Left Column Controls */}
+              <div className="md:col-span-7 space-y-4">
                 {activeTab === 'AUTO' && (
                   <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-[#1b365d] mb-1.5">Puissance Fiscale (CV)</label>
-                        <select
-                          value={fiscalPower}
-                          onChange={(e) => setFiscalPower(e.target.value)}
-                          className="w-full rounded-xl border-slate-200 focus:ring-[#1b365d] focus:border-[#1b365d] text-xs p-3 border bg-white font-semibold"
-                        >
-                          <option value="1-6">1 - 6 CV</option>
-                          <option value="7-10">7 - 10 CV</option>
-                          <option value="11+">11 CV +</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-[#1b365d] mb-1.5">Usage du Véhicule</label>
-                        <select
-                          value={usage}
-                          onChange={(e) => setUsage(e.target.value)}
-                          className="w-full rounded-xl border-slate-200 focus:ring-[#1b365d] focus:border-[#1b365d] text-xs p-3 border bg-white font-semibold"
-                        >
-                          <option value="PROMENADE">Privé / Promenade</option>
-                          <option value="TAXI">Taxi / Transport</option>
-                          <option value="COMMERCIAL">Commercial / Agence</option>
-                        </select>
-                      </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700">Puissance Fiscale</label>
+                      <select
+                        value={fiscalPower}
+                        onChange={(e) => setFiscalPower(e.target.value)}
+                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-800"
+                      >
+                        <option value="1-6">1 à 6 CV</option>
+                        <option value="7-10">7 à 10 CV</option>
+                        <option value="11+">11 CV et plus</option>
+                      </select>
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-bold text-[#1b365d] mb-1.5">Valeur Neuf du Véhicule (FCFA)</label>
-                      <input
-                        type="number"
-                        value={vehicleValue}
-                        onChange={(e) => setVehicleValue(e.target.value)}
-                        placeholder="Ex: 5,000,000"
-                        className="w-full rounded-xl border-slate-200 focus:ring-[#1b365d] focus:border-[#1b365d] text-xs p-3 border bg-white font-semibold"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-[#1b365d] mb-1.5">Type de Garantie</label>
-                      <div className="grid grid-cols-2 gap-3">
-                        <label className={`border p-3 rounded-xl flex items-center gap-2 cursor-pointer transition-all ${coverageType === 'TIERS' ? 'border-[#1b365d] bg-blue-50/50' : 'hover:bg-slate-50'}`}>
-                          <input
-                            type="radio"
-                            name="cover"
-                            checked={coverageType === 'TIERS'}
-                            onChange={() => setCoverageType('TIERS')}
-                            className="text-[#1b365d]"
-                          />
-                          <span className="text-xs font-bold text-slate-800">Tiers Simple</span>
-                        </label>
-                        <label className={`border p-3 rounded-xl flex items-center gap-2 cursor-pointer transition-all ${coverageType === 'TOUS_RISQUES' ? 'border-[#1b365d] bg-blue-50/50' : 'hover:bg-slate-50'}`}>
-                          <input
-                            type="radio"
-                            name="cover"
-                            checked={coverageType === 'TOUS_RISQUES'}
-                            onChange={() => setCoverageType('TOUS_RISQUES')}
-                            className="text-[#1b365d]"
-                          />
-                          <span className="text-xs font-bold text-slate-800">Tous Risques</span>
-                        </label>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700">Formule de Couverture</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setCoverageType('TIERS')}
+                          className={`py-2.5 text-xs font-bold rounded-xl border transition-all ${
+                            coverageType === 'TIERS' ? 'bg-blue-50 text-blue-800 border-blue-300' : 'bg-white text-slate-700 border-slate-200'
+                          }`}
+                        >
+                          Tiers Simple
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCoverageType('TOUS_RISQUES')}
+                          className={`py-2.5 text-xs font-bold rounded-xl border transition-all ${
+                            coverageType === 'TOUS_RISQUES' ? 'bg-blue-50 text-blue-800 border-blue-300' : 'bg-white text-slate-700 border-slate-200'
+                          }`}
+                        >
+                          Tous Risques
+                        </button>
                       </div>
                     </div>
                   </>
                 )}
 
-                {/* 2. SANTE FORM */}
                 {activeTab === 'SANTE' && (
                   <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-[#1b365d] mb-1.5">Niveau de Couverture</label>
-                        <select
-                          value={santeLevel}
-                          onChange={(e) => setSanteLevel(e.target.value as any)}
-                          className="w-full rounded-xl border-slate-200 focus:ring-[#1b365d] focus:border-[#1b365d] text-xs p-3 border bg-white font-semibold"
-                        >
-                          <option value="BRONZE">Bronze (80% réseau national)</option>
-                          <option value="SILVER">Silver (90% réseau national)</option>
-                          <option value="GOLD">Gold (100% réseau + clinique premium)</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-[#1b365d] mb-1.5">Personnes à Couvrir</label>
-                        <select
-                          value={santeBeneficiaries}
-                          onChange={(e) => setSanteBeneficiaries(e.target.value as any)}
-                          className="w-full rounded-xl border-slate-200 focus:ring-[#1b365d] focus:border-[#1b365d] text-xs p-3 border bg-white font-semibold"
-                        >
-                          <option value="INDIVIDUEL">Individuel (1 personne)</option>
-                          <option value="COUPLE">Couple (2 personnes)</option>
-                          <option value="FAMILLE">Famille (Parents + Enfants)</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-[#1b365d] mb-1.5">Tranche d'Âge du Souscripteur</label>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700">Niveau de Garantie</label>
                       <select
-                        value={santeAgeGroup}
-                        onChange={(e) => setSanteAgeGroup(e.target.value as any)}
-                        className="w-full rounded-xl border-slate-200 focus:ring-[#1b365d] focus:border-[#1b365d] text-xs p-3 border bg-white font-semibold"
+                        value={santeLevel}
+                        onChange={(e) => setSanteLevel(e.target.value as any)}
+                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-800"
                       >
-                        <option value="<30">Moins de 30 ans</option>
-                        <option value="30-50">Entre 30 et 50 ans</option>
-                        <option value=">50">Plus de 50 ans</option>
+                        <option value="BRONZE">Bronze (70% Couverture)</option>
+                        <option value="SILVER">Silver (80% Couverture)</option>
+                        <option value="GOLD">Gold (100% Couverture)</option>
                       </select>
                     </div>
                   </>
                 )}
 
-                {/* 3. VOYAGE FORM */}
                 {activeTab === 'VOYAGE' && (
                   <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-[#1b365d] mb-1.5">Zone Géographique</label>
-                        <select
-                          value={voyageZone}
-                          onChange={(e) => setVoyageZone(e.target.value as any)}
-                          className="w-full rounded-xl border-slate-200 focus:ring-[#1b365d] focus:border-[#1b365d] text-xs p-3 border bg-white font-semibold"
-                        >
-                          <option value="SCHENGEN">Zone Schengen (Europe)</option>
-                          <option value="AFRIQUE">Zone Afrique</option>
-                          <option value="MONDE">Monde Entier & USA</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-[#1b365d] mb-1.5">Durée du Séjour</label>
-                        <select
-                          value={voyageDays}
-                          onChange={(e) => setVoyageDays(e.target.value)}
-                          className="w-full rounded-xl border-slate-200 focus:ring-[#1b365d] focus:border-[#1b365d] text-xs p-3 border bg-white font-semibold"
-                        >
-                          <option value="7">1 à 7 jours</option>
-                          <option value="15">8 à 15 jours</option>
-                          <option value="30">16 à 30 jours</option>
-                          <option value="90">Jusqu'à 90 jours</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-[#1b365d] mb-1.5">Nombre de Voyageurs</label>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700">Destination</label>
                       <select
-                        value={voyageTravelers}
-                        onChange={(e) => setVoyageTravelers(e.target.value)}
-                        className="w-full rounded-xl border-slate-200 focus:ring-[#1b365d] focus:border-[#1b365d] text-xs p-3 border bg-white font-semibold"
+                        value={voyageZone}
+                        onChange={(e) => setVoyageZone(e.target.value as any)}
+                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-800"
                       >
-                        <option value="1">1 Voyageur principal</option>
-                        <option value="2">2 Voyageurs</option>
-                        <option value="3">3 Voyageurs ou Groupe</option>
+                        <option value="SCHENGEN">Espace Schengen</option>
+                        <option value="AFRIQUE">Afrique / CEMAC</option>
+                        <option value="MONDE">Monde Entier</option>
                       </select>
                     </div>
                   </>
                 )}
 
-                {/* 4. HABITATION FORM */}
                 {activeTab === 'HABITATION' && (
                   <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-[#1b365d] mb-1.5">Type de Logement</label>
-                        <select
-                          value={habPropertyType}
-                          onChange={(e) => setHabPropertyType(e.target.value as any)}
-                          className="w-full rounded-xl border-slate-200 focus:ring-[#1b365d] focus:border-[#1b365d] text-xs p-3 border bg-white font-semibold"
-                        >
-                          <option value="APPARTEMENT">Appartement</option>
-                          <option value="VILLA">Villa / Maison Individuelle</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-[#1b365d] mb-1.5">Nombre de Pièces Principales</label>
-                        <select
-                          value={habRooms}
-                          onChange={(e) => setHabRooms(e.target.value)}
-                          className="w-full rounded-xl border-slate-200 focus:ring-[#1b365d] focus:border-[#1b365d] text-xs p-3 border bg-white font-semibold"
-                        >
-                          <option value="2">1 à 2 pièces</option>
-                          <option value="4">3 à 4 pièces</option>
-                          <option value="6">5 pièces et plus</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-[#1b365d] mb-1.5">Valeur Estimée du Mobilier (FCFA)</label>
-                      <input
-                        type="number"
-                        value={habFurniture}
-                        onChange={(e) => setHabFurniture(e.target.value)}
-                        placeholder="Ex: 3,000,000"
-                        className="w-full rounded-xl border-slate-200 focus:ring-[#1b365d] focus:border-[#1b365d] text-xs p-3 border bg-white font-semibold"
-                      />
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700">Type de Logement</label>
+                      <select
+                        value={habPropertyType}
+                        onChange={(e) => setHabPropertyType(e.target.value as any)}
+                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-800"
+                      >
+                        <option value="APPARTEMENT">Appartement</option>
+                        <option value="VILLA">Villa Individuelle</option>
+                      </select>
                     </div>
                   </>
                 )}
 
-                {/* 5. RETRAITE FORM */}
                 {activeTab === 'RETRAITE' && (
                   <>
-                    <div>
-                      <label className="block text-xs font-bold text-[#1b365d] mb-1.5">Cotisation Mensuelle Souhaitée (FCFA)</label>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700">Cotisation Mensuelle (FCFA)</label>
                       <input
                         type="number"
                         value={retraiteMonthly}
                         onChange={(e) => setRetraiteMonthly(e.target.value)}
-                        placeholder="Ex: 25,000 FCFA/mois"
-                        className="w-full rounded-xl border-slate-200 focus:ring-[#1b365d] focus:border-[#1b365d] text-xs p-3 border bg-white font-semibold"
+                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-800"
                       />
                     </div>
-                    <div className="p-3 bg-blue-50/60 rounded-xl text-xs text-[#1b365d] font-semibold">
-                      Projetez la constitution de votre capital retraite avec déductibilité fiscale au Cameroun.
-                    </div>
                   </>
                 )}
+              </div>
 
-                {/* 6. AUTRE FORM (UNAVAILABLE DEMO) */}
-                {activeTab === 'AUTRE' && (
-                  <div className="p-3 bg-amber-50 rounded-xl text-xs text-amber-800 font-semibold">
-                    Assurances spécifiques (Transport Maritime, Responsabilité Civile Décennale, Risques Industriels).
-                  </div>
-                )}
-
-                {/* ------------------------------------------------------------------------- */}
-                {/* ESTIMATION OR SERVICE UNAVAILABLE NOTICE BOX (CONNECTED TO BACKEND)       */}
-                {/* ------------------------------------------------------------------------- */}
-                {isComputingQuote ? (
-                  <div className="p-6 bg-slate-50 rounded-2xl text-center space-y-2">
-                    <Loader2 className="h-6 w-6 animate-spin text-[#1b365d] mx-auto" />
-                    <p className="text-xs font-bold text-[#1b365d]">Calcul de la tarification backend en cours...</p>
-                  </div>
-                ) : isServiceAvailable ? (
-                  <>
-                    <div className="bg-slate-50 p-6 rounded-2xl border-2 border-dashed border-[#1b365d]/20 text-center space-y-1">
-                      <p className="text-xs font-bold text-slate-500">{breakdownLabel || 'Estimation de votre prime'}</p>
-                      <div className="text-3xl font-extrabold text-[#1b365d]">
-                        ~ {new Intl.NumberFormat('fr-FR').format(computedTotal)} FCFA / {activeTab === 'VOYAGE' ? 'voyage' : activeTab === 'RETRAITE' ? 'an' : 'an'}
+              {/* Right Column Total Result Box */}
+              <div className="md:col-span-5 bg-gradient-to-br from-blue-900 to-slate-900 text-white rounded-2xl p-6 shadow-xl flex flex-col justify-between min-h-[220px]">
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-amber-400 block">
+                    Cotisation Estimée
+                  </span>
+                  <div className="mt-3">
+                    {isComputingQuote ? (
+                      <div className="flex items-center gap-2 text-slate-300">
+                        <Loader2 className="h-5 w-5 animate-spin text-blue-400" />
+                        <span className="text-xs font-semibold">Calcul backend en cours...</span>
                       </div>
-                      <p className="text-[10px] text-slate-400">Tarif calculé en temps réel par notre API sous réserve d'expertise.</p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setLoadingBtn('simulator-register')
-                        if (simulationId) {
-                          router.push(`/register?simulation_id=${simulationId}`)
-                        } else {
-                          router.push('/register')
-                        }
-                      }}
-                      className="w-full py-4 bg-[#f59e0b] hover:bg-[#e08e00] text-white font-extrabold text-base rounded-xl shadow-xl shadow-amber-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      {loadingBtn === 'simulator-register' ? (
-                        <>
-                          <Loader2 className="h-5 w-5 animate-spin text-white" />
-                          <span>Redirection...</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>Continuer vers l'inscription</span>
-                          <ArrowRight className="h-5 w-5" />
-                        </>
-                      )}
-                    </button>
-                  </>
-                ) : (
-                  <div className="bg-amber-50 border-2 border-amber-200/80 p-6 rounded-2xl text-center space-y-3">
-                    <div className="w-12 h-12 bg-amber-500/15 text-amber-600 rounded-full flex items-center justify-center mx-auto">
-                      <AlertTriangle className="h-6 w-6" />
-                    </div>
-                    <div>
-                      <h4 className="font-extrabold text-sm text-amber-950">Service indisponible pour le moment</h4>
-                      <p className="text-xs text-amber-800 mt-1 max-w-sm mx-auto leading-relaxed">
-                        {unavailableMessage || "La tarification en ligne pour ce type d'assurance n'est pas encore activée dans le système."}
+                    ) : isServiceAvailable ? (
+                      <>
+                        <span className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+                          {computedTotal.toLocaleString('fr-FR')} <span className="text-sm font-bold text-blue-300">FCFA</span>
+                        </span>
+                        <p className="text-xs text-slate-300 font-medium mt-1">
+                          {breakdownLabel || 'Tarif annuel prime TTC calculée'}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-xs text-amber-300 font-semibold leading-relaxed">
+                        {unavailableMessage}
                       </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => scrollToSection('contact')}
-                      className="px-6 py-3 bg-[#1b365d] hover:bg-[#1b365d]/90 text-white rounded-xl font-bold text-xs shadow-md transition-all inline-flex items-center gap-2 cursor-pointer"
-                    >
-                      <Send className="h-3.5 w-3.5" />
-                      <span>Demander une étude sur mesure</span>
-                    </button>
+                    )}
                   </div>
-                )}
+                </div>
 
+                <button
+                  onClick={() => {
+                    setAuthMode('REGISTER')
+                    setIsAuthModalOpen(true)
+                  }}
+                  disabled={!isServiceAvailable}
+                  className="mt-6 w-full py-3 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-extrabold text-xs rounded-xl transition-all pro-shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>Souscrire Cette Option</span>
+                  <ArrowRight className="h-4 w-4" />
+                </button>
               </div>
 
             </div>
 
           </div>
-        </section>
 
-        {/* ------------------------------------------------------------- */}
-        {/* 7. TESTIMONIALS SECTION                                       */}
-        {/* ------------------------------------------------------------- */}
-        <section className="py-20 bg-[#f8fafc]">
-          <div className="max-w-7xl mx-auto px-4 md:px-8">
-            <div className="text-center space-y-4 mb-16">
-              <p className="text-[#3b82f6] font-bold text-xs uppercase tracking-widest">TÉMOIGNAGES</p>
-              <h2 className="text-3xl sm:text-4xl font-extrabold text-[#1b365d]">Ce que nos clients disent de nous</h2>
-            </div>
+        </div>
+      </section>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              
-              <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200/60 hover:shadow-lg transition-shadow">
-                <div className="flex gap-1 text-[#f59e0b] mb-4">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="h-4 w-4 fill-current" />
-                  ))}
-                </div>
-                <p className="text-sm text-slate-600 italic mb-8 leading-relaxed">
-                  "L'assurance voyage a été souscrite en 5 minutes chrono pour mon visa. Service client très réactif via WhatsApp."
-                </p>
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full overflow-hidden bg-slate-200">
-                    <img className="w-full h-full object-cover" src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150" alt="M. Jean-Paul T." />
-                  </div>
-                  <div>
-                    <h5 className="font-bold text-sm text-[#1b365d]">M. Jean-Paul T.</h5>
-                    <p className="text-xs text-slate-400">Entrepreneur - Douala</p>
-                  </div>
-                </div>
+      {/* 6. CARROUSEL CONTINU DE PARTENAIRES (Marquee Ticker) */}
+      <section className="py-12 bg-slate-100 border-y border-slate-200/80 overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6 text-center">
+          <span className="text-xs font-extrabold text-slate-500 uppercase tracking-widest">
+            PARMIGIANI & PARTENAIRES D'ASSURANCE CERTIFIÉS CIMA
+          </span>
+        </div>
+
+        <div className="relative w-full overflow-hidden flex">
+          <div className="animate-marquee flex items-center gap-12 sm:gap-16 opacity-80 hover:opacity-100 transition-opacity">
+            {[...partners, ...partners, ...partners].map((p, idx) => (
+              <div key={idx} className="flex items-center gap-3 shrink-0 bg-white px-5 py-2.5 rounded-xl border border-slate-200/80 shadow-2xs">
+                <Shield className="h-5 w-5 text-blue-700 shrink-0" />
+                <span className="text-xs font-extrabold text-slate-800 whitespace-nowrap">{p.name}</span>
               </div>
-
-              <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200/60 hover:shadow-lg transition-shadow">
-                <div className="flex gap-1 text-[#f59e0b] mb-4">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="h-4 w-4 fill-current" />
-                  ))}
-                </div>
-                <p className="text-sm text-slate-600 italic mb-8 leading-relaxed">
-                  "Suite à un accrochage, Bethel a géré tout le dossier avec l'expert. Je n'ai eu qu'à récupérer ma voiture réparée."
-                </p>
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full overflow-hidden bg-slate-200">
-                    <img className="w-full h-full object-cover" src="https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=150" alt="Mme Clarisse M." />
-                  </div>
-                  <div>
-                    <h5 className="font-bold text-sm text-[#1b365d]">Mme Clarisse M.</h5>
-                    <p className="text-xs text-slate-400">Cadre bancaire - Yaoundé</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200/60 hover:shadow-lg transition-shadow">
-                <div className="flex gap-1 text-[#f59e0b] mb-4">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="h-4 w-4 fill-current" />
-                  ))}
-                </div>
-                <p className="text-sm text-slate-600 italic mb-8 leading-relaxed">
-                  "Les tarifs sont vraiment compétitifs. J'ai pu regrouper auto et habitation avec une belle réduction."
-                </p>
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full overflow-hidden bg-slate-200">
-                    <img className="w-full h-full object-cover" src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150" alt="Dr. Ibrahim B." />
-                  </div>
-                  <div>
-                    <h5 className="font-bold text-sm text-[#1b365d]">Dr. Ibrahim B.</h5>
-                    <p className="text-xs text-slate-400">Médecin - Garoua</p>
-                  </div>
-                </div>
-              </div>
-
-            </div>
+            ))}
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* ------------------------------------------------------------- */}
-        {/* 8. MOBILE APP SECTION                                         */}
-        {/* ------------------------------------------------------------- */}
-        <section className="py-20 bg-[#0f172a] text-white overflow-hidden" id="app-download">
-          <div className="max-w-7xl mx-auto px-4 md:px-8">
-            <div className="bg-[#1b365d]/40 rounded-[2.5rem] p-8 md:p-16 border border-white/10 relative overflow-hidden">
-              
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center relative z-10">
-                <div className="space-y-6">
-                  <h2 className="text-3xl sm:text-5xl font-extrabold leading-tight">
-                    Votre assurance dans <br /> la poche
-                  </h2>
-                  <p className="text-slate-300 text-sm sm:text-base opacity-90 max-w-md leading-relaxed">
-                    Déclarez un sinistre, gérez vos polices et payez vos primes directement depuis votre smartphone.
-                  </p>
-                  
-                  <div className="flex flex-wrap gap-4 pt-2">
-                    <a 
-                      href={downloadLinks.find(l => l.platform === 'APP_STORE')?.url || '#'}
-                      className="flex items-center gap-3 bg-black border border-white/20 px-6 py-3.5 rounded-xl hover:bg-slate-900 transition-all"
-                    >
-                      <Download className="h-5 w-5 text-white" />
-                      <div className="text-left">
-                        <p className="text-[10px] uppercase font-bold text-slate-400">Disponible sur</p>
-                        <p className="text-sm font-bold">App Store</p>
-                      </div>
-                    </a>
-
-                    <a 
-                      href={downloadLinks.find(l => l.platform === 'PLAY_STORE')?.url || '#'}
-                      className="flex items-center gap-3 bg-black border border-white/20 px-6 py-3.5 rounded-xl hover:bg-slate-900 transition-all"
-                    >
-                      <Download className="h-5 w-5 text-white" />
-                      <div className="text-left">
-                        <p className="text-[10px] uppercase font-bold text-slate-400">Télécharger sur</p>
-                        <p className="text-sm font-bold">Google Play</p>
-                      </div>
-                    </a>
-
-                    <a 
-                      href={downloadLinks.find(l => l.platform === 'ANDROID_APK')?.url || '#'}
-                      className="flex items-center gap-3 bg-white/10 border border-white/20 px-6 py-3.5 rounded-xl hover:bg-white/20 transition-all"
-                    >
-                      <Smartphone className="h-5 w-5 text-[#f59e0b]" />
-                      <div className="text-left">
-                        <p className="text-[10px] uppercase font-bold text-slate-300">Direct Download</p>
-                        <p className="text-sm font-bold">Fichier APK</p>
-                      </div>
-                    </a>
-                  </div>
-                </div>
-
-                <div className="flex justify-center">
-                  <div className="relative w-[260px] h-[520px] bg-slate-800 rounded-[2.5rem] border-[6px] border-slate-700 shadow-2xl overflow-hidden">
-                    <img 
-                      className="w-full h-full object-cover" 
-                      src="https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=500" 
-                      alt="Application Mobile Bethel" 
-                    />
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </div>
-        </section>
-
-      </main>
-
-      {/* ------------------------------------------------------------- */}
-      {/* 9. FOOTER SECTION                                             */}
-      {/* ------------------------------------------------------------- */}
-      <footer className="bg-[#1a1b21] text-white py-16" id="contact">
-        <div className="max-w-7xl mx-auto px-4 md:px-8">
+      {/* 7. APP MOBILE & FOOTER */}
+      <footer id="contact" className="bg-slate-900 text-white pt-16 pb-12 relative overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-12 pb-12 border-b border-slate-800">
             
-            <div className="space-y-4">
-              <div className="flex items-center py-1">
-                <img 
-                  src="/logo-bethel.png" 
-                  alt="Bethel Comprehensive Insurance Ltd" 
-                  className="h-12 w-auto object-contain bg-white/90 p-1.5 rounded-lg"
+            {/* Column 1: Info */}
+            <div className="lg:col-span-5 space-y-4">
+              <div className="flex items-center gap-3">
+                <img
+                  src="/bethel-logo.png"
+                  alt="Bethel Insurance"
+                  className="h-10 w-auto object-contain bg-white p-1 rounded-lg"
                 />
+                <div>
+                  <h3 className="text-base font-extrabold text-white">Bethel Comprehensive Insurance</h3>
+                  <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider block">MobiAssur Portal</span>
+                </div>
               </div>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Leader du courtage en assurance au Cameroun. Une vision moderne et 100% digitale de la protection.
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              <h4 className="font-bold text-xs text-[#f59e0b] uppercase tracking-wider">Liens Rapides</h4>
-              <ul className="space-y-2.5 text-xs text-slate-400">
-                <li><a href="#" className="hover:text-white transition-colors">Mentions Légales</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Politique de Confidentialité</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Conditions Générales CIMA</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Recrutement</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">FAQ & Aide</a></li>
-              </ul>
-            </div>
-
-            <div className="md:col-span-2 space-y-4">
-              <h4 className="font-bold text-xs text-[#f59e0b] uppercase tracking-wider">Contactez nos conseillers</h4>
               
-              {leadFeedback ? (
-                <div className={`p-4 rounded-xl text-xs font-bold border ${leadFeedback.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
+              <p className="text-xs text-slate-400 leading-relaxed font-medium max-w-sm">
+                Compagnie d'assurance agréée par la CIMA. Émission de polices d'assurance auto, santé, voyage et entreprise avec suivi en temps réel.
+              </p>
+
+              <div className="flex items-center gap-4 text-xs font-semibold text-slate-300 pt-2">
+                <div className="flex items-center gap-1.5">
+                  <Phone className="h-4 w-4 text-blue-400" />
+                  <span>+237 699 00 00 00</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <MapPin className="h-4 w-4 text-amber-400" />
+                  <span>Douala / Yaoundé, Cameroun</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Column 2: Lead Form */}
+            <div className="lg:col-span-7 bg-slate-800/80 p-6 sm:p-8 rounded-3xl border border-slate-700/80">
+              <h4 className="text-sm font-extrabold text-white mb-2">Envoyez-nous un Message</h4>
+              <p className="text-xs text-slate-400 mb-6 font-medium">Un conseiller MobiAssur vous recontactera sous 2 heures.</p>
+
+              {leadFeedback && (
+                <div className={`p-3 rounded-xl text-xs font-bold mb-4 ${
+                  leadFeedback.type === 'success' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-red-500/20 text-red-300 border border-red-500/30'
+                }`}>
                   {leadFeedback.message}
                 </div>
-              ) : (
-                <form onSubmit={handleLeadSubmit} className="space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <input
-                      type="text"
-                      required
-                      value={leadName}
-                      onChange={(e) => setLeadName(e.target.value)}
-                      placeholder="Votre Nom complet"
-                      className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#f59e0b]"
-                    />
-                    <input
-                      type="tel"
-                      required
-                      value={leadPhone}
-                      onChange={(e) => setLeadPhone(e.target.value)}
-                      placeholder="Votre Téléphone (+237...)"
-                      className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#f59e0b]"
-                    />
-                  </div>
-
-                  <input
-                    type="email"
-                    value={leadEmail}
-                    onChange={(e) => setLeadEmail(e.target.value)}
-                    placeholder="Votre Email (optionnel)"
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#f59e0b]"
-                  />
-
-                  <textarea
-                    rows={3}
-                    value={leadMessage}
-                    onChange={(e) => setLeadMessage(e.target.value)}
-                    placeholder="Votre message ou besoin d'assurance..."
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#f59e0b]"
-                  />
-
-                  <button
-                    type="submit"
-                    disabled={isSubmittingLead}
-                    className="w-full py-3 bg-[#f59e0b] hover:bg-[#e08e00] text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2"
-                  >
-                    <Send className="h-4 w-4" />
-                    <span>{isSubmittingLead ? 'Envoi en cours...' : 'Envoyer le message'}</span>
-                  </button>
-                </form>
               )}
+
+              <form onSubmit={handleLeadSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <input
+                    type="text"
+                    placeholder="Nom complet"
+                    value={leadName}
+                    onChange={(e) => setLeadName(e.target.value)}
+                    required
+                    className="h-11 px-4 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
+                  />
+                  <input
+                    type="text"
+                    placeholder="N° Téléphone (+237)"
+                    value={leadPhone}
+                    onChange={(e) => setLeadPhone(e.target.value)}
+                    required
+                    className="h-11 px-4 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+                <textarea
+                  placeholder="Comment pouvons-nous vous aider ?"
+                  rows={3}
+                  value={leadMessage}
+                  onChange={(e) => setLeadMessage(e.target.value)}
+                  required
+                  className="w-full p-4 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white placeholder:text-slate-500 focus:border-blue-500 focus:outline-none resize-none"
+                />
+                <button
+                  type="submit"
+                  disabled={isSubmittingLead}
+                  className="w-full py-3 bg-blue-700 hover:bg-blue-800 disabled:opacity-50 text-white font-extrabold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  {isSubmittingLead ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  <span>Envoyer la Demande</span>
+                </button>
+              </form>
             </div>
 
           </div>
 
-          <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-slate-500">
-            <p>© 2026 Bethel Comprehensive Insurance Ltd. Agréé CIMA.</p>
+          <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">
+            <p>© 2026 Bethel Comprehensive Insurance Ltd. Tous droits réservés.</p>
             <div className="flex gap-6">
-              <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 text-[#f59e0b]" /> +237 699 00 00 00</span>
-              <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-[#f59e0b]" /> Douala, Cameroun</span>
+              <a href="#" className="hover:text-slate-300">Mentions Légales</a>
+              <a href="#" className="hover:text-slate-300">Politique CIMA</a>
+              <a href="#" className="hover:text-slate-300">Sécurité des Données</a>
             </div>
           </div>
 
         </div>
       </footer>
 
-      {/* ------------------------------------------------------------- */}
-      {/* 10. INTERACTIVE AUTH / REGISTRATION MODAL CONNECTED TO BACKEND */}
-      {/* ------------------------------------------------------------- */}
+      {/* Auth Modal */}
       <AnimatePresence>
         {isAuthModalOpen && (
-          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-            <motion.div 
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl relative space-y-6"
+              className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 border border-slate-200 shadow-2xl relative"
             >
-              <button 
+              <button
                 onClick={() => setIsAuthModalOpen(false)}
-                className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 p-1"
+                className="absolute top-5 right-5 p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700"
               >
-                <X className="h-6 w-6" />
+                <X className="h-5 w-5" />
               </button>
 
-              <div className="text-center space-y-2">
-                <div className="w-12 h-12 bg-blue-50 text-[#1b365d] rounded-2xl flex items-center justify-center mx-auto">
-                  <UserCheck className="h-6 w-6" />
-                </div>
-                <h3 className="text-xl font-bold text-[#1b365d]">
-                  {authMode === 'REGISTER' ? 'Création de Compte Client' : 'Connexion Espace Client'}
+              <div className="mb-6 text-center">
+                <h3 className="text-2xl font-extrabold text-slate-900">
+                  {authMode === 'REGISTER' ? 'Souscription Rapide' : 'Espace Assuré'}
                 </h3>
-                <p className="text-xs text-slate-500">
-                  {authMode === 'REGISTER' 
-                    ? 'Inscrivez-vous pour finaliser la souscription de votre devis.' 
-                    : 'Accédez à votre espace pour gérer vos polices et déclarer vos sinistres.'}
+                <p className="text-xs text-slate-500 mt-1 font-medium">
+                  {authMode === 'REGISTER' ? 'Créez votre compte client pour valider votre devis' : 'Connectez-vous à votre compte'}
                 </p>
               </div>
 
-              {authMode === 'LOGIN' && (
-                <div className="grid grid-cols-2 gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200/60 mb-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLoginType('email')
-                      setAuthFeedback(null)
-                    }}
-                    className={`py-2 text-xs font-bold rounded-lg transition-all ${
-                      loginType === 'email'
-                        ? 'bg-white text-[#1b365d] shadow-sm'
-                        : 'text-slate-500 hover:text-slate-900'
-                    }`}
-                  >
-                    Adresse Email
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLoginType('phone')
-                      setAuthFeedback(null)
-                    }}
-                    className={`py-2 text-xs font-bold rounded-lg transition-all ${
-                      loginType === 'phone'
-                        ? 'bg-white text-[#1b365d] shadow-sm'
-                        : 'text-slate-500 hover:text-slate-900'
-                    }`}
-                  >
-                    Téléphone (+237)
-                  </button>
-                </div>
-              )}
-
               {authFeedback && (
-                <div className={`p-3 rounded-xl text-xs font-bold text-center ${
-                  authFeedback.type === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
+                <div className={`p-3 rounded-xl text-xs font-bold mb-4 ${
+                  authFeedback.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
                 }`}>
                   {authFeedback.message}
                 </div>
@@ -1350,94 +1107,104 @@ export default function Home() {
 
               <form onSubmit={handleAuthSubmit} className="space-y-4">
                 {authMode === 'REGISTER' && (
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Nom complet</label>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">Nom Complet</label>
                     <input
                       type="text"
-                      required
+                      placeholder="Jean Dupont"
                       value={regFullName}
                       onChange={(e) => setRegFullName(e.target.value)}
-                      placeholder="Ex: Jean Dupont"
-                      className="w-full rounded-xl border border-slate-200 p-3 text-xs focus:ring-[#1b365d] focus:border-[#1b365d]"
-                    />
-                  </div>
-                )}
-
-                {/* Show Phone if REGISTER or if LOGIN with phone type */}
-                {(authMode === 'REGISTER' || (authMode === 'LOGIN' && loginType === 'phone')) && (
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Téléphone (+237)</label>
-                    <input
-                      type="tel"
                       required
-                      value={regPhone}
-                      onChange={(e) => setRegPhone(e.target.value)}
-                      placeholder="+237 699 11 22 33"
-                      className="w-full rounded-xl border border-slate-200 p-3 text-xs focus:ring-[#1b365d] focus:border-[#1b365d]"
+                      className="w-full h-11 px-4 rounded-xl border border-slate-200 text-xs font-semibold"
                     />
                   </div>
                 )}
 
-                {/* Show Email if REGISTER or if LOGIN with email type */}
-                {(authMode === 'REGISTER' || (authMode === 'LOGIN' && loginType === 'email')) && (
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Adresse Email</label>
-                    <input
-                      type="email"
-                      required
-                      value={regEmail}
-                      onChange={(e) => setRegEmail(e.target.value)}
-                      placeholder="jean.dupont@gmail.com"
-                      className="w-full rounded-xl border border-slate-200 p-3 text-xs focus:ring-[#1b365d] focus:border-[#1b365d]"
-                    />
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Mot de passe</label>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">Téléphone (+237)</label>
                   <input
-                    type="password"
+                    type="text"
+                    placeholder="+237 699 00 00 00"
+                    value={regPhone}
+                    onChange={(e) => setRegPhone(e.target.value)}
                     required
-                    value={regPassword}
-                    onChange={(e) => setRegPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full rounded-xl border border-slate-200 p-3 text-xs focus:ring-[#1b365d] focus:border-[#1b365d]"
+                    className="w-full h-11 px-4 rounded-xl border border-slate-200 text-xs font-semibold"
                   />
                 </div>
 
-                {simulationId && authMode === 'REGISTER' && (
-                  <div className="p-3 bg-blue-50 text-[#1b365d] rounded-xl text-xs font-bold flex items-center gap-2">
-                    <Check className="h-4 w-4 text-emerald-600" />
-                    <span>Devis simulé automatiquement lié à votre profil</span>
-                  </div>
-                )}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">Adresse Email</label>
+                  <input
+                    type="email"
+                    placeholder="jean.dupont@exemple.cm"
+                    value={regEmail}
+                    onChange={(e) => setRegEmail(e.target.value)}
+                    required
+                    className="w-full h-11 px-4 rounded-xl border border-slate-200 text-xs font-semibold"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">Mot de passe</label>
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    value={regPassword}
+                    onChange={(e) => setRegPassword(e.target.value)}
+                    required
+                    className="w-full h-11 px-4 rounded-xl border border-slate-200 text-xs font-semibold"
+                  />
+                </div>
 
                 <button
                   type="submit"
                   disabled={isSubmittingAuth}
-                  className="w-full py-4 bg-[#f59e0b] hover:bg-[#e08e00] text-white font-extrabold text-sm rounded-xl shadow-lg transition-all active:scale-95"
+                  className="w-full py-3.5 bg-blue-700 hover:bg-blue-800 text-white font-extrabold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 mt-4"
                 >
-                  {isSubmittingAuth 
-                    ? 'Traitement...' 
-                    : authMode === 'REGISTER' ? 'Créer mon compte et souscrire' : 'Se connecter'}
+                  {isSubmittingAuth ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+                  <span>{authMode === 'REGISTER' ? 'Créer mon Compte & Continuer' : 'Se Connecter'}</span>
                 </button>
               </form>
 
-              <div className="text-center pt-2">
+              <div className="mt-4 text-center">
                 <button
-                  type="button"
-                  onClick={() => {
-                    setAuthMode(authMode === 'REGISTER' ? 'LOGIN' : 'REGISTER')
-                    setAuthFeedback(null)
-                  }}
-                  className="text-xs font-bold text-[#1b365d] hover:underline"
+                  onClick={() => setAuthMode(authMode === 'REGISTER' ? 'LOGIN' : 'REGISTER')}
+                  className="text-xs font-bold text-blue-700 hover:underline cursor-pointer"
                 >
-                  {authMode === 'REGISTER' 
-                    ? 'Déjà un compte ? Connectez-vous' 
-                    : 'Pas encore de compte ? Inscrivez-vous'}
+                  {authMode === 'REGISTER' ? 'Déjà un compte ? Se connecter' : 'Nouveau ? Créer un compte'}
                 </button>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
+      {/* Video Modal */}
+      <AnimatePresence>
+        {isVideoModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-slate-900 rounded-3xl max-w-3xl w-full p-4 border border-slate-800 shadow-2xl relative overflow-hidden"
+            >
+              <button
+                onClick={() => setIsVideoModalOpen(false)}
+                className="absolute top-4 right-4 z-10 p-2 rounded-full bg-slate-800 text-slate-300 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+
+              <div className="aspect-video w-full rounded-2xl bg-black flex items-center justify-center relative overflow-hidden">
+                <iframe
+                  className="w-full h-full rounded-2xl"
+                  src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1"
+                  title="Présentation Bethel Insurance"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
             </motion.div>
           </div>
         )}

@@ -325,4 +325,23 @@ div.fixed.inset-0 [class*="overflow-auto"]::-webkit-scrollbar {
   .border-cultural-info-light {
       border-color: rgb(var(--cultural-info) / 0.3);
   }
+
+  .animate-marquee {
+    display: flex;
+    width: max-content;
+    animation: marquee 25s linear infinite;
+  }
+
+  .animate-marquee:hover {
+    animation-play-state: paused;
+  }
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
 }
