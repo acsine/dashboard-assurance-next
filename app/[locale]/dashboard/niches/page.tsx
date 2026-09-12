@@ -118,8 +118,12 @@ export default function NichesPage() {
   }
 
   const showAgreements = async (id: string) => {
-    const res = await nichesApi.agreements(id)
-    setAgreements(asList(res))
+    try {
+      const res = await nichesApi.agreements(id)
+      setAgreements(asList(res))
+    } catch (err: any) {
+      toast.error(err.message || 'Impossible de charger les conventions pour cette niche')
+    }
   }
 
   const niches = asList<Niche>(data)

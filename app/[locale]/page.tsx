@@ -38,7 +38,8 @@ import {
   Sparkles,
   ExternalLink,
   ChevronRight,
-  Globe
+  Globe,
+  Zap
 } from 'lucide-react'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 
@@ -49,6 +50,12 @@ export default function Home() {
 
   // Track button click loading state
   const [loadingBtn, setLoadingBtn] = useState<string | null>(null)
+  const [isNavigatingToLogin, setIsNavigatingToLogin] = useState(false)
+
+  const handleGoToLogin = () => {
+    setIsNavigatingToLogin(true)
+    router.push('/login')
+  }
 
   // Simulator State (Supports all 6 insurance product tabs)
   const [activeTab, setActiveTab] = useState<'AUTO' | 'SANTE' | 'VOYAGE' | 'HABITATION' | 'RETRAITE' | 'AUTRE'>('AUTO')
@@ -397,6 +404,7 @@ export default function Home() {
             <a href="#hero" className="hover:text-blue-700 transition-colors">Accueil</a>
             <a href="#services" className="hover:text-blue-700 transition-colors">Nos Services</a>
             <a href="#partenaire" className="hover:text-blue-700 transition-colors">Pourquoi Nous</a>
+            <a href="#performance" className="hover:text-blue-700 transition-colors">Performances</a>
             <a href="#simulateur" className="hover:text-blue-700 transition-colors">Simulateur</a>
             <a href="#contact" className="hover:text-blue-700 transition-colors">Contact</a>
           </nav>
@@ -406,11 +414,16 @@ export default function Home() {
             <LanguageSwitcher />
             
             <button
-              onClick={() => router.push('/login')}
-              className="px-4 py-2 text-xs font-bold text-slate-700 hover:text-blue-700 hover:bg-slate-100/80 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+              onClick={handleGoToLogin}
+              disabled={isNavigatingToLogin}
+              className="px-4 py-2 text-xs font-bold text-slate-700 hover:text-blue-700 hover:bg-slate-100/80 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed"
             >
-              <LogIn className="h-4 w-4" />
-              <span>Espace Client</span>
+              {isNavigatingToLogin ? (
+                <Loader2 className="h-4 w-4 animate-spin text-blue-700" />
+              ) : (
+                <LogIn className="h-4 w-4" />
+              )}
+              <span>{isNavigatingToLogin ? 'Chargement...' : 'Espace Client'}</span>
             </button>
 
             <button
@@ -659,63 +672,14 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* PROGRESSION BARS (Motion progress bars) */}
-              <div className="space-y-5 pt-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between text-xs font-extrabold text-slate-800">
-                    <span>Taux de Satisfaction Client</span>
-                    <span className="text-blue-700">99.4%</span>
-                  </div>
-                  <div className="h-2.5 w-full bg-slate-200 rounded-full overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      whileInView={{ width: '99.4%' }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 1, ease: 'easeOut' }}
-                      className="h-full bg-blue-700 rounded-full"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between text-xs font-extrabold text-slate-800">
-                    <span>Règlement des Sinistres (Délai 24-48h)</span>
-                    <span className="text-emerald-700">98.2%</span>
-                  </div>
-                  <div className="h-2.5 w-full bg-slate-200 rounded-full overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      whileInView={{ width: '98.2%' }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 1, delay: 0.1, ease: 'easeOut' }}
-                      className="h-full bg-emerald-600 rounded-full"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between text-xs font-extrabold text-slate-800">
-                    <span>Conformité & Protection CIMA</span>
-                    <span className="text-amber-700">100%</span>
-                  </div>
-                  <div className="h-2.5 w-full bg-slate-200 rounded-full overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      whileInView={{ width: '100%' }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 1, delay: 0.2, ease: 'easeOut' }}
-                      className="h-full bg-amber-600 rounded-full"
-                    />
-                  </div>
-                </div>
-              </div>
-
               <div className="pt-4">
                 <button
-                  onClick={() => router.push('/login')}
-                  className="px-6 py-3 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-xl transition-all pro-shadow-sm cursor-pointer active:scale-95"
+                  onClick={handleGoToLogin}
+                  disabled={isNavigatingToLogin}
+                  className="px-6 py-3 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-xl transition-all pro-shadow-sm cursor-pointer active:scale-95 flex items-center justify-center gap-2 disabled:opacity-75 disabled:cursor-not-allowed"
                 >
-                  En savoir plus sur MobiAssur
+                  {isNavigatingToLogin && <Loader2 className="h-4 w-4 animate-spin" />}
+                  <span>En savoir plus sur MobiAssur</span>
                 </button>
               </div>
             </div>
@@ -743,6 +707,285 @@ export default function Home() {
               </div>
             </div>
 
+          </div>
+
+        </div>
+      </section>
+
+      {/* 4.5. INDICATEURS HUMAINS & IMPACT QUALITÉ (Warm, Authentic & Human-Centered Design) */}
+      <section id="performance" className="py-20 bg-gradient-to-b from-slate-50 via-blue-50/20 to-slate-50 text-slate-900 relative overflow-hidden border-y border-slate-200/80">
+        
+        {/* Soft Background Accents */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[350px] bg-blue-300/10 blur-[140px] rounded-full pointer-events-none" />
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          
+          {/* Header */}
+          <div className="text-center max-w-3xl mx-auto mb-16 space-y-3">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-100/80 border border-blue-200 text-blue-800 text-xs font-extrabold tracking-wide">
+              <Users className="h-3.5 w-3.5 text-blue-700" />
+              <span>ENGAGEMENT HUMAIN & EXCELLENCE DE SERVICE</span>
+            </div>
+            
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900 leading-tight">
+              Une Relation de Confiance Basée sur <span className="text-blue-700">l'Écoute & la Réactivité</span>
+            </h2>
+            
+            <p className="text-slate-600 text-sm sm:text-base font-medium leading-relaxed max-w-2xl mx-auto">
+              Derrière chaque chiffre se trouvent des familles accompagnées, des véhicules secourus et des soins médicaux pris en charge sans délai.
+            </p>
+          </div>
+
+          {/* 3 Human & Organic Feature Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+            
+            {/* Card 1: Satisfaction & Témoignage */}
+            <motion.div
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+              whileHover={{ y: -4 }}
+              className="bg-white rounded-3xl p-8 border border-slate-200/90 pro-shadow-md hover:pro-shadow-xl transition-all duration-300 flex flex-col justify-between relative group"
+            >
+              <div>
+                {/* Header Badge */}
+                <div className="flex items-center justify-between mb-6">
+                  <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-blue-50 text-blue-800 border border-blue-200/60">
+                    Avis Client Vérifié
+                  </span>
+                  <div className="flex items-center gap-1 text-amber-500 text-xs font-extrabold">
+                    <span>★ 4.9/5</span>
+                  </div>
+                </div>
+
+                {/* Main Stat display */}
+                <div className="mb-6">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-4xl sm:text-5xl font-extrabold text-slate-900 tracking-tight">99.4%</span>
+                    <span className="text-xs font-bold text-blue-700 uppercase tracking-wider">de Satisfaction</span>
+                  </div>
+                  {/* Organic Animated Bar */}
+                  <div className="w-full h-2 bg-slate-100 rounded-full mt-3 overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      whileInView={{ width: '99.4%' }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 1.2, ease: 'easeOut' }}
+                      className="h-full bg-gradient-to-r from-blue-600 to-blue-800 rounded-full"
+                    />
+                  </div>
+                </div>
+
+                {/* Human Quote Box */}
+                <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/60 text-xs text-slate-600 font-medium italic leading-relaxed mb-6">
+                  « Lors de mon accident en ville, la prise en charge remorquage a été déclenchée en 20min via l'app. Une véritable aide humaine. »
+                </div>
+
+                <h3 className="text-base font-extrabold text-slate-900">Écoute & Accompagnement Assuré</h3>
+                <p className="text-slate-500 text-xs font-medium mt-1 leading-relaxed">
+                  Enquête menée auprès de +1 200 assurés après chaque intervention ou remboursement.
+                </p>
+              </div>
+
+              {/* Human Footer */}
+              <div className="mt-8 pt-4 border-t border-slate-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-blue-700 text-white font-extrabold text-xs flex items-center justify-center shadow-2xs">
+                    MB
+                  </div>
+                  <div>
+                    <span className="text-xs font-extrabold text-slate-800 block leading-tight">Marc B.</span>
+                    <span className="text-[10px] font-bold text-slate-400 block">Assuré Auto depuis 3 ans</span>
+                  </div>
+                </div>
+                <span className="text-[11px] font-extrabold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200/60">
+                  Client Vérifié
+                </span>
+              </div>
+            </motion.div>
+
+            {/* Card 2: Rapidité du Règlement */}
+            <motion.div
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              whileHover={{ y: -4 }}
+              className="bg-white rounded-3xl p-8 border border-slate-200/90 pro-shadow-md hover:pro-shadow-xl transition-all duration-300 flex flex-col justify-between relative group"
+            >
+              <div>
+                {/* Header Badge */}
+                <div className="flex items-center justify-between mb-6">
+                  <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200/60">
+                    Délais d'Indemnisation
+                  </span>
+                  <span className="text-emerald-700 text-xs font-extrabold flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5" /> &lt; 48 heures
+                  </span>
+                </div>
+
+                {/* Main Stat display */}
+                <div className="mb-6">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-4xl sm:text-5xl font-extrabold text-slate-900 tracking-tight">98.2%</span>
+                    <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider">Réglés sous 24-48h</span>
+                  </div>
+                  {/* Organic Animated Bar */}
+                  <div className="w-full h-2 bg-slate-100 rounded-full mt-3 overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      whileInView={{ width: '98.2%' }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 1.2, delay: 0.1, ease: 'easeOut' }}
+                      className="h-full bg-gradient-to-r from-emerald-500 to-teal-700 rounded-full"
+                    />
+                  </div>
+                </div>
+
+                {/* Human Step Process */}
+                <div className="space-y-2.5 my-4">
+                  <div className="flex items-center gap-3 text-xs text-slate-700 font-bold bg-slate-50 p-2.5 rounded-xl border border-slate-200/50">
+                    <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-extrabold flex items-center justify-center shrink-0">1</span>
+                    <span>Déclaration simplifiée depuis l'application mobile</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-slate-700 font-bold bg-slate-50 p-2.5 rounded-xl border border-slate-200/50">
+                    <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-extrabold flex items-center justify-center shrink-0">2</span>
+                    <span>Expertise & Validation en moins de 2 heures</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-slate-700 font-bold bg-slate-50 p-2.5 rounded-xl border border-slate-200/50">
+                    <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-extrabold flex items-center justify-center shrink-0">3</span>
+                    <span>Virement direct Mobile Money ou Banque sous 24-48h</span>
+                  </div>
+                </div>
+
+                <h3 className="text-base font-extrabold text-slate-900 mt-2">Traitements des Dossiers Sinistres</h3>
+              </div>
+
+              {/* Human Footer */}
+              <div className="mt-8 pt-4 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-600">Délai moyen d'intervention :</span>
+                <span className="text-xs font-extrabold text-emerald-700 bg-emerald-100/80 px-2.5 py-1 rounded-full">
+                  36 minutes
+                </span>
+              </div>
+            </motion.div>
+
+            {/* Card 3: Protection & Réglementation CIMA */}
+            <motion.div
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              whileHover={{ y: -4 }}
+              className="bg-white rounded-3xl p-8 border border-slate-200/90 pro-shadow-md hover:pro-shadow-xl transition-all duration-300 flex flex-col justify-between relative group"
+            >
+              <div>
+                {/* Header Badge */}
+                <div className="flex items-center justify-between mb-6">
+                  <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-amber-50 text-amber-800 border border-amber-200/60">
+                    Agrément Réglémentaire
+                  </span>
+                  <span className="text-amber-700 text-xs font-extrabold flex items-center gap-1">
+                    <Shield className="h-3.5 w-3.5" /> Code CIMA
+                  </span>
+                </div>
+
+                {/* Main Stat display */}
+                <div className="mb-6">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-4xl sm:text-5xl font-extrabold text-slate-900 tracking-tight">100%</span>
+                    <span className="text-xs font-bold text-amber-700 uppercase tracking-wider">Conforme CIMA</span>
+                  </div>
+                  {/* Organic Animated Bar */}
+                  <div className="w-full h-2 bg-slate-100 rounded-full mt-3 overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      whileInView={{ width: '100%' }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 1.2, delay: 0.2, ease: 'easeOut' }}
+                      className="h-full bg-gradient-to-r from-amber-500 to-amber-700 rounded-full"
+                    />
+                  </div>
+                </div>
+
+                {/* Guarantee items */}
+                <div className="space-y-3 my-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 mt-0.5">
+                      <Award className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-extrabold text-slate-900">Compagnie Agréée & Certifiée</h4>
+                      <p className="text-[11px] text-slate-500 font-medium">Conformité intégrale au Code de la CIMA au Cameroun.</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 mt-0.5">
+                      <Lock className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-extrabold text-slate-900">Protection des Fonds Assurés</h4>
+                      <p className="text-[11px] text-slate-500 font-medium">Garanties financières solides et réassurance internationale.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Human Footer */}
+              <div className="mt-8 pt-4 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-600">Assistance Conseiller :</span>
+                <span className="text-xs font-extrabold text-slate-900 flex items-center gap-1">
+                  <Headphones className="h-3.5 w-3.5 text-blue-700" />
+                  24h/7d
+                </span>
+              </div>
+            </motion.div>
+
+          </div>
+
+          {/* Bottom Human Commitments Bar */}
+          <div className="bg-white rounded-2xl p-6 border border-slate-200/80 pro-shadow-sm grid grid-cols-2 md:grid-cols-4 gap-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
+                <Phone className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="text-xs font-extrabold text-slate-900">Conseillers Basés au Cameroun</h4>
+                <p className="text-[11px] text-slate-500 font-medium">Équipes locales à Douala & Yaoundé</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
+                <CheckCircle2 className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="text-xs font-extrabold text-slate-900">Transparence des Prix</h4>
+                <p className="text-[11px] text-slate-500 font-medium">Calcul certifié 0 frais cachés</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-700 flex items-center justify-center shrink-0">
+                <HeartPulse className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="text-xs font-extrabold text-slate-900">Tiers-Payant Santé Direct</h4>
+                <p className="text-[11px] text-slate-500 font-medium">Cliniques & pharmacies partenaires</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0">
+                <Zap className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="text-xs font-extrabold text-slate-900">Accords sous 24 Hours</h4>
+                <p className="text-[11px] text-slate-500 font-medium">Traitements rapides des demandes</p>
+              </div>
+            </div>
           </div>
 
         </div>
@@ -796,18 +1039,43 @@ export default function Home() {
               {/* Left Column Controls */}
               <div className="md:col-span-7 space-y-4">
                 {activeTab === 'AUTO' && (
-                  <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-slate-700">Puissance Fiscale</label>
                       <select
                         value={fiscalPower}
                         onChange={(e) => setFiscalPower(e.target.value)}
-                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-800"
+                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-600 focus:outline-none"
                       >
-                        <option value="1-6">1 à 6 CV</option>
-                        <option value="7-10">7 à 10 CV</option>
-                        <option value="11+">11 CV et plus</option>
+                        <option value="1-6">1 à 6 CV (Petite citadine)</option>
+                        <option value="7-10">7 à 10 CV (Berline / SUV moyen)</option>
+                        <option value="11+">11 CV et plus (Berline puissante / 4x4)</option>
                       </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700">Usage du Véhicule</label>
+                      <select
+                        value={usage}
+                        onChange={(e) => setUsage(e.target.value)}
+                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                      >
+                        <option value="PROMENADE">Promenade / Trajet Travail</option>
+                        <option value="PROFESSIONNEL">Usage Professionnel / Commercial</option>
+                        <option value="TAXI">Transport de Personnes / Taxi / VTC</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700">Valeur Vénale / Estimée (FCFA)</label>
+                      <input
+                        type="number"
+                        step="500000"
+                        value={vehicleValue}
+                        onChange={(e) => setVehicleValue(e.target.value)}
+                        placeholder="5000000"
+                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                      />
                     </div>
 
                     <div className="space-y-1.5">
@@ -816,8 +1084,8 @@ export default function Home() {
                         <button
                           type="button"
                           onClick={() => setCoverageType('TIERS')}
-                          className={`py-2.5 text-xs font-bold rounded-xl border transition-all ${
-                            coverageType === 'TIERS' ? 'bg-blue-50 text-blue-800 border-blue-300' : 'bg-white text-slate-700 border-slate-200'
+                          className={`py-2.5 px-3 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                            coverageType === 'TIERS' ? 'bg-blue-50 text-blue-800 border-blue-400 shadow-2xs' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                           }`}
                         >
                           Tiers Simple
@@ -825,79 +1093,173 @@ export default function Home() {
                         <button
                           type="button"
                           onClick={() => setCoverageType('TOUS_RISQUES')}
-                          className={`py-2.5 text-xs font-bold rounded-xl border transition-all ${
-                            coverageType === 'TOUS_RISQUES' ? 'bg-blue-50 text-blue-800 border-blue-300' : 'bg-white text-slate-700 border-slate-200'
+                          className={`py-2.5 px-3 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                            coverageType === 'TOUS_RISQUES' ? 'bg-blue-50 text-blue-800 border-blue-400 shadow-2xs' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                           }`}
                         >
                           Tous Risques
                         </button>
                       </div>
                     </div>
-                  </>
+                  </div>
                 )}
 
                 {activeTab === 'SANTE' && (
-                  <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-slate-700">Niveau de Garantie</label>
                       <select
                         value={santeLevel}
                         onChange={(e) => setSanteLevel(e.target.value as any)}
-                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-800"
+                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-600 focus:outline-none"
                       >
-                        <option value="BRONZE">Bronze (70% Couverture)</option>
-                        <option value="SILVER">Silver (80% Couverture)</option>
-                        <option value="GOLD">Gold (100% Couverture)</option>
+                        <option value="BRONZE">Bronze (70% Couverture Médicale)</option>
+                        <option value="SILVER">Silver (80% Couverture Médicale)</option>
+                        <option value="GOLD">Gold (100% Tiers-Payant & Évacuation)</option>
                       </select>
                     </div>
-                  </>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700">Bénéficiaires Couverts</label>
+                      <select
+                        value={santeBeneficiaries}
+                        onChange={(e) => setSanteBeneficiaries(e.target.value as any)}
+                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                      >
+                        <option value="INDIVIDUEL">Individuel (1 Personne)</option>
+                        <option value="COUPLE">Couple (2 Personnes)</option>
+                        <option value="FAMILLE">Famille (Conjoint & Enfants)</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <label className="text-xs font-bold text-slate-700">Tranche d'Âge de l'Assuré Principal</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { id: '<30', label: 'Moins de 30 ans' },
+                          { id: '30-50', label: '30 à 50 ans' },
+                          { id: '>50', label: 'Plus de 50 ans' },
+                        ].map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => setSanteAgeGroup(item.id as any)}
+                            className={`py-2.5 px-3 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                              santeAgeGroup === item.id ? 'bg-blue-50 text-blue-800 border-blue-400 shadow-2xs' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                            }`}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 )}
 
                 {activeTab === 'VOYAGE' && (
-                  <>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-700">Destination</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <label className="text-xs font-bold text-slate-700">Destination / Zone Géographique</label>
                       <select
                         value={voyageZone}
                         onChange={(e) => setVoyageZone(e.target.value as any)}
-                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-800"
+                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-600 focus:outline-none"
                       >
-                        <option value="SCHENGEN">Espace Schengen</option>
-                        <option value="AFRIQUE">Afrique / CEMAC</option>
-                        <option value="MONDE">Monde Entier</option>
+                        <option value="SCHENGEN">Espace Schengen (Conforme Visas 30 000 €)</option>
+                        <option value="AFRIQUE">Afrique & Zone CEMAC</option>
+                        <option value="MONDE">Monde Entier (USA, Asie, Canada, etc.)</option>
                       </select>
                     </div>
-                  </>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700">Durée du Séjour (en jours)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="365"
+                        value={voyageDays}
+                        onChange={(e) => setVoyageDays(e.target.value)}
+                        placeholder="7"
+                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700">Nombre de Voyageurs</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="10"
+                        value={voyageTravelers}
+                        onChange={(e) => setVoyageTravelers(e.target.value)}
+                        placeholder="1"
+                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                      />
+                    </div>
+                  </div>
                 )}
 
                 {activeTab === 'HABITATION' && (
-                  <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-slate-700">Type de Logement</label>
                       <select
                         value={habPropertyType}
                         onChange={(e) => setHabPropertyType(e.target.value as any)}
-                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-800"
+                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-600 focus:outline-none"
                       >
-                        <option value="APPARTEMENT">Appartement</option>
-                        <option value="VILLA">Villa Individuelle</option>
+                        <option value="APPARTEMENT">Appartement en Immeuble</option>
+                        <option value="VILLA">Villa / Maison Individuelle</option>
                       </select>
                     </div>
-                  </>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700">Nombre de Pièces</label>
+                      <select
+                        value={habRooms}
+                        onChange={(e) => setHabRooms(e.target.value)}
+                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                      >
+                        <option value="1">Studio / 1 Pièce</option>
+                        <option value="2">2 Pièces</option>
+                        <option value="3">3 Pièces</option>
+                        <option value="4">4 Pièces</option>
+                        <option value="5">5 Pièces et plus</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <label className="text-xs font-bold text-slate-700">Valeur Estimée du Mobilier & Équipements (FCFA)</label>
+                      <input
+                        type="number"
+                        step="500000"
+                        value={habFurniture}
+                        onChange={(e) => setHabFurniture(e.target.value)}
+                        placeholder="3000000"
+                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                      />
+                    </div>
+                  </div>
                 )}
 
                 {activeTab === 'RETRAITE' && (
-                  <>
+                  <div className="space-y-4">
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-700">Cotisation Mensuelle (FCFA)</label>
+                      <label className="text-xs font-bold text-slate-700">Cotisation Mensuelle Épargnée (FCFA)</label>
                       <input
                         type="number"
+                        step="5000"
+                        min="5000"
                         value={retraiteMonthly}
                         onChange={(e) => setRetraiteMonthly(e.target.value)}
-                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-800"
+                        placeholder="25000"
+                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-600 focus:outline-none"
                       />
+                      <p className="text-[11px] font-medium text-slate-500">
+                        Rendement garanti avec capitalisation annuelle et disponibilité des fonds.
+                      </p>
                     </div>
-                  </>
+                  </div>
                 )}
               </div>
 
@@ -1207,6 +1569,26 @@ export default function Home() {
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* Navigation to Login Loading Overlay (No background card, full page blurred) */}
+      <AnimatePresence>
+        {isNavigatingToLogin && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-slate-900/25 backdrop-blur-md cursor-wait select-none"
+          >
+            <div className="flex flex-col items-center justify-center gap-3 text-center">
+              <Loader2 className="h-14 w-14 text-blue-700 animate-spin drop-shadow-md" />
+              <p className="text-sm font-extrabold text-slate-900 drop-shadow-sm">
+                Redirection vers l'Espace Client...
+              </p>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 

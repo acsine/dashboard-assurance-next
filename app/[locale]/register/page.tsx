@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
-import { Mail, Lock, Phone, User, ArrowRight, Loader2, CheckCircle2, Shield } from 'lucide-react'
+import { Mail, Lock, Phone, User, ArrowRight, Loader2, CheckCircle2, Shield, Eye, EyeOff } from 'lucide-react'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://gestion-d-assurance-v1-ten.vercel.app'
 
@@ -21,6 +21,7 @@ export default function RegisterPage() {
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [isNavigatingLogin, setIsNavigatingLogin] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -169,13 +170,25 @@ export default function RegisterPage() {
                   <Lock className="h-4.5 w-4.5" />
                 </div>
                 <Input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-11 bg-white border-gray-200 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-blue-500/20"
+                  className="pl-11 pr-11 bg-white border-gray-200 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-blue-500/20"
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-gray-600 cursor-pointer transition-colors"
+                  aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
               </div>
             </div>
 

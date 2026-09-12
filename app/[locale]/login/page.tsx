@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
-import { Mail, Lock, Phone, ArrowRight, Loader2 } from 'lucide-react'
+import { Mail, Lock, Phone, ArrowRight, Loader2, Eye, EyeOff } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -19,6 +19,7 @@ export default function LoginPage() {
 
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
 
   useEffect(() => {
     const msg = consumeAuthToast()
@@ -76,9 +77,9 @@ export default function LoginPage() {
           {/* Logo & Header */}
           <div className="flex flex-col items-center text-center gap-1">
             <img
-              src="/logo-bethel.png"
+              src="/bethel-logo.png"
               alt="Bethel Comprehensive Insurance Ltd"
-              className="h-52 sm:h-28 w-auto object-contain mb-2"
+              className="h-32 sm:h-44 lg:h-52 w-auto max-w-[340px] sm:max-w-[420px] object-contain mb-3 drop-shadow-xs"
             />
             <h2 className="text-5xl sm:text-4xl font-extrabold tracking-tight text-[#1b365d] leading-tight">
               Connexion
@@ -159,13 +160,25 @@ export default function LoginPage() {
                   <Lock className="h-4 w-4" />
                 </div>
                 <Input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-11 bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-[#1b365d] focus:ring-[#1b365d]/20 rounded-xl text-xs py-3"
+                  className="pl-11 pr-11 bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-[#1b365d] focus:ring-[#1b365d]/20 rounded-xl text-xs py-3"
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer transition-colors"
+                  aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
               </div>
             </div>
 
