@@ -16,6 +16,8 @@ import {
   type QuoteComputeResult,
 } from '@/lib/api/mobi-assur'
 import Header from '@/components/dashboard/Header'
+import QuoteDetailsAndGuarantees from '@/components/insurance/QuoteDetailsAndGuarantees'
+import ExcelImportModal from '@/components/excel/ExcelImportModal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -31,6 +33,7 @@ import {
   Loader2,
   Eye,
   BellRing,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { RoleGuard } from '@/components/auth/RoleGuard'
 
@@ -173,37 +176,29 @@ function emptyConvertForm(p?: Prospect): ConvertFormState {
   }
 }
 
-function QuoteBreakdownView({ breakdown, total }: { breakdown?: QuoteBreakdown | Record<string, unknown> | null; total?: number | null }) {
+function QuoteBreakdownView({
+  breakdown,
+  total,
+  comparison,
+  selectedInsurerId,
+  onSelectInsurer,
+}: {
+  breakdown?: QuoteBreakdown | Record<string, unknown> | null
+  total?: number | null
+  comparison?: any[] | null
+  selectedInsurerId?: string
+  onSelectInsurer?: (insurerId: string) => void
+}) {
   if (!breakdown && total == null) return null
-  const b = (breakdown || {}) as Record<string, unknown>
-  const num = (key: string) => {
-    const v = b[key]
-    return typeof v === 'number' ? v : null
-  }
-  const rc = num('rc_net') ?? num('rc') ?? num('rc_duree')
-  const dr = num('dr')
-  const ipt = num('ipt')
-  const acc = num('acc')
-  const fc = num('fc')
-  const tva = num('tva')
-  const cr = num('cr')
-  const vignette = num('vignette')
-  const bdTotal = num('total')
   return (
-    <div className="rounded-lg border border-emerald-100 bg-emerald-50/50 p-3 text-[11px] space-y-1">
-      <p className="font-bold text-emerald-800 uppercase tracking-wider">Devis estimé</p>
-      {rc != null && <p>RC nette : {formatFcfa(rc)}</p>}
-      {dr != null && dr > 0 && <p>DR : {formatFcfa(dr)}</p>}
-      {ipt != null && ipt > 0 && <p>IPT : {formatFcfa(ipt)}</p>}
-      {acc != null && <p>Accessoires : {formatFcfa(acc)}</p>}
-      {fc != null && fc > 0 && <p>FC / ASAC : {formatFcfa(fc)}</p>}
-      {tva != null && tva > 0 && <p>TVA : {formatFcfa(tva)}</p>}
-      {cr != null && cr > 0 && <p>Carte rose : {formatFcfa(cr)}</p>}
-      {vignette != null && vignette > 0 && <p>Vignette : {formatFcfa(vignette)}</p>}
-      <p className="font-bold text-emerald-900 pt-1 border-t border-emerald-100">
-        Total : {formatFcfa(total ?? bdTotal)}
-      </p>
-    </div>
+    <QuoteDetailsAndGuarantees
+      breakdown={breakdown}
+      total={total}
+      comparison={comparison}
+      selectedInsurerId={selectedInsurerId}
+      onSelectInsurer={onSelectInsurer}
+      showCompanyComparison={true}
+    />
   )
 }
 
@@ -556,6 +551,7 @@ export default function ProspectsPage() {
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [rejectMotif, setRejectMotif] = useState('')
   const [search, setSearch] = useState('')
+  const [isExcelModalOpen, setIsExcelModalOpen] = useState(false)
   const [convertingProspect, setConvertingProspect] = useState<Prospect | null>(null)
   const [convertForm, setConvertForm] = useState<ConvertFormState>(emptyConvertForm())
   const [convertFieldErrors, setConvertFieldErrors] = useState<Record<string, string>>({})
@@ -995,14 +991,24 @@ export default function ProspectsPage() {
             </button>
           </div>
 
-          {(tab === 'all' || tab === 'recontact') && (
-            <Input
-              placeholder="Rechercher nom, téléphone, CNI, statut…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-9 text-xs border-slate-200 w-full sm:w-72 bg-white"
-            />
-          )}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            {(tab === 'all' || tab === 'recontact') && (
+              <Input
+                placeholder="Rechercher nom, téléphone, CNI, statut…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-9 text-xs border-slate-200 w-full sm:w-72 bg-white"
+              />
+            )}
+            <Button
+              type="button"
+              onClick={() => setIsExcelModalOpen(true)}
+              className="h-9 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer shrink-0"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              Importer Excel
+            </Button>
+          </div>
         </div>
 
         {tab === 'all' || tab === 'recontact' ? (
@@ -1314,7 +1320,11 @@ export default function ProspectsPage() {
                       '—'}
                   </p>
                 )}
-                <QuoteBreakdownView breakdown={liveQuote?.breakdown} total={liveQuote?.total} />
+                <QuoteBreakdownView
+                  breakdown={liveQuote?.breakdown}
+                  total={liveQuote?.total}
+                  comparison={liveQuote?.comparison}
+                />
                 <div className="flex gap-2 justify-end pt-2">
                   <Button
                     type="button"
@@ -1599,6 +1609,13 @@ export default function ProspectsPage() {
           </Card>
         </div>
       )}
+      {/* Excel Import Modal */}
+      <ExcelImportModal
+        entityType="prospects"
+        isOpen={isExcelModalOpen}
+        onClose={() => setIsExcelModalOpen(false)}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['prospects'] })}
+      />
     </div>
   )
 }

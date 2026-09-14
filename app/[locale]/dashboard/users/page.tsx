@@ -92,9 +92,13 @@ function UsersContent() {
   // Delete user mutation
   const deleteUserMutation = useMutation({
     mutationFn: (id: string) => usersApi.delete(id),
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
-      toast.success('Collaborateur supprimé')
+      if (res?.code === 'USER_DEACTIVATED' || res?.data?.code === 'USER_DEACTIVATED') {
+        toast.info(res?.message || res?.data?.message || 'Collaborateur désactivé (données associées existantes)')
+      } else {
+        toast.success('Collaborateur supprimé avec succès')
+      }
       setDeletingUser(null)
     },
     onError: (err: any) => {
@@ -189,34 +193,71 @@ function UsersContent() {
         </div>
 
         {canManage && showAddForm && (
-          <Card className="border-gray-100 shadow-sm bg-white max-w-2xl">
-            <CardContent className="pt-6">
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider border-b border-gray-50 pb-2">
-                  Créer un compte collaborateur
-                </h4>
+          <Card className="border-slate-200/90 shadow-lg bg-white rounded-3xl overflow-hidden max-w-3xl mx-auto mb-6">
+            <CardContent className="p-6 sm:p-8">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  if (!fullName || !phone) {
+                    toast.error('Le nom et le téléphone sont obligatoires')
+                    return
+                  }
+                  if (role === ROLES.AGENT && !agentCode) {
+                    toast.error('Le code agent est obligatoire pour un agent terrain')
+                    return
+                  }
+                  const parsedPhone = parsePhoneNumberFromString(phone, countryCode as CountryCode)
+                  if (!parsedPhone || !parsedPhone.isValid()) {
+                    toast.error("Le numéro de téléphone n'est pas valide pour ce pays.")
+                    return
+                  }
+                  createUserMutation.mutate({
+                    full_name: fullName,
+                    email: email || undefined,
+                    phone: parsedPhone.format('E.164'),
+                    agent_code: role === ROLES.AGENT ? agentCode : undefined,
+                    password: password || undefined,
+                    role,
+                  })
+                }}
+                className="space-y-6"
+              >
+                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                  <h4 className="text-base font-black text-slate-900 tracking-tight flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
+                    Créer un nouveau compte utilisateur
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddForm(false)}
+                    className="text-slate-400 hover:text-slate-600 p-1"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                    <label className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wider block">
                       Nom complet *
                     </label>
                     <Input
                       placeholder="Ex: Paul Mbarga..."
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      className="h-10 text-xs border-gray-200"
+                      className="h-11 text-xs border-slate-200 font-semibold"
                       required
                     />
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                    <label className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wider block">
                       Rôle d'accès *
                     </label>
                     <select
                       value={role}
                       onChange={(e) => setRole(e.target.value as Role)}
-                      className="flex h-10 w-full rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs transition-colors focus-visible:outline-none"
+                      className="flex h-11 w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-900"
                     >
                       <option value="AGENT_TERRAIN">Agent Terrain (RBAC)</option>
                       <option value="RESPONSABLE_AGENCE">Responsable Agence (Lecture / préparation)</option>
@@ -225,7 +266,7 @@ function UsersContent() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                    <label className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wider block">
                       Adresse E-mail
                     </label>
                     <Input
@@ -233,19 +274,19 @@ function UsersContent() {
                       placeholder="Ex: paul@agence.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="h-10 text-xs border-gray-200"
+                      className="h-11 text-xs border-slate-200"
                     />
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                    <label className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wider block">
                       Téléphone *
                     </label>
                     <div className="flex">
                       <select
                         value={countryCode}
                         onChange={(e) => setCountryCode(e.target.value)}
-                        className="w-28 h-10 rounded-l-xl border border-gray-200 border-r-0 bg-white px-2 py-2 text-xs transition-colors focus-visible:outline-none focus:border-gray-200 text-gray-900"
+                        className="w-28 h-11 rounded-l-xl border border-slate-200 border-r-0 bg-white px-2 py-2 text-xs font-bold text-slate-900"
                       >
                         <option value="CM">🇨🇲 CM (+237)</option>
                         <option value="CI">🇨🇮 CI (+225)</option>
@@ -259,13 +300,13 @@ function UsersContent() {
                         placeholder="Ex: 677000000"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
-                        className="flex-1 h-10 text-xs border-gray-200 rounded-l-none rounded-r-xl"
+                        className="flex-1 h-11 text-xs border-slate-200 rounded-l-none rounded-r-xl font-semibold"
                       />
                     </div>
                   </div>
 
                   <div className="space-y-1 sm:col-span-2">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                    <label className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wider block">
                       Code agent {role === ROLES.AGENT ? '*' : ''}
                     </label>
                     <Input
@@ -274,12 +315,12 @@ function UsersContent() {
                       onChange={(e) => setAgentCode(e.target.value)}
                       disabled={role !== ROLES.AGENT}
                       required={role === ROLES.AGENT}
-                      className="h-10 text-xs border-gray-200"
+                      className="h-11 text-xs border-slate-200 font-semibold"
                     />
                   </div>
 
                   <div className="space-y-1 sm:col-span-2">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                    <label className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wider block">
                       Mot de passe (Temporaire)
                     </label>
                     <Input
@@ -287,13 +328,13 @@ function UsersContent() {
                       placeholder="Mot de passe ou généré automatiquement si vide"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="h-10 text-xs border-gray-205"
+                      className="h-11 text-xs border-slate-200 font-semibold"
                     />
                   </div>
                 </div>
 
-                <div className="flex gap-2 justify-end pt-3">
-                  <Button type="button" variant="ghost" onClick={() => setShowAddForm(false)}>
+                <div className="flex gap-2 justify-end pt-4 border-t border-slate-100">
+                  <Button type="button" variant="outline" onClick={() => setShowAddForm(false)} className="rounded-xl">
                     Annuler
                   </Button>
                   <Button
@@ -301,7 +342,7 @@ function UsersContent() {
                     variant="primary"
                     disabled={createUserMutation.isPending}
                     isLoading={createUserMutation.isPending}
-                    className="text-white"
+                    className="bg-gradient-to-r from-blue-700 to-indigo-700 text-white font-black rounded-xl px-6 shadow-md"
                   >
                     Créer le Compte
                   </Button>

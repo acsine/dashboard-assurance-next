@@ -7,8 +7,9 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
-import { Loader2, AlertTriangle, ShieldAlert, FileText, CheckCircle2, Clock, Filter, Send } from 'lucide-react'
+import { Loader2, AlertTriangle, ShieldAlert, FileText, CheckCircle2, Clock, Filter, Send, FileSpreadsheet } from 'lucide-react'
 import { asList, sinistresApi, type SinistreItem } from '@/lib/api/mobi-assur'
+import ExcelImportModal from '@/components/excel/ExcelImportModal'
 
 const STATUSES = ['DECLARE', 'EN_COURS', 'COMPLEMENT', 'VALIDE', 'REJETE', 'CLOS'] as const
 
@@ -24,6 +25,7 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; b
 export default function SinistresPage() {
   const qc = useQueryClient()
   const [statusFilter, setStatusFilter] = useState('')
+  const [isExcelModalOpen, setIsExcelModalOpen] = useState(false)
   const [selected, setSelected] = useState<SinistreItem | null>(null)
   const [note, setNote] = useState('')
   const [newStatus, setNewStatus] = useState('EN_COURS')
@@ -73,6 +75,14 @@ export default function SinistresPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            onClick={() => setIsExcelModalOpen(true)}
+            className="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer border-0"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            Importer Excel
+          </Button>
           <Filter className="h-4 w-4 text-slate-400" />
           <select
             className="h-9 w-44 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-2xs focus:border-blue-500 focus:ring-2 focus:ring-blue-600/20 outline-hidden transition-all"
@@ -125,11 +135,10 @@ export default function SinistresPage() {
                     <li key={s.id}>
                       <button
                         type="button"
-                        className={`w-full text-left p-4 transition-all flex flex-col gap-2 ${
-                          isSelected
-                            ? 'bg-blue-50/70 border-l-4 border-l-blue-600 shadow-2xs'
-                            : 'hover:bg-slate-50/80 border-l-4 border-l-transparent'
-                        }`}
+                        className={`w-full text-left p-4 rounded-xl transition-all flex flex-col gap-2 ${isSelected
+                            ? 'bg-blue-50/80 shadow-2xs font-bold'
+                            : 'hover:bg-slate-50/80'
+                          }`}
                         onClick={() => {
                           setSelected(s)
                           setNewStatus(s.status)
@@ -183,11 +192,9 @@ export default function SinistresPage() {
                     </CardDescription>
                   </div>
                   <span
-                    className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border ${
-                      (STATUS_CONFIG[detail.status] || STATUS_CONFIG.DECLARE).bg
-                    } ${(STATUS_CONFIG[detail.status] || STATUS_CONFIG.DECLARE).text} ${
-                      (STATUS_CONFIG[detail.status] || STATUS_CONFIG.DECLARE).border
-                    }`}
+                    className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border ${(STATUS_CONFIG[detail.status] || STATUS_CONFIG.DECLARE).bg
+                      } ${(STATUS_CONFIG[detail.status] || STATUS_CONFIG.DECLARE).text} ${(STATUS_CONFIG[detail.status] || STATUS_CONFIG.DECLARE).border
+                      }`}
                   >
                     {(STATUS_CONFIG[detail.status] || STATUS_CONFIG.DECLARE).label}
                   </span>
@@ -306,6 +313,13 @@ export default function SinistresPage() {
           )}
         </Card>
       </div>
+      {/* Excel Import Modal */}
+      <ExcelImportModal
+        entityType="sinistres"
+        isOpen={isExcelModalOpen}
+        onClose={() => setIsExcelModalOpen(false)}
+        onSuccess={() => qc.invalidateQueries({ queryKey: ['admin-sinistres'] })}
+      />
     </div>
   )
 }

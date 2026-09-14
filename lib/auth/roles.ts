@@ -52,6 +52,7 @@ export function canProxy(role: Role, method: string, path: string): boolean {
     ((verb === 'POST' && path === '/contracts') ||
       (verb === 'PATCH' && /^\/contracts\/[^/]+$/.test(path)) ||
       (verb === 'POST' && /^\/support\/tickets\/[^/]+\/messages$/.test(path)) ||
-      (verb === 'POST' && /^\/support\/tickets\/[^/]+\/voice$/.test(path)))
+      (verb === 'POST' && /^\/support\/tickets\/[^/]+\/voice$/.test(path)) ||
+      (verb === 'POST' && /^\/admin\/niche-agreements\/[^/]+\/(validate|reject)$/.test(path)))
   )
 }

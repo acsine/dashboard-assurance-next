@@ -2,7 +2,9 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { clientsApi, contractsApi, prospectsApi, walletApi, portalClientApi } from '@/lib/api/mobi-assur'
+import { useAuthStore } from '@/lib/stores/auth-store'
 import Header from '@/components/dashboard/Header'
+import { useState } from 'react'
 import {
   Users,
   FileText,
@@ -18,29 +20,64 @@ import {
   CreditCard,
   Inbox,
   Smartphone,
+  ShieldCheck,
+  Sparkles,
+  FileSpreadsheet,
+  CheckCircle2,
+  Loader2,
 } from 'lucide-react'
 import Link from 'next/link'
 
+function SpinLinkButton({
+  href,
+  className,
+  children,
+  icon: Icon,
+  iconClassName,
+}: {
+  href: string
+  className?: string
+  children: React.ReactNode
+  icon?: React.ComponentType<{ className?: string }>
+  iconClassName?: string
+}) {
+  const [loading, setLoading] = useState(false)
+
+  return (
+    <Link
+      href={href}
+      onClick={() => setLoading(true)}
+      className={className}
+    >
+      {loading ? (
+        <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+      ) : Icon ? (
+        <Icon className={iconClassName || 'h-3.5 w-3.5 shrink-0'} />
+      ) : null}
+      <span>{children}</span>
+    </Link>
+  )
+}
+
 export default function DashboardOverview() {
-  // Query clients
+  const { user } = useAuthStore()
+
+  // Queries
   const { data: clients = [], isLoading: loadingClients } = useQuery({
     queryKey: ['clients'],
     queryFn: () => clientsApi.list(),
   })
 
-  // Query contracts
   const { data: contracts = [], isLoading: loadingContracts } = useQuery({
     queryKey: ['contracts'],
     queryFn: () => contractsApi.list(),
   })
 
-  // Query prospects
   const { data: prospects = [] } = useQuery({
     queryKey: ['prospects'],
     queryFn: () => prospectsApi.list(),
   })
 
-  // Query withdrawals
   const { data: withdrawals = [] } = useQuery({
     queryKey: ['withdrawals-pending'],
     queryFn: () => walletApi.listPendingWithdrawals(),
@@ -59,120 +96,172 @@ export default function DashboardOverview() {
 
   const totalPremium = safeContracts.reduce((acc, c) => acc + (c.prime_ttc || 0), 0)
   const paidContracts = safeContracts.filter((c) => c.status?.toUpperCase() === 'PAYE')
-  const pendingContracts = safeContracts.filter((c) => c.status?.toUpperCase() === 'DEVIS')
-
   const pendingConversions = safeProspects.filter(
     (p) => p.status === 'EN_ATTENTE_VALIDATION',
   ).length
 
+  const todayDateStr = new Date().toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+
   const kpis = [
     {
-      title: 'Clients Actifs',
+      title: 'Clients Assurés Actifs',
       value: safeClients.length || 0,
       icon: Users,
       color: 'blue',
-      description: 'Total enregistrés',
+      description: 'Répertoire national clients',
       link: '/dashboard/clients',
+      badge: 'Clientele',
     },
     {
       title: 'Volume Primes (TTC)',
       value: `${totalPremium.toLocaleString('fr-FR')} FCFA`,
       icon: TrendingUp,
       color: 'emerald',
-      description: `${paidContracts.length} contrats payés`,
+      description: `${paidContracts.length} contrats validés`,
       link: '/dashboard/contracts',
+      badge: 'Chiffre d\'Affaires',
     },
     {
-      title: 'Prospects (agence)',
+      title: 'Prospects en Pipeline',
       value: safeProspects.length || 0,
       icon: Clock,
       color: 'amber',
       description:
         pendingConversions > 0
           ? `${pendingConversions} conversion(s) à valider`
-          : 'Tous les prospects synchronisés',
+          : 'Prospects synchronisés',
       link: '/dashboard/prospects',
+      badge: 'Opportunités',
     },
     {
       title: 'Retraits de Wallet',
       value: safeWithdrawals.length || 0,
       icon: Wallet,
       color: 'indigo',
-      description: 'Demandes en attente',
+      description: 'Demandes agents en attente',
       link: '/dashboard/wallet',
+      badge: 'Commissions',
     },
     {
-      title: 'Comptes portail',
-      value: portalKpis?.portal_active_clients ?? '—',
+      title: 'Comptes Portail Client',
+      value: portalKpis?.portal_active_clients ?? safeClients.length,
       icon: Smartphone,
       color: 'blue',
-      description: 'Clients app actifs',
+      description: 'Utilisateurs d\'application mobile',
       link: '/dashboard/clients',
+      badge: 'Digital',
     },
     {
-      title: 'Sinistres ouverts',
-      value: portalKpis?.open_claims ?? '—',
+      title: 'Dossiers Sinistres Ouverts',
+      value: portalKpis?.open_claims ?? '0',
       icon: AlertTriangle,
-      color: 'amber',
-      description: 'File sinistres',
+      color: 'rose',
+      description: 'File d\'instruction sinistres',
       link: '/dashboard/sinistres',
+      badge: 'Urgence',
     },
     {
-      title: 'Paiements pending',
-      value: portalKpis?.pending_client_payments ?? '—',
+      title: 'Paiements Déclarés',
+      value: portalKpis?.pending_client_payments ?? '0',
       icon: CreditCard,
       color: 'indigo',
-      description: 'Déclarations client',
+      description: 'Justificatifs à valider',
       link: '/dashboard/paiements-declares',
+      badge: 'Encaissements',
     },
     {
-      title: 'Demandes ouvertes',
-      value: portalKpis?.open_requests ?? '—',
+      title: 'Demandes & Avenants',
+      value: portalKpis?.open_requests ?? '0',
       icon: Inbox,
       color: 'emerald',
-      description: 'Avenants / support',
+      description: 'Requêtes support ouvertes',
       link: '/dashboard/demandes-clients',
+      badge: 'Support',
     },
   ]
 
   return (
-    <div className="flex-1 flex flex-col bg-transparent">
-
+    <div className="flex-1 flex flex-col bg-slate-50/60 min-h-screen">
       <Header
-        title="Commandement Global des Opérations"
-        subtitle="Supervision en temps réel du réseau national d'assurance Bethel Comprehensive Insurance."
+        title="Commandement & Supervision Global"
+        subtitle="Tableau de bord de gestion des polices, sinistres et commissions Bethel Insurance."
       />
 
       <div className="p-6 sm:p-8 space-y-8 flex-1">
+        
+        {/* Welcome Hero Banner */}
+        <div
+          className="relative rounded-2xl text-white py-4 px-5 sm:px-6 overflow-hidden shadow-lg border border-blue-900/40"
+          style={{ background: 'linear-gradient(135deg, #0b192c 0%, #1b365d 60%, #0f172a 100%)' }}
+        >
+          <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-blue-500/10 blur-[80px] rounded-full pointer-events-none" />
+          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="space-y-1.5">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-400/15 backdrop-blur-md border border-amber-400/30 text-amber-300 text-[11px] font-extrabold capitalize shadow-xs">
+                <Sparkles className="h-3 w-3 text-amber-400" />
+                <span>{todayDateStr}</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black tracking-tight leading-tight text-white drop-shadow-xs">
+                Bonjour, {user?.full_name || 'Gestionnaire'} 👋
+              </h2>
+              <p className="text-slate-200 text-xs font-semibold max-w-xl leading-snug">
+                Supervision en temps réel des opérations d'assurance, validation des encaissements et suivi du portefeuille client.
+              </p>
+            </div>
 
-        {/* Quick Actions Bar */}
-        <div className="bg-white/90 backdrop-blur-xl p-4 sm:p-5 rounded-2xl border border-slate-200/80 pro-shadow-sm flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+              <Link href="/dashboard/contracts/new">
+                <button className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-black bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer border-0">
+                  <Plus className="h-3.5 w-3.5 stroke-[3]" />
+                  <span>Créer une Police / Devis</span>
+                </button>
+              </Link>
+              <Link href="/dashboard/prospects">
+                <button className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-black bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition-all shadow-sm border border-emerald-400/30 active:scale-95 cursor-pointer">
+                  <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-200" />
+                  <span>Importer Excel</span>
+                </button>
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Actions Shortcuts Bar */}
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-blue-50 text-blue-700 rounded-xl font-bold">
+            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs">
               <Activity className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-sm font-extrabold text-slate-900">Actions Rapides Opérationnelles</h3>
-              <p className="text-xs font-medium text-slate-500">Accès direct aux tâches fréquentes</p>
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">
+                Actions Opérationnelles Rapides
+              </h3>
+              <p className="text-xs font-medium text-slate-500">Raccourcis vers les tâches fréquentes</p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2.5">
-            <Link href="/dashboard/contracts">
-              <button className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold bg-blue-700 hover:bg-blue-800 text-white rounded-xl transition-all pro-shadow-sm cursor-pointer active:scale-[0.98]">
-                <Plus className="h-4 w-4" />
-                Nouvelle Police
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Link href="/dashboard/clients/new">
+              <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-extrabold bg-slate-100 hover:bg-slate-200 text-slate-900 rounded-xl transition-all cursor-pointer">
+                <Plus className="h-3.5 w-3.5 text-blue-600" />
+                Client
               </button>
             </Link>
             <Link href="/dashboard/sinistres">
-              <button className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl transition-all cursor-pointer">
-                <AlertTriangle className="h-4 w-4 text-amber-600" />
-                Déclarer Sinistre
+              <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-extrabold bg-slate-100 hover:bg-slate-200 text-slate-900 rounded-xl transition-all cursor-pointer">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                Sinistre
               </button>
             </Link>
             <Link href="/dashboard/paiements-declares">
-              <button className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl transition-all cursor-pointer">
-                <CreditCard className="h-4 w-4 text-indigo-600" />
-                Valider Paiement
+              <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-extrabold bg-slate-100 hover:bg-slate-200 text-slate-900 rounded-xl transition-all cursor-pointer">
+                <CreditCard className="h-3.5 w-3.5 text-indigo-600" />
+                Paiement
               </button>
             </Link>
           </div>
@@ -183,38 +272,41 @@ export default function DashboardOverview() {
           {kpis.map((kpi, i) => (
             <div
               key={i}
-              className="bg-white/95 backdrop-blur-xl p-5 sm:p-6 rounded-2xl border border-slate-200/80 pro-shadow-sm hover:pro-shadow-lg hover:-translate-y-1 transition-all duration-200 flex flex-col justify-between group"
+              className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between group"
             >
               <div className="flex justify-between items-start">
-                <span className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider block">
-                  {kpi.title}
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-700 border border-slate-200">
+                  {kpi.badge}
                 </span>
                 <span
                   className={`p-2.5 rounded-xl text-sm transition-all duration-200 ${
                     kpi.color === 'blue'
-                      ? 'bg-blue-50 text-blue-700 group-hover:bg-blue-700 group-hover:text-white'
+                      ? 'bg-blue-50 text-blue-700 group-hover:bg-blue-600 group-hover:text-white'
                       : kpi.color === 'emerald'
-                      ? 'bg-emerald-50 text-emerald-700 group-hover:bg-emerald-700 group-hover:text-white'
+                      ? 'bg-emerald-50 text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white'
                       : kpi.color === 'amber'
-                      ? 'bg-amber-50 text-amber-700 group-hover:bg-amber-700 group-hover:text-white'
-                      : 'bg-indigo-50 text-indigo-700 group-hover:bg-indigo-700 group-hover:text-white'
+                      ? 'bg-amber-50 text-amber-700 group-hover:bg-amber-600 group-hover:text-white'
+                      : kpi.color === 'rose'
+                      ? 'bg-rose-50 text-rose-700 group-hover:bg-rose-600 group-hover:text-white'
+                      : 'bg-indigo-50 text-indigo-700 group-hover:bg-indigo-600 group-hover:text-white'
                   }`}
                 >
                   <kpi.icon className="h-5 w-5" />
                 </span>
               </div>
               <div className="mt-4">
-                <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-tight block">
+                <span className="text-xs font-bold text-slate-500 block">{kpi.title}</span>
+                <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-tight block mt-1">
                   {kpi.value}
                 </span>
-                <p className="text-xs font-medium text-slate-500 mt-1">{kpi.description}</p>
+                <p className="text-[11px] font-medium text-slate-400 mt-1">{kpi.description}</p>
               </div>
-              <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between">
+              <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between">
                 <Link
                   href={kpi.link}
                   className="text-xs font-bold text-blue-700 hover:text-blue-900 flex items-center gap-1.5 transition-colors"
                 >
-                  Consulter
+                  Gérer
                   <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
                 </Link>
               </div>
@@ -222,22 +314,25 @@ export default function DashboardOverview() {
           ))}
         </div>
 
-        {/* Dashboard Content Blocks */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 flex-1">
-          {/* Contracts List Column */}
-          <div className="xl:col-span-2 bg-white/95 backdrop-blur-xl rounded-2xl border border-slate-200/80 pro-shadow-sm p-6 flex flex-col justify-between">
+        {/* Dashboard Content Grid */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          
+          {/* Contracts List Widget */}
+          <div className="xl:col-span-2 bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-6 flex flex-col justify-between">
             <div>
-              <div className="flex justify-between items-center mb-6">
+              <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
                 <div>
-                  <h3 className="font-extrabold text-slate-900 text-base sm:text-lg tracking-tight">Polices d'Assurances Récentes</h3>
+                  <h3 className="font-extrabold text-slate-900 text-base sm:text-lg tracking-tight">
+                    Polices d'Assurances Récentes
+                  </h3>
                   <p className="text-xs font-medium text-slate-500 mt-0.5">
-                    Dernières cotisations et devis émis par l'agence.
+                    Dernières polices émises et devis en cours
                   </p>
                 </div>
                 <Link href="/dashboard/contracts">
-                  <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer">
-                    Voir tout
-                    <ArrowUpRight className="h-3.5 w-3.5" />
+                  <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-extrabold text-blue-700 hover:bg-blue-50 rounded-xl transition-colors cursor-pointer">
+                    <span>Tout voir</span>
+                    <ArrowUpRight className="h-4 w-4" />
                   </button>
                 </Link>
               </div>
@@ -245,50 +340,42 @@ export default function DashboardOverview() {
               {safeContracts.length === 0 ? (
                 <div className="py-12 text-center text-slate-400">
                   <FileText className="h-10 w-10 mx-auto text-slate-300 mb-3" />
-                  <p className="text-sm font-medium">Aucun contrat ou devis enregistré</p>
+                  <p className="text-sm font-medium">Aucun contrat enregistré</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
+                  <table className="w-full text-left border-collapse text-xs">
                     <thead>
-                      <tr className="border-b border-slate-100">
-                        <th className="pb-3 px-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                          N° Police / Produit
-                        </th>
-                        <th className="pb-3 px-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                          Formule
-                        </th>
-                        <th className="pb-3 px-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                          Prime TTC
-                        </th>
-                        <th className="pb-3 px-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                          Statut
-                        </th>
+                      <tr className="border-b border-slate-100 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                        <th className="pb-3 px-2">N° Police / Produit</th>
+                        <th className="pb-3 px-2">Branche</th>
+                        <th className="pb-3 px-2">Prime TTC</th>
+                        <th className="pb-3 px-2">Statut</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {safeContracts.slice(0, 5).map((contract) => (
+                      {safeContracts.slice(0, 6).map((contract) => (
                         <tr key={contract.id} className="hover:bg-slate-50/80 transition-colors group">
                           <td className="py-3.5 px-2">
                             <span className="font-extrabold text-sm text-slate-900 block group-hover:text-blue-700 transition-colors">
                               {contract.id.substring(0, 8).toUpperCase()}
                             </span>
-                            <span className="text-xs font-medium text-slate-500 block mt-0.5">
+                            <span className="text-[11px] font-semibold text-slate-400 block mt-0.5">
                               {contract.product_type}
                             </span>
                           </td>
-                          <td className="py-3.5 px-2 text-xs font-semibold text-slate-600">
-                            {contract.subscription_type}
+                          <td className="py-3.5 px-2 font-semibold text-slate-700">
+                            {contract.product_line || 'AUTO'}
                           </td>
-                          <td className="py-3.5 px-2 font-extrabold text-xs text-slate-900">
+                          <td className="py-3.5 px-2 font-black text-slate-900">
                             {(contract.prime_ttc || 0).toLocaleString('fr-FR')} FCFA
                           </td>
                           <td className="py-3.5 px-2">
                             <span
-                              className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-block border ${
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-black inline-block border ${
                                 contract.status === 'PAYE'
-                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200/80'
-                                  : 'bg-amber-50 text-amber-800 border-amber-200/80'
+                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                  : 'bg-amber-50 text-amber-800 border-amber-200'
                               }`}
                             >
                               {contract.status}
@@ -302,33 +389,33 @@ export default function DashboardOverview() {
               )}
             </div>
 
-            {safeContracts.length > 5 && (
+            {safeContracts.length > 6 && (
               <div className="mt-6 pt-4 border-t border-slate-100 text-center">
                 <Link
                   href="/dashboard/contracts"
                   className="text-xs font-bold text-blue-700 hover:text-blue-900 transition-colors"
                 >
-                  Voir l'intégralité des contrats →
+                  Voir l'intégralité des polices d'assurance →
                 </Link>
               </div>
             )}
           </div>
 
-          {/* Activity / Logs Column */}
-          <div className="bg-white/95 backdrop-blur-xl rounded-2xl border border-slate-200/80 pro-shadow-sm p-6 flex flex-col justify-between">
+          {/* Network System Health Widget */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-6 flex flex-col justify-between space-y-6">
             <div>
-              <h3 className="font-extrabold text-slate-900 text-base sm:text-lg tracking-tight mb-6 flex items-center gap-2">
+              <h3 className="font-extrabold text-slate-900 text-base tracking-tight mb-6 pb-3 border-b border-slate-100 flex items-center gap-2">
                 <Activity className="h-5 w-5 text-blue-700" />
-                Statut du Réseau National
+                Supervision Réseau & Services
               </h3>
 
               <div className="space-y-5">
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <div className="flex justify-between text-xs font-bold">
-                    <span className="text-slate-600">API Gateway MobiAssur</span>
-                    <span className="text-emerald-700 font-extrabold inline-flex items-center gap-1.5">
+                    <span className="text-slate-700">API Gateway & Tarification</span>
+                    <span className="text-emerald-700 font-extrabold inline-flex items-center gap-1 text-[11px]">
                       <span className="w-1.5 h-1.5 bg-emerald-600 rounded-full animate-ping" />
-                      Opérationnel
+                      100% Opérationnel
                     </span>
                   </div>
                   <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
@@ -336,10 +423,10 @@ export default function DashboardOverview() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <div className="flex justify-between text-xs font-bold">
-                    <span className="text-slate-600">Service Émission Polices</span>
-                    <span className="text-emerald-700 font-extrabold inline-flex items-center gap-1.5">
+                    <span className="text-slate-700">Génération Attestation CIMA</span>
+                    <span className="text-emerald-700 font-extrabold inline-flex items-center gap-1 text-[11px]">
                       <span className="w-1.5 h-1.5 bg-emerald-600 rounded-full animate-ping" />
                       Opérationnel
                     </span>
@@ -349,10 +436,10 @@ export default function DashboardOverview() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <div className="flex justify-between text-xs font-bold">
-                    <span className="text-slate-600">Synchro App Mobile</span>
-                    <span className="text-amber-700 font-extrabold">Actif (323/324)</span>
+                    <span className="text-slate-700">Synchronisation Mobile App</span>
+                    <span className="text-amber-700 font-extrabold text-[11px]">Actif</span>
                   </div>
                   <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                     <div className="h-full bg-amber-500 rounded-full w-[95%]" />
@@ -361,19 +448,21 @@ export default function DashboardOverview() {
               </div>
             </div>
 
-            <div className="mt-6 p-4 bg-gradient-to-br from-blue-50 to-slate-50 rounded-xl border border-blue-200/80 pro-shadow-sm flex items-start gap-3">
-              <div className="bg-blue-700/10 p-2 rounded-lg shrink-0">
-                <AlertCircle className="h-5 w-5 text-blue-700" />
+            <div className="p-4 bg-gradient-to-br from-blue-50 to-slate-50 rounded-xl border border-blue-200/80 shadow-2xs flex items-start gap-3">
+              <div className="bg-blue-600 text-white p-2 rounded-lg shrink-0">
+                <ShieldCheck className="h-5 w-5" />
               </div>
               <div>
-                <h4 className="text-xs font-extrabold text-slate-900">MobiAssur Management System</h4>
+                <h4 className="text-xs font-extrabold text-slate-900">Bethel Insurance Platform</h4>
                 <p className="text-[11px] text-slate-600 mt-1 leading-relaxed font-medium">
-                  Plateforme certifiée conforme aux exigences CIMA et de résilience réseau des opérations d'assurance.
+                  Système d'information certifié conforme au Code de la CIMA pour la souscription et l'instruction des sinistres.
                 </p>
               </div>
             </div>
           </div>
+
         </div>
+
       </div>
     </div>
   )

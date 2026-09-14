@@ -677,7 +677,9 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
                             <span>
                               {Number(p.amount).toLocaleString('fr-FR')} FCFA · {p.method}
                               {p.payer_name ? ` · ${p.payer_name}` : ''}
-                              {p.has_reference ? ' · réf. déclarée' : ''}
+                              {p.reference_externe ? (
+                                <span className="ml-1 font-mono text-blue-700"> · réf: {p.reference_externe}</span>
+                              ) : p.has_reference ? ' · réf. déclarée' : ''}
                             </span>
                             <span className={p.status === 'SUCCESS' ? 'text-green-600 font-bold' : 'text-amber-600 font-bold'}>
                               {p.status}

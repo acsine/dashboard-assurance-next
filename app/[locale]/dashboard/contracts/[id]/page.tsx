@@ -573,7 +573,7 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
                             )}
                             {needsReference && (
                               <span className="mt-1 block text-amber-600">
-                                Référence déclarée par le client — saisie requise pour valider
+                                Réf. client : <span className="font-mono font-bold">{payment.reference_externe || '—'}</span>
                               </span>
                             )}
                           </div>

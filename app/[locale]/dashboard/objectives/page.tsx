@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
-import { Loader2, Plus, Save, Target, Trash2 } from 'lucide-react'
+import { Loader2, Plus, Save, Target, Trash2, FileSpreadsheet } from 'lucide-react'
+import ExcelImportModal from '@/components/excel/ExcelImportModal'
 import {
   objectivesApi,
   asList,
@@ -41,6 +42,7 @@ export default function ObjectivesPage() {
   const [items, setItems] = useState<TemplateItem[]>([])
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [editAgent, setEditAgent] = useState<any | null>(null)
+  const [isExcelModalOpen, setIsExcelModalOpen] = useState(false)
   const [agentItems, setAgentItems] = useState<TemplateItem[]>([])
   const [showAddForm, setShowAddForm] = useState(false)
   const [newMetric, setNewMetric] = useState({
@@ -246,6 +248,16 @@ export default function ObjectivesPage() {
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={() => setIsExcelModalOpen(true)}
+                    className="flex items-center gap-2 px-4 py-3 text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl active:scale-95 transition-all cursor-pointer border-0 shadow-xs"
+                  >
+                    <FileSpreadsheet className="h-4 w-4" />
+                    Importer Excel
+                  </button>
+                )}
                 {canManage && (
                   <button
                     type="button"
@@ -754,6 +766,16 @@ export default function ObjectivesPage() {
           </div>
         )}
       </div>
+      {/* Excel Import Modal */}
+      <ExcelImportModal
+        entityType="objectives"
+        isOpen={isExcelModalOpen}
+        onClose={() => setIsExcelModalOpen(false)}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['objectives-template'] })
+          queryClient.invalidateQueries({ queryKey: ['objectives-agents'] })
+        }}
+      />
     </div>
   )
 }

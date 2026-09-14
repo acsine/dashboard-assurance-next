@@ -112,229 +112,237 @@ function NewContractFormContent() {
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-white">
+    <div className="flex-1 flex flex-col bg-slate-50/60 min-h-screen">
       <Header
         title="Création de Police / Devis"
         subtitle="Saisissez les informations du souscripteur, du conducteur et des véhicules."
       />
 
-      <div className="p-8 space-y-6 max-w-4xl flex-1">
-        {/* Return link */}
-        <div>
-          <Link
-            href="/dashboard/contracts"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Retour aux contrats
-          </Link>
-        </div>
+      <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-10">
+        <div className="w-full max-w-3xl space-y-6">
+          {/* Return link */}
+          <div>
+            <Link
+              href="/dashboard/contracts"
+              className="inline-flex items-center gap-2 text-xs font-extrabold text-blue-700 hover:text-blue-900 transition-colors bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-2xs"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Retour aux contrats
+            </Link>
+          </div>
 
-        <Card className="border-gray-100 shadow-sm bg-white">
-          <CardContent className="pt-6">
-            <form onSubmit={handleSubmit} className="space-y-8">
-              {/* Subscriber Information */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider border-b border-gray-50 pb-2 flex items-center gap-2">
-                  <User className="h-4.5 w-4.5 text-blue-500" /> Souscripteur
-                </h3>
+          <Card className="border-slate-200/90 shadow-lg bg-white rounded-3xl overflow-hidden">
+            <CardContent className="p-6 sm:p-8">
+              <form onSubmit={handleSubmit} className="space-y-8">
+                {/* Subscriber Information */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-black text-blue-900 uppercase tracking-wider border-b border-blue-100 pb-2.5 flex items-center gap-2.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block shadow-xs" />
+                    Souscripteur
+                  </h3>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                      Sélectionner le Client *
-                    </label>
-                    {loadingClients ? (
-                      <div className="text-xs text-gray-400">Chargement...</div>
-                    ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
+                        Sélectionner le Client *
+                      </label>
+                      {loadingClients ? (
+                        <div className="text-xs text-slate-400">Chargement...</div>
+                      ) : (
+                        <select
+                          value={clientId}
+                          onChange={(e) => {
+                            setClientId(e.target.value)
+                            setVehicleId('')
+                          }}
+                          className="flex h-11 w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 font-semibold text-slate-900"
+                          required
+                        >
+                          <option value="">Sélectionner un client dans la liste</option>
+                          {safeClients.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.full_name} ({c.phone})
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
+                        Conducteur habituel (Nom)
+                      </label>
+                      <Input
+                        placeholder="Ex: Jean Dupont (Laissez vide si identique au client)"
+                        value={driverName}
+                        onChange={(e) => setDriverName(e.target.value)}
+                        className="h-11 text-xs border-slate-200 font-medium"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Policy parameters */}
+                <div className="space-y-4 pt-4">
+                  <h3 className="text-sm font-black text-emerald-900 uppercase tracking-wider border-b border-emerald-100 pb-2.5 flex items-center gap-2.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block shadow-xs" />
+                    Paramètres du Contrat
+                  </h3>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
+                        Type de produit *
+                      </label>
                       <select
-                        value={clientId}
+                        value={productType}
                         onChange={(e) => {
-                          setClientId(e.target.value)
-                          setVehicleId('')
+                          const next = e.target.value
+                          const opt = productTypeOptions.find((o) => o.code === next)
+                          setProductType(next)
+                          setProductLine((opt?.line as typeof productLine) || 'AUTO')
+                          if ((opt?.line || 'AUTO') !== 'AUTO') setVehicleId('')
                         }}
-                        className="flex h-11 w-full rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-0 focus-visible:border-transparent font-medium"
+                        className="flex h-11 w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs transition-colors focus-visible:outline-none font-semibold text-slate-900"
                         required
                       >
-                        <option value="">Sélectionner un client dans la liste</option>
-                        {safeClients.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.full_name} ({c.phone})
+                        {productTypeOptions.map((opt) => (
+                          <option key={opt.code} value={opt.code}>
+                            {opt.label}
                           </option>
                         ))}
                       </select>
-                    )}
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
+                        Type de souscription
+                      </label>
+                      <select
+                        value={subscriptionType}
+                        onChange={(e) => setSubscriptionType(e.target.value)}
+                        className="flex h-11 w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs transition-colors focus-visible:outline-none font-semibold text-slate-900"
+                      >
+                        <option value="AFFAIRE_NOUVELLE">Affaire Nouvelle</option>
+                        <option value="RENOUVELLEMENT">Renouvellement</option>
+                        <option value="AVENANT">Avenant</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
+                        Date d'effet *
+                      </label>
+                      <Input
+                        type="date"
+                        value={dateEffet}
+                        onChange={(e) => setDateEffet(e.target.value)}
+                        className="h-11 text-xs border-slate-200 font-semibold"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
+                        Durée (jours) *
+                      </label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={365}
+                        value={dureeJours}
+                        onChange={(e) => setDureeJours(Number(e.target.value))}
+                        className="h-11 text-xs border-slate-200 font-semibold"
+                        required
+                      />
+                    </div>
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                      Conducteur habituel (Nom)
-                    </label>
-                    <Input
-                      placeholder="Ex: Jean Dupont (Laissez vide si identique au client)"
-                      value={driverName}
-                      onChange={(e) => setDriverName(e.target.value)}
-                      className="h-11 text-xs border-gray-200"
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
+                        Zone de circulation
+                      </label>
+                      <select
+                        value={zoneCirculation}
+                        onChange={(e) => setZoneCirculation(e.target.value)}
+                        className="flex h-11 w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs transition-colors focus-visible:outline-none font-semibold text-slate-900"
+                      >
+                        <option value="ZONE_A">Zone A — Yaoundé / Douala</option>
+                        <option value="ZONE_B">Zone B — Autres Villes</option>
+                        <option value="ZONE_C">Zone C — Zones rurales</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Policy parameters */}
-              <div className="space-y-4 pt-4">
-                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider border-b border-gray-50 pb-2 flex items-center gap-2">
-                  <FileText className="h-4.5 w-4.5 text-blue-500" /> Paramètres du Contrat
-                </h3>
+                {/* Vehicle Selection Section */}
+                {needsVehicle && (
+                  <div className="space-y-4 pt-4">
+                    <h3 className="text-sm font-black text-amber-900 uppercase tracking-wider border-b border-amber-100 pb-2.5 flex items-center gap-2.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block shadow-xs" />
+                      Véhicule à Assurer *
+                    </h3>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                      Type de produit *
-                    </label>
-                    <select
-                      value={productType}
-                      onChange={(e) => {
-                        const next = e.target.value
-                        const opt = productTypeOptions.find((o) => o.code === next)
-                        setProductType(next)
-                        setProductLine((opt?.line as typeof productLine) || 'AUTO')
-                        if ((opt?.line || 'AUTO') !== 'AUTO') setVehicleId('')
-                      }}
-                      className="flex h-11 w-full rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs transition-colors focus-visible:outline-none"
-                      required
-                    >
-                      {productTypeOptions.map((opt) => (
-                        <option key={opt.code} value={opt.code}>
-                          {opt.label}
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
+                        Choix du véhicule
+                      </label>
+                      <select
+                        value={vehicleId}
+                        onChange={(event) => setVehicleId(event.target.value)}
+                        disabled={!clientId || loadingVehicles}
+                        required
+                        className="flex h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-xs disabled:bg-slate-50 font-semibold text-slate-900"
+                      >
+                        <option value="">
+                          {loadingVehicles ? 'Chargement des véhicules...' : 'Sélectionner un véhicule existant'}
                         </option>
-                      ))}
-                    </select>
+                        {vehicles.map((vehicle) => (
+                          <option key={vehicle.id} value={vehicle.id}>
+                            {vehicle.marque} {vehicle.modele || ''} — {vehicle.immatriculation || vehicle.chassis_num}
+                          </option>
+                        ))}
+                      </select>
+                      {clientId && !loadingVehicles && vehicles.length === 0 && (
+                        <p className="text-xs font-semibold text-amber-700 bg-amber-50 p-3 rounded-xl border border-amber-200">
+                          ⚠️ Ce client n'a aucun véhicule enregistré. Veuillez d'abord lui en ajouter un depuis sa fiche client.
+                        </p>
+                      )}
+                    </div>
                   </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                      Type de souscription
-                    </label>
-                    <select
-                      value={subscriptionType}
-                      onChange={(e) => setSubscriptionType(e.target.value)}
-                      className="flex h-11 w-full rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs transition-colors focus-visible:outline-none"
-                    >
-                      <option value="AFFAIRE_NOUVELLE">Affaire Nouvelle</option>
-                      <option value="RENOUVELLEMENT">Renouvellement</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                      Zone de circulation
-                    </label>
-                    <select
-                      value={zoneCirculation}
-                      onChange={(e) => setZoneCirculation(e.target.value)}
-                      className="flex h-11 w-full rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs transition-colors focus-visible:outline-none"
-                    >
-                      <option value="ZONE_C">Zone C (Caméroun)</option>
-                      <option value="ZONE_A">Zone A</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                      Durée (Jours)
-                    </label>
-                    <select
-                      value={dureeJours}
-                      onChange={(e) => setDureeJours(Number(e.target.value))}
-                      className="flex h-11 w-full rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs transition-colors focus-visible:outline-none"
-                    >
-                      <option value={30}>30 Jours</option>
-                      <option value={90}>90 Jours</option>
-                      <option value={180}>180 Jours</option>
-                      <option value={365}>365 Jours</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1 sm:col-span-2">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                      Date d'effet *
-                    </label>
-                    <Input
-                      type="datetime-local"
-                      value={dateEffet}
-                      onChange={(e) => setDateEffet(e.target.value)}
-                      className="h-11 text-xs border-gray-200"
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Vehicles specifications */}
-              {needsVehicle && (
-              <div className="space-y-4 pt-4">
-                <h3 className="border-b border-gray-50 pb-2 text-sm font-bold uppercase tracking-wider text-gray-900">
-                  Véhicule assuré (mono-véhicule V1)
-                </h3>
-                <select
-                  value={vehicleId}
-                  onChange={(event) => setVehicleId(event.target.value)}
-                  disabled={!clientId || loadingVehicles}
-                  required
-                  className="flex h-11 w-full rounded-xl border border-gray-200 bg-white px-4 text-xs disabled:bg-gray-50"
-                >
-                  <option value="">
-                    {loadingVehicles ? 'Chargement...' : 'Sélectionner un véhicule existant'}
-                  </option>
-                  {vehicles.map((vehicle) => (
-                    <option key={vehicle.id} value={vehicle.id}>
-                      {vehicle.marque} {vehicle.modele || ''} — {vehicle.immatriculation || vehicle.chassis_num}
-                    </option>
-                  ))}
-                </select>
-                {clientId && !loadingVehicles && vehicles.length === 0 && (
-                  <p className="text-xs text-amber-700">
-                    Ce client n’a aucun véhicule. Ajoutez-le d’abord depuis sa fiche client.
-                  </p>
                 )}
-              </div>
-              )}
-              {!needsVehicle && (
-                <p className="text-xs text-slate-500 pt-2">
-                  Produit hors automobile : aucun véhicule n’est requis pour ce contrat.
-                </p>
-              )}
 
-              {/* Action triggers */}
-              <div className="flex justify-end gap-3 pt-6 border-t border-gray-100">
-                <Link href="/dashboard/contracts">
-                  <Button type="button" variant="outline" size="lg">
-                    Annuler
+                {/* Action triggers */}
+                <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
+                  <Link href="/dashboard/contracts">
+                    <Button type="button" variant="outline" size="lg" className="rounded-xl border-slate-200">
+                      Annuler
+                    </Button>
+                  </Link>
+                  <Button
+                    type="submit"
+                    size="lg"
+                    disabled={createContractMutation.isPending}
+                    className="bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-800 hover:to-indigo-800 text-white flex items-center gap-2 font-black rounded-xl px-6 shadow-md cursor-pointer transition-all"
+                  >
+                    {createContractMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4.5 w-4.5 animate-spin text-white" />
+                        <span>Création du Devis en cours...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4.5 w-4.5" />
+                        <span>Créer le Devis</span>
+                      </>
+                    )}
                   </Button>
-                </Link>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  size="lg"
-                  disabled={createContractMutation.isPending}
-                  className="text-white flex items-center gap-2 font-semibold"
-                >
-                  {createContractMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Création...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-4 w-4" />
-                      Créer le Devis
-                    </>
-                  )}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   )

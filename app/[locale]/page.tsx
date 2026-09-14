@@ -42,6 +42,8 @@ import {
   Zap
 } from 'lucide-react'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
+import QuoteDetailsAndGuarantees, { type InsurerComparisonItem } from '@/components/insurance/QuoteDetailsAndGuarantees'
+import type { QuoteBreakdown } from '@/lib/api/mobi-assur'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://gestion-d-assurance-v1-ten.vercel.app'
 
@@ -87,6 +89,9 @@ export default function Home() {
   // Real-time backend quote response state
   const [computedTotal, setComputedTotal] = useState<number>(142500)
   const [breakdownLabel, setBreakdownLabel] = useState<string>('')
+  const [computedBreakdown, setComputedBreakdown] = useState<QuoteBreakdown | Record<string, unknown> | null>(null)
+  const [computedComparison, setComputedComparison] = useState<InsurerComparisonItem[] | null>(null)
+  const [selectedInsurerId, setSelectedInsurerId] = useState<string | undefined>(undefined)
   const [simulationId, setSimulationId] = useState<string | null>(null)
   const [isComputingQuote, setIsComputingQuote] = useState(false)
 
@@ -192,16 +197,22 @@ export default function Home() {
         setIsServiceAvailable(true)
         setComputedTotal(data.data.total || 0)
         setBreakdownLabel(data.data.breakdown?.label || '')
+        setComputedBreakdown(data.data.breakdown || null)
+        setComputedComparison(data.data.comparison || data.data.insurers || null)
         setSimulationId(data.data.simulation_id || null)
       } else {
         setIsServiceAvailable(false)
         setUnavailableMessage(data?.data?.message || data?.message || "Service d'assurance indisponible pour le moment.")
         setSimulationId(null)
+        setComputedBreakdown(null)
+        setComputedComparison(null)
       }
     } catch (e) {
       setIsServiceAvailable(false)
       setUnavailableMessage("Service indisponible pour le moment (Erreur de connexion au serveur backend).")
       setSimulationId(null)
+      setComputedBreakdown(null)
+      setComputedComparison(null)
     } finally {
       setIsComputingQuote(false)
     }
@@ -1306,6 +1317,20 @@ export default function Home() {
               </div>
 
             </div>
+
+            {/* Detailed Quote Breakdown with Vignette, RC Tutorial & Company Comparison */}
+            {isServiceAvailable && (
+              <div className="mt-8 pt-6 border-t border-slate-200/80">
+                <QuoteDetailsAndGuarantees
+                  breakdown={computedBreakdown || { total: computedTotal, label: breakdownLabel, vignette: activeTab === 'AUTO' ? 15000 : 0 }}
+                  total={computedTotal}
+                  comparison={computedComparison}
+                  selectedInsurerId={selectedInsurerId}
+                  onSelectInsurer={(id) => setSelectedInsurerId(id)}
+                  showCompanyComparison={true}
+                />
+              </div>
+            )}
 
           </div>
 

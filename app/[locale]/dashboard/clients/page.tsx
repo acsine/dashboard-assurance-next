@@ -6,12 +6,16 @@ import { clientsApi, asList } from '@/lib/api/mobi-assur'
 import Header from '@/components/dashboard/Header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Search, Plus, User, Phone, MapPin, Eye, ArrowRight, FileText, Shield } from 'lucide-react'
+import { Search, Plus, User, Phone, MapPin, Eye, ArrowRight, FileText, Shield, FileSpreadsheet } from 'lucide-react'
 import Link from 'next/link'
 import { LinkButton } from '@/components/ui/link-button'
+import ExcelImportModal from '@/components/excel/ExcelImportModal'
+import { useQueryClient } from '@tanstack/react-query'
 
 export default function ClientsPage() {
   const [search, setSearch] = useState('')
+  const [isExcelModalOpen, setIsExcelModalOpen] = useState(false)
+  const queryClient = useQueryClient()
 
   const { data: clients = [], isLoading } = useQuery({
     queryKey: ['clients', search],
@@ -41,10 +45,20 @@ export default function ClientsPage() {
               className="pl-10 h-11 border-slate-200 focus:border-blue-600 focus:ring-blue-600/20 rounded-xl bg-slate-50/50 focus:bg-white text-xs font-medium"
             />
           </div>
-          <LinkButton href="/dashboard/clients/new" className="flex items-center gap-2 px-5 py-2.5 text-xs font-bold bg-blue-700 hover:bg-blue-800 text-white rounded-xl active:scale-[0.98] transition-all pro-shadow-sm cursor-pointer border-0">
-            <Plus className="h-4 w-4" />
-            Nouveau Client
-          </LinkButton>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              onClick={() => setIsExcelModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl active:scale-[0.98] transition-all pro-shadow-sm cursor-pointer border-0"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              Importer Excel
+            </Button>
+            <LinkButton href="/dashboard/clients/new" className="flex items-center gap-2 px-5 py-2.5 text-xs font-bold bg-blue-700 hover:bg-blue-800 text-white rounded-xl active:scale-[0.98] transition-all pro-shadow-sm cursor-pointer border-0">
+              <Plus className="h-4 w-4" />
+              Nouveau Client
+            </LinkButton>
+          </div>
         </div>
 
         {/* Clients Table / List */}
@@ -145,6 +159,13 @@ export default function ClientsPage() {
           )}
         </div>
       </div>
+      {/* Excel Import Modal */}
+      <ExcelImportModal
+        entityType="clients"
+        isOpen={isExcelModalOpen}
+        onClose={() => setIsExcelModalOpen(false)}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['clients'] })}
+      />
     </div>
   )
 }

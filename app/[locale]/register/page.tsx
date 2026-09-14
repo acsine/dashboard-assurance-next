@@ -7,7 +7,21 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
-import { Mail, Lock, Phone, User, ArrowRight, Loader2, CheckCircle2, Shield, Eye, EyeOff } from 'lucide-react'
+import {
+  Mail,
+  Lock,
+  Phone,
+  User,
+  ArrowRight,
+  Loader2,
+  CheckCircle2,
+  ShieldCheck,
+  Eye,
+  EyeOff,
+  Sparkles,
+  ArrowLeft,
+  LockKeyhole,
+} from 'lucide-react'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://gestion-d-assurance-v1-ten.vercel.app'
 
@@ -41,8 +55,8 @@ export default function RegisterPage() {
           phone: phone,
           email: email,
           password: password,
-          quote_simulation_id: simulationId || null
-        })
+          quote_simulation_id: simulationId || null,
+        }),
       })
 
       const data = await resp.json()
@@ -58,205 +72,245 @@ export default function RegisterPage() {
       }
     } catch (err: any) {
       console.error(err)
-      toast.error('Impossible de contacter le serveur d\'inscription.')
+      toast.error("Impossible de contacter le serveur d'inscription.")
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen flex bg-white text-gray-900">
-      {/* Left side: Registration Form */}
-      <div className="w-full lg:w-1/2 flex flex-col justify-center px-8 sm:px-16 lg:px-24 py-12 bg-white relative z-10">
-        <div className="max-w-md w-full mx-auto space-y-5">
+    <div className="min-h-screen flex bg-gradient-to-br from-slate-900 via-[#1b365d] to-slate-950 text-slate-900 relative overflow-hidden">
+      {/* Background Glowing Soft Effects */}
+      <div className="absolute top-0 right-1/4 w-[600px] h-[600px] bg-emerald-600/10 blur-[160px] rounded-full pointer-events-none" />
+      <div className="absolute bottom-0 left-1/4 w-[500px] h-[500px] bg-blue-500/10 blur-[150px] rounded-full pointer-events-none" />
+
+      <div className="w-full flex min-h-screen relative z-10">
+        
+        {/* Left Side: Form Container */}
+        <div className="w-full lg:w-1/2 flex flex-col justify-between p-6 sm:p-12 lg:p-16 bg-white/95 backdrop-blur-2xl border-r border-white/20 shadow-2xl relative overflow-y-auto">
           
-          {/* Logo & Header */}
-          <div className="flex flex-col items-center text-center gap-0">
-            <img
-              src="/bethel-logo.png"
-              alt="Bethel Comprehensive Insurance"
-              className="h-44 sm:h-56 md:h-64 w-auto max-w-[min(100%,28rem)] object-contain -mb-8 sm:-mb-12 md:-mb-14"
-            />
-            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-gray-900 leading-tight">
-              Créer mon compte Client
-            </h2>
-            <p className="text-gray-500 text-xs sm:text-sm max-w-sm mt-1">
-              Finalisez votre inscription pour consulter votre devis et gérer vos souscriptions.
-            </p>
+          {/* Top Return Button */}
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => router.push('/')}
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold text-slate-600 hover:text-blue-900 bg-slate-100 hover:bg-blue-50 border border-slate-200/80 transition-all cursor-pointer group"
+            >
+              <ArrowLeft className="h-3.5 w-3.5 group-hover:-translate-x-1 transition-transform text-blue-600" />
+              <span>Retour à l'accueil</span>
+            </button>
+
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-blue-50 text-blue-800 border border-blue-200/80">
+              <ShieldCheck className="h-3.5 w-3.5 text-blue-600" />
+              Création d'Espace Assuré
+            </span>
           </div>
 
-          {/* Simulation Link Badge */}
-          {simulationId && (
-            <motion.div 
-              initial={{ opacity: 0, y: -5 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="p-3 bg-blue-50 border border-blue-200/60 rounded-xl flex items-center gap-2.5 text-xs text-[#1b365d] font-bold"
-            >
-              <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-              <span>Votre devis simulé sera automatiquement lié à votre espace !</span>
-            </motion.div>
-          )}
-
-          {/* Registration Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            
-            {/* Nom complet */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
-                Nom complet
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
-                  <User className="h-4.5 w-4.5" />
-                </div>
-                <Input
-                  type="text"
-                  placeholder="Jean Dupont"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="pl-11 bg-white border-gray-200 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-blue-500/20"
-                  required
-                />
-              </div>
+          {/* Form Content */}
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="max-w-md w-full mx-auto space-y-5 my-auto py-6"
+          >
+            {/* Logo Header */}
+            <div className="flex flex-col items-center text-center">
+              <img
+                src="/bethel-logo.png"
+                alt="Bethel Comprehensive Insurance"
+                className="h-28 sm:h-36 w-auto object-contain drop-shadow-md transition-transform hover:scale-105"
+              />
+              <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-[#1b365d] mt-1">
+                Inscription Assuré
+              </h1>
+              <p className="text-slate-500 text-xs sm:text-sm font-medium mt-1 max-w-sm">
+                Créez votre espace personnel pour suivre vos devis, attestation et réclamations.
+              </p>
             </div>
 
-            {/* Téléphone */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
-                N° de Téléphone (+237)
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
-                  <Phone className="h-4.5 w-4.5" />
-                </div>
-                <Input
-                  type="tel"
-                  placeholder="+237 699 11 22 33"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="pl-11 bg-white border-gray-200 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-blue-500/20"
-                  required
-                />
-              </div>
-            </div>
+            {/* Simulation Link Notification Badge */}
+            {simulationId && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-2.5 text-xs text-emerald-950 font-bold shadow-2xs"
+              >
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                <span>Votre simulation de devis sera directement rattachée à votre espace !</span>
+              </motion.div>
+            )}
 
-            {/* Email */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
-                Adresse E-mail
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
-                  <Mail className="h-4.5 w-4.5" />
+            {/* Registration Form */}
+            <form onSubmit={handleSubmit} className="space-y-3.5 pt-1">
+              
+              {/* Nom complet */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-extrabold text-slate-800 uppercase tracking-wider block">
+                  Nom complet *
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <User className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <Input
+                    type="text"
+                    placeholder="Jean Dupont"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="pl-11 h-11 bg-slate-50/60 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#1b365d] focus:ring-2 focus:ring-[#1b365d]/20 rounded-xl text-xs font-medium"
+                    required
+                  />
                 </div>
-                <Input
-                  type="email"
-                  placeholder="jean.dupont@gmail.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-11 bg-white border-gray-200 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-blue-500/20"
-                  required
-                />
               </div>
-            </div>
 
-            {/* Mot de passe */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
-                Mot de passe
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
-                  <Lock className="h-4.5 w-4.5" />
+              {/* Téléphone */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-extrabold text-slate-800 uppercase tracking-wider block">
+                  N° de Téléphone (+237) *
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <Phone className="h-4 w-4 text-emerald-600" />
+                  </div>
+                  <Input
+                    type="tel"
+                    placeholder="+237 699 11 22 33"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="pl-11 h-11 bg-slate-50/60 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#1b365d] focus:ring-2 focus:ring-[#1b365d]/20 rounded-xl text-xs font-medium"
+                    required
+                  />
                 </div>
-                <Input
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pl-11 pr-11 bg-white border-gray-200 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-blue-500/20"
-                  required
-                />
+              </div>
+
+              {/* Email */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-extrabold text-slate-800 uppercase tracking-wider block">
+                  Adresse E-mail *
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <Mail className="h-4 w-4 text-indigo-600" />
+                  </div>
+                  <Input
+                    type="email"
+                    placeholder="jean.dupont@gmail.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="pl-11 h-11 bg-slate-50/60 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#1b365d] focus:ring-2 focus:ring-[#1b365d]/20 rounded-xl text-xs font-medium"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Mot de passe */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-extrabold text-slate-800 uppercase tracking-wider block">
+                  Mot de passe *
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <LockKeyhole className="h-4 w-4 text-amber-600" />
+                  </div>
+                  <Input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pl-11 pr-11 h-11 bg-slate-50/60 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#1b365d] focus:ring-2 focus:ring-[#1b365d]/20 rounded-xl text-xs font-medium"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer transition-colors"
+                    aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full h-12 bg-gradient-to-r from-amber-600 via-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md hover:shadow-lg active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer border-0 mt-4"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin text-white" />
+                    <span>Création du compte en cours...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Créer mon compte et souscrire</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
+              </Button>
+            </form>
+
+            {/* Login Link */}
+            <div className="text-center pt-3 border-t border-slate-100">
+              <p className="text-xs text-slate-500 font-medium">
+                Vous possédez déjà un compte ?{' '}
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-gray-600 cursor-pointer transition-colors"
-                  aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                  onClick={() => {
+                    setIsNavigatingLogin(true)
+                    router.push('/login')
+                  }}
+                  className="font-extrabold text-[#1b365d] hover:text-blue-700 hover:underline cursor-pointer inline-flex items-center gap-1"
                 >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
+                  {isNavigatingLogin && <Loader2 className="h-3 w-3 animate-spin" />}
+                  <span>Se connecter</span>
                 </button>
+              </p>
+            </div>
+          </motion.div>
+
+          {/* Footer Branding */}
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+            <span>© 2026 Bethel Comprehensive Insurance Ltd.</span>
+            <span>Agréé Code CIMA</span>
+          </div>
+        </div>
+
+        {/* Right Side: Hero Visual Panel */}
+        <div className="hidden lg:block lg:w-1/2 relative bg-[#1b365d] overflow-hidden">
+          <div
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-transform duration-1000 scale-105"
+            style={{ backgroundImage: "url('/login-bg.jpg')" }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-[#1b365d]/60 to-[#1b365d]/20" />
+
+          {/* Hero Content Overlay */}
+          <div className="absolute inset-0 p-12 flex flex-col justify-between relative z-10">
+            <div className="flex justify-end">
+              <div className="bg-white/10 backdrop-blur-xl border border-white/20 px-4 py-2 rounded-full text-white text-xs font-bold flex items-center gap-2 shadow-lg">
+                <Sparkles className="h-4 w-4 text-amber-400" />
+                <span>Souscription 100% Digitale</span>
               </div>
             </div>
 
-            {/* Submit Button */}
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full h-12 bg-[#f59e0b] hover:bg-[#e08e00] active:scale-[0.98] rounded-xl text-sm font-bold transition-all shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 mt-6 text-white border-0 cursor-pointer"
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="bg-white/15 backdrop-blur-2xl p-8 rounded-3xl border border-white/25 shadow-2xl text-white space-y-4 max-w-lg"
             >
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Création du compte...
-                </>
-              ) : (
-                <>
-                  Créer mon compte et souscrire
-                  <ArrowRight className="h-4 w-4" />
-                </>
-              )}
-            </Button>
-          </form>
-
-          {/* Link to Login */}
-          <div className="text-center pt-4">
-            <p className="text-xs text-gray-500 font-medium flex items-center justify-center gap-1.5">
-              <span>Vous possédez déjà un compte ?</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsNavigatingLogin(true)
-                  router.push('/login')
-                }}
-                className="font-bold text-[#1b365d] hover:underline inline-flex items-center gap-1 cursor-pointer"
-              >
-                {isNavigatingLogin && <Loader2 className="h-3 w-3 animate-spin" />}
-                <span>Se connecter</span>
-              </button>
-            </p>
+              <h3 className="text-xl font-black leading-snug">
+                "La souscription en ligne avec Bethel est d'une simplicité remarquable. Mon attestation m'a été délivrée en moins de 10 minutes."
+              </h3>
+              <div className="pt-3 border-t border-white/15 flex items-center justify-between text-xs text-slate-200">
+                <span className="font-bold">Emmanuel K. — Assuré Auto & Santé</span>
+                <span className="text-emerald-400 font-extrabold flex items-center gap-1">
+                  <CheckCircle2 className="h-4 w-4" /> Vérifié
+                </span>
+              </div>
+            </motion.div>
           </div>
-
-          {/* Footer branding */}
-          <p className="text-xs text-gray-400 text-center pt-6 border-t border-gray-100">
-            © 2026 Bethel Comprehensive Insurance. Tous droits réservés.
-          </p>
         </div>
-      </div>
 
-      {/* Right side: Image Panel */}
-      <div className="hidden lg:block lg:w-1/2 relative bg-gray-950">
-        <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: "url('/login-bg.jpg')" }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-gray-950/80 via-gray-950/20 to-transparent" />
-        
-        {/* Quote / Overlay Info */}
-        <div className="absolute bottom-12 left-12 right-12 text-white space-y-3 p-6 bg-gray-950/40 backdrop-blur-md rounded-2xl border border-white/10">
-          <span className="text-[10px] font-bold tracking-widest text-[#f59e0b] uppercase flex items-center gap-1.5">
-            <Shield className="h-3.5 w-3.5" /> Espace Assurance Client 100% Sécurisé
-          </span>
-          <p className="text-lg font-medium leading-snug">
-            "La souscription en ligne avec Bethel est d'une simplicité remarquable. Mon attestation d'assurance m'a été délivrée en moins de 10 minutes après paiement."
-          </p>
-          <span className="text-xs font-semibold block text-gray-300">
-            Emmanuel K. — Assuré Auto & Santé
-          </span>
-        </div>
       </div>
     </div>
   )

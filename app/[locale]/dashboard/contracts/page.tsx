@@ -5,12 +5,17 @@ import { useState } from 'react'
 import { contractsApi, clientsApi } from '@/lib/api/mobi-assur'
 import Header from '@/components/dashboard/Header'
 import { Input } from '@/components/ui/input'
-import { Search, FileText, Eye, Download, ShieldAlert, Plus, Filter } from 'lucide-react'
+import { Search, FileText, Eye, Download, ShieldAlert, Plus, Filter, FileSpreadsheet } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
+import ExcelImportModal from '@/components/excel/ExcelImportModal'
+import { useQueryClient } from '@tanstack/react-query'
 
 export default function ContractsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('')
+  const [isExcelModalOpen, setIsExcelModalOpen] = useState(false)
+  const queryClient = useQueryClient()
 
   // Query Contracts
   const { data: contracts = [], isLoading } = useQuery({
@@ -59,12 +64,22 @@ export default function ContractsPage() {
             </select>
           </div>
 
-          <Link href="/dashboard/contracts/new">
-            <button className="flex items-center gap-2 px-5 py-2.5 text-xs font-bold bg-blue-700 hover:bg-blue-800 text-white rounded-xl active:scale-[0.98] transition-all pro-shadow-sm cursor-pointer border-0">
-              <Plus className="h-4 w-4" />
-              Nouvelle Police
-            </button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              onClick={() => setIsExcelModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl active:scale-[0.98] transition-all pro-shadow-sm cursor-pointer border-0"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              Importer Excel
+            </Button>
+            <Link href="/dashboard/contracts/new">
+              <button className="flex items-center gap-2 px-5 py-2.5 text-xs font-bold bg-blue-700 hover:bg-blue-800 text-white rounded-xl active:scale-[0.98] transition-all pro-shadow-sm cursor-pointer border-0">
+                <Plus className="h-4 w-4" />
+                Nouvelle Police
+              </button>
+            </Link>
+          </div>
         </div>
 
         {/* Contracts Table */}
@@ -184,6 +199,13 @@ export default function ContractsPage() {
           )}
         </div>
       </div>
+      {/* Excel Import Modal */}
+      <ExcelImportModal
+        entityType="contracts"
+        isOpen={isExcelModalOpen}
+        onClose={() => setIsExcelModalOpen(false)}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['contracts'] })}
+      />
     </div>
   )
 }

@@ -457,6 +457,7 @@ export interface ClientDossier {
     payer_name?: string | null
     has_reference?: boolean
     declared_by_client?: boolean
+    reference_externe?: string | null
   }>
   pending_payments_count: number
   sinistres: Array<Record<string, unknown>>
@@ -524,6 +525,7 @@ export interface Contract {
   client_id: string
   agent_id?: string
   product_type: string
+  product_line?: string
   status: string
   subscription_type: string
   zone_circulation: string
@@ -541,7 +543,7 @@ export interface Payment {
   contract_id: string
   amount: number
   method: PaymentMethod
-  /** Jamais exposé par l'API BO pour les paiements déclarés client */
+  /** Référence de paiement (transaction Mobile Money, etc.) */
   reference_externe?: string
   payer_name?: string | null
   declared_by_client?: boolean
@@ -576,7 +578,8 @@ export function suggestCarteRoseSerial(contractId: string): string {
 export interface CreateContractRequest {
   client_id: string
   agent_id?: string
-  product_type: 'CAT1'
+  product_type: 'CAT1' | string
+  product_line?: string
   subscription_type?: string
   zone_circulation?: string
   date_effet: string
@@ -586,7 +589,7 @@ export interface CreateContractRequest {
   conducteur_permis_cat?: string
   conducteur_permis_num?: string
   conducteur_permis_date?: string
-  vehicles: Array<{
+  vehicles?: Array<{
     vehicle_id?: string
     vehicle?: Partial<Vehicle>
     prime_vehicule?: number
@@ -1467,6 +1470,35 @@ export interface Niche {
   is_active: boolean
 }
 
+export interface NicheAgreement {
+  id: string
+  niche_id: string
+  agent_id: string
+  agency_id: string
+  status: 'PENDING_VALIDATION' | 'ACTIVE' | 'REJECTED' | 'EXPIRED' | 'CANCELLED'
+  contact_name?: string | null
+  contact_phone?: string | null
+  contact_role?: string | null
+  organization_type?: string | null
+  legal_registration_number?: string | null
+  target_member_count?: number | null
+  risk_profile?: string | null
+  custom_guarantees?: string | null
+  estimated_premium?: number | null
+  premium_frequency?: 'JOURNALIER' | 'HEBDOMADAIRE' | 'MENSUEL' | 'ANNUEL' | null
+  competition_level?: 'FAIBLE' | 'NULLE' | 'MODEREE' | 'FORTE' | null
+  margin_potential?: 'MOYENNE' | 'ELEVEE' | 'TRES_ELEVEE' | null
+  tracking_step?: string | null
+  next_follow_up_date?: string | null
+  notes?: string | null
+  signed_at?: string | null
+  validated_at?: string | null
+  validator_id?: string | null
+  rejection_reason?: string | null
+  agent_name?: string | null
+  niche_name?: string | null
+}
+
 export interface Challenge {
   id: string
   title: string
@@ -1546,7 +1578,32 @@ export const nichesApi = {
   update: (id: string, data: Partial<Niche>) =>
     mobiRequest<Niche>(`/admin/niches/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (id: string) => mobiRequest<unknown>(`/admin/niches/${id}`, { method: 'DELETE' }),
-  agreements: (id: string) => mobiRequest<{ items: any[] }>(`/admin/niches/${id}/agreements`),
+  agreements: (id: string) => mobiRequest<{ items: NicheAgreement[] }>(`/admin/niches/${id}/agreements`),
+  listAllAgreements: (status?: string) => {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : ''
+    return mobiRequest<{ items: NicheAgreement[] }>(`/admin/niche-agreements${qs}`)
+  },
+  validateAgreement: (agreementId: string, notes?: string) =>
+    mobiRequest<NicheAgreement>(`/admin/niche-agreements/${agreementId}/validate`, {
+      method: 'POST',
+      body: JSON.stringify({ notes }),
+    }),
+  rejectAgreement: (agreementId: string, rejectionReason: string) =>
+    mobiRequest<NicheAgreement>(`/admin/niche-agreements/${agreementId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ rejection_reason: rejectionReason }),
+    }),
+  listAgentNiches: () => mobiRequest<{ items: any[] }>('/agent/niches'),
+  signNiche: (nicheId: string, data: any) =>
+    mobiRequest<NicheAgreement>(`/agent/niches/${nicheId}/sign`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateTracking: (nicheId: string, data: any) =>
+    mobiRequest<NicheAgreement>(`/agent/niches/${nicheId}/tracking`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
 }
 
 export const rewardsApi = {
@@ -1635,11 +1692,29 @@ export const sinistresApi = {
     return mobiRequest<{ items: SinistreItem[] }>(`/admin/sinistres${qs}`)
   },
   get: (id: string) => mobiRequest<SinistreItem>(`/admin/sinistres/${id}`),
+  create: (data: any) =>
+    mobiRequest<SinistreItem>('/admin/sinistres', { method: 'POST', body: JSON.stringify(data) }),
   updateStatus: (id: string, data: { status: string; note?: string }) =>
     mobiRequest<SinistreItem>(`/admin/sinistres/${id}/status`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+}
+
+export const excelImportApi = {
+  uploadFile: (entityType: string, file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return mobiRequest<{
+      status: number
+      message: string
+      imported_count?: number
+      created_items?: any[]
+    }>(`/${entityType}/import-excel`, {
+      method: 'POST',
+      body: formData,
+    })
+  },
 }
 
 export const portalClientApi = {

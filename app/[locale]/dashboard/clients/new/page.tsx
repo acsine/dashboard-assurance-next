@@ -269,29 +269,31 @@ function NewClientContent() {
   const busy = submitting || createMutation.isPending
 
   return (
-    <div className="flex-1 flex flex-col bg-white">
+    <div className="flex-1 flex flex-col bg-slate-50/60 min-h-screen">
       <Header
         title="Nouveau Client"
         subtitle="Dossier complet : assuré, véhicule, conducteur, garanties et pièces."
       />
 
-      <div className="p-8 space-y-6 max-w-4xl flex-1">
-        <Link
-          href="/dashboard/clients"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700 transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Retour à la liste
-        </Link>
+      <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-10">
+        <div className="w-full max-w-3xl space-y-6">
+          <Link
+            href="/dashboard/clients"
+            className="inline-flex items-center gap-2 text-xs font-extrabold text-blue-700 hover:text-blue-900 transition-colors bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-2xs"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Retour à la liste des clients
+          </Link>
 
-        <Card className="border-gray-100 shadow-sm bg-white">
-          <CardContent className="pt-6">
-            <form onSubmit={handleSubmit} className="space-y-8">
-              {/* Assuré */}
-              <section className="space-y-4">
-                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider border-b border-gray-50 pb-2">
-                  Informations Assuré
-                </h3>
+          <Card className="border-slate-200/90 shadow-lg bg-white rounded-3xl overflow-hidden">
+            <CardContent className="p-6 sm:p-8">
+              <form onSubmit={handleSubmit} className="space-y-8">
+                {/* Assuré */}
+                <section className="space-y-4">
+                  <h3 className="text-sm font-black text-blue-900 uppercase tracking-wider border-b border-blue-100 pb-2.5 flex items-center gap-2.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block shadow-xs" />
+                    Informations Assuré
+                  </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1 sm:col-span-2">
                     <label className={labelClass}>Nom complet *</label>
@@ -375,8 +377,9 @@ function NewClientContent() {
 
               {/* Véhicule */}
               <section className="space-y-4">
-                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider border-b border-gray-50 pb-2">
-                  Véhicule
+                <h3 className="text-sm font-black text-emerald-900 uppercase tracking-wider border-b border-emerald-100 pb-2.5 flex items-center gap-2.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block shadow-xs" />
+                  Informations Véhicule
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
@@ -486,8 +489,9 @@ function NewClientContent() {
 
               {/* Conducteur */}
               <section className="space-y-4">
-                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider border-b border-gray-50 pb-2">
-                  Conducteur
+                <h3 className="text-sm font-black text-indigo-900 uppercase tracking-wider border-b border-indigo-100 pb-2.5 flex items-center gap-2.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block shadow-xs" />
+                  Conducteur principal
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
@@ -539,22 +543,23 @@ function NewClientContent() {
 
               {/* Garanties */}
               <section className="space-y-4">
-                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider border-b border-gray-50 pb-2">
+                <h3 className="text-sm font-black text-amber-900 uppercase tracking-wider border-b border-amber-100 pb-2.5 flex items-center gap-2.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block shadow-xs" />
                   Garanties souscrites
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {GUARANTEE_OPTIONS.map((g) => (
                     <label
                       key={g.key}
-                      className="flex items-center gap-2 text-xs text-gray-700 p-2 rounded-lg hover:bg-gray-50 cursor-pointer"
+                      className="flex items-center gap-2 text-xs text-slate-800 p-2.5 rounded-xl hover:bg-slate-50 border border-slate-100 cursor-pointer transition-colors"
                     >
                       <input
                         type="checkbox"
                         checked={!!guarantees[g.key]}
                         onChange={() => toggleGuarantee(g.key)}
-                        className="rounded border-gray-300"
+                        className="rounded border-slate-300 text-amber-600 focus:ring-amber-500"
                       />
-                      {g.label}
+                      <span className="font-semibold">{g.label}</span>
                     </label>
                   ))}
                 </div>
@@ -562,7 +567,8 @@ function NewClientContent() {
 
               {/* Fichiers */}
               <section className="space-y-4">
-                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider border-b border-gray-50 pb-2">
+                <h3 className="text-sm font-black text-violet-900 uppercase tracking-wider border-b border-violet-100 pb-2.5 flex items-center gap-2.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-violet-500 inline-block shadow-xs" />
                   Pièces justificatives
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -571,28 +577,27 @@ function NewClientContent() {
                 </div>
               </section>
 
-              <div className="flex justify-end gap-3 pt-6 border-t border-gray-100">
+              <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
                 <Link href="/dashboard/clients">
-                  <Button type="button" variant="outline" size="lg">
+                  <Button type="button" variant="outline" size="lg" className="rounded-xl border-slate-200">
                     Annuler
                   </Button>
                 </Link>
                 <Button
                   type="submit"
-                  variant="primary"
                   size="lg"
                   disabled={busy || !!emailError || !!dobError || !!conducteurDobError}
-                  className="text-white flex items-center gap-2 font-semibold"
+                  className="bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-800 hover:to-indigo-800 text-white flex items-center gap-2 font-black rounded-xl px-6 shadow-md transition-all cursor-pointer"
                 >
                   {busy ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Enregistrement...
+                      <Loader2 className="h-4.5 w-4.5 animate-spin text-white" />
+                      <span>Enregistrement du dossier...</span>
                     </>
                   ) : (
                     <>
-                      <Save className="h-4 w-4" />
-                      Enregistrer le dossier
+                      <Save className="h-4.5 w-4.5" />
+                      <span>Enregistrer le dossier</span>
                     </>
                   )}
                 </Button>
@@ -602,7 +607,8 @@ function NewClientContent() {
         </Card>
       </div>
     </div>
-  )
+  </div>
+)
 }
 
 export default function NewClientPage() {
