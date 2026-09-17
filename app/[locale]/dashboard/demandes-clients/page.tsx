@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import Header from '@/components/dashboard/Header'
 import { Button } from '@/components/ui/button'
+import SearchableSelect from '@/components/ui/searchable-select'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
@@ -64,17 +65,20 @@ export default function DemandesClientsPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-slate-400" />
-          <select
-            className="h-9 w-44 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-2xs focus:border-blue-500 focus:ring-2 focus:ring-blue-600/20 outline-hidden transition-all"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="">Tous les statuts</option>
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>{STATUS_CONFIG[s]?.label || s}</option>
-            ))}
-          </select>
+          <div className="w-52">
+            <SearchableSelect
+              value={statusFilter}
+              onChange={(val) => setStatusFilter(val)}
+              placeholder="Tous les statuts"
+              options={[
+                { value: '', label: 'Tous les statuts' },
+                ...STATUSES.map((s) => ({
+                  value: s,
+                  label: STATUS_CONFIG[s]?.label || s,
+                })),
+              ]}
+            />
+          </div>
         </div>
       </div>
 
@@ -221,17 +225,14 @@ export default function DemandesClientsPage() {
                   <div className="space-y-3">
                     <div>
                       <label className="text-xs font-semibold text-slate-700 mb-1 block">Nouveau Statut</label>
-                      <select
-                        className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 shadow-2xs focus:border-blue-500 focus:ring-2 focus:ring-blue-600/20 outline-hidden"
+                      <SearchableSelect
                         value={newStatus}
-                        onChange={(e) => setNewStatus(e.target.value)}
-                      >
-                        {STATUSES.map((s) => (
-                          <option key={s} value={s}>
-                            {STATUS_CONFIG[s]?.label || s}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(val) => setNewStatus(val)}
+                        options={STATUSES.map((s) => ({
+                          value: s,
+                          label: STATUS_CONFIG[s]?.label || s,
+                        }))}
+                      />
                     </div>
 
                     <div>

@@ -9,6 +9,7 @@ import Header from '@/components/dashboard/Header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
+import SearchableSelect from '@/components/ui/searchable-select'
 import { toast } from 'sonner'
 import { ArrowLeft, Loader2, Save, Upload, CheckCircle2 } from 'lucide-react'
 import Link from 'next/link'
@@ -310,10 +311,14 @@ function NewClientContent() {
                   </div>
                   <div className="space-y-1">
                     <label className={labelClass}>Sexe *</label>
-                    <select value={sexe} onChange={(e) => setSexe(e.target.value as any)} className={selectClass}>
-                      <option value="MASCULIN">Masculin</option>
-                      <option value="FEMININ">Féminin</option>
-                    </select>
+                    <SearchableSelect
+                      value={sexe}
+                      onChange={(val) => setSexe(val as any)}
+                      options={[
+                        { value: 'MASCULIN', label: 'Masculin' },
+                        { value: 'FEMININ', label: 'Féminin' },
+                      ]}
+                    />
                   </div>
                   <div className="space-y-1">
                     <label className={labelClass}>Date de naissance *</label>
@@ -417,12 +422,16 @@ function NewClientContent() {
                   </div>
                   <div className="space-y-1">
                     <label className={labelClass}>Énergie</label>
-                    <select value={energie} onChange={(e) => setEnergie(e.target.value)} className={selectClass}>
-                      <option value="ESSENCE">Essence</option>
-                      <option value="DIESEL">Diesel</option>
-                      <option value="HYBRIDE">Hybride</option>
-                      <option value="ELECTRIQUE">Électrique</option>
-                    </select>
+                    <SearchableSelect
+                      value={energie}
+                      onChange={(val) => setEnergie(val)}
+                      options={[
+                        { value: 'ESSENCE', label: 'Essence' },
+                        { value: 'DIESEL', label: 'Diesel' },
+                        { value: 'HYBRIDE', label: 'Hybride' },
+                        { value: 'ELECTRIQUE', label: 'Électrique' },
+                      ]}
+                    />
                   </div>
                   <div className="space-y-1">
                     <label className={labelClass}>Puissance (CV)</label>
@@ -458,15 +467,15 @@ function NewClientContent() {
                   </div>
                   <div className="space-y-1">
                     <label className={labelClass}>Zone de circulation</label>
-                    <select
+                    <SearchableSelect
                       value={zoneCirculation}
-                      onChange={(e) => setZoneCirculation(e.target.value)}
-                      className={selectClass}
-                    >
-                      <option value="ZONE_A">Zone A</option>
-                      <option value="ZONE_B">Zone B</option>
-                      <option value="ZONE_C">Zone C</option>
-                    </select>
+                      onChange={(val) => setZoneCirculation(val)}
+                      options={[
+                        { value: 'ZONE_A', label: 'Zone A' },
+                        { value: 'ZONE_B', label: 'Zone B' },
+                        { value: 'ZONE_C', label: 'Zone C' },
+                      ]}
+                    />
                   </div>
                   <div className="space-y-1">
                     <label className={labelClass}>Produit</label>

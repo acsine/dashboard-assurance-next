@@ -19,6 +19,7 @@ import Header from '@/components/dashboard/Header'
 import QuoteDetailsAndGuarantees from '@/components/insurance/QuoteDetailsAndGuarantees'
 import ExcelImportModal from '@/components/excel/ExcelImportModal'
 import { Button } from '@/components/ui/button'
+import SearchableSelect from '@/components/ui/searchable-select'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
@@ -29,7 +30,7 @@ import {
   Users,
   Clock,
   ArrowRightLeft,
-  Sparkles,
+  CheckCircle2,
   Loader2,
   Eye,
   BellRing,
@@ -426,70 +427,53 @@ function TariffFields({
           <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
             Catégorie *
           </label>
-          <select
+          <SearchableSelect
             value={form.category_id}
-            onChange={(e) => setForm({ ...form, category_id: e.target.value })}
-            className="w-full h-10 text-xs border border-gray-200 rounded-md px-2"
-            required
-          >
-            <option value="">—</option>
-            {categories.filter((c) => c.is_active).map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.code} — {c.name}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => setForm({ ...form, category_id: val })}
+            placeholder="Sélectionner une catégorie..."
+            options={categories.filter((c) => c.is_active).map((c) => ({
+              value: c.id,
+              label: `${c.code} — ${c.name}`,
+            }))}
+          />
         </div>
         <div className="space-y-1">
           <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
             Zone
           </label>
-          <select
+          <SearchableSelect
             value={form.zone_id}
-            onChange={(e) => setForm({ ...form, zone_id: e.target.value })}
-            className="w-full h-10 text-xs border border-gray-200 rounded-md px-2"
-          >
-            <option value="">—</option>
-            {zones.filter((z) => z.is_active).map((z) => (
-              <option key={z.id} value={z.id}>
-                {z.name}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => setForm({ ...form, zone_id: val })}
+            placeholder="Sélectionner une zone..."
+            options={zones.filter((z) => z.is_active).map((z) => ({
+              value: z.id,
+              label: z.name,
+            }))}
+          />
         </div>
         <div className="space-y-1">
           <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
             Durée *
           </label>
-          <select
+          <SearchableSelect
             value={form.duration_id}
-            onChange={(e) => setForm({ ...form, duration_id: e.target.value })}
-            className="w-full h-10 text-xs border border-gray-200 rounded-md px-2"
-            required
-          >
-            <option value="">—</option>
-            {durations.filter((d) => d.is_active).map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.label} ({d.months} mois)
-              </option>
-            ))}
-          </select>
+            onChange={(val) => setForm({ ...form, duration_id: val })}
+            placeholder="Sélectionner une durée..."
+            options={durations.filter((d) => d.is_active).map((d) => ({
+              value: d.id,
+              label: `${d.label} (${d.months} mois)`,
+            }))}
+          />
         </div>
         <div className="space-y-1">
           <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
             Carburant
           </label>
-          <select
+          <SearchableSelect
             value={form.fuel}
-            onChange={(e) => setForm({ ...form, fuel: e.target.value })}
-            className="w-full h-10 text-xs border border-gray-200 rounded-md px-2"
-          >
-            {FUEL_OPTIONS.map((f) => (
-              <option key={f} value={f}>
-                {f}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => setForm({ ...form, fuel: val })}
+            options={FUEL_OPTIONS.map((f) => ({ value: f, label: f }))}
+          />
         </div>
         <div className="space-y-1">
           <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
@@ -1111,7 +1095,7 @@ export default function ProspectsPage() {
                                     className="text-xs"
                                     onClick={() => openInterestedDialog(p)}
                                   >
-                                    <Sparkles className="h-3.5 w-3.5 mr-1" />
+                                    <CheckCircle2 className="h-3.5 w-3.5 mr-1 text-emerald-600" />
                                     Intéressé
                                   </Button>
                                 )}

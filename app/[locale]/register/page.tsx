@@ -18,7 +18,6 @@ import {
   ShieldCheck,
   Eye,
   EyeOff,
-  Sparkles,
   ArrowLeft,
   LockKeyhole,
 } from 'lucide-react'
@@ -287,7 +286,7 @@ export default function RegisterPage() {
           <div className="absolute inset-0 p-12 flex flex-col justify-between relative z-10">
             <div className="flex justify-end">
               <div className="bg-white/10 backdrop-blur-xl border border-white/20 px-4 py-2 rounded-full text-white text-xs font-bold flex items-center gap-2 shadow-lg">
-                <Sparkles className="h-4 w-4 text-amber-400" />
+                <ShieldCheck className="h-4 w-4 text-amber-400" />
                 <span>Souscription 100% Digitale</span>
               </div>
             </div>

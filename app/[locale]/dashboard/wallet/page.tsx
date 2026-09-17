@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation'
 import { walletApi, type WithdrawalRequest } from '@/lib/api/mobi-assur'
 import Header from '@/components/dashboard/Header'
 import { Button } from '@/components/ui/button'
+import SearchableSelect from '@/components/ui/searchable-select'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import {
@@ -515,17 +516,20 @@ export default function WalletPage() {
                       className="h-9 pl-8 text-xs border-gray-200"
                     />
                   </div>
-                  <select
-                    value={historyStatus}
-                    onChange={(e) => setHistoryStatus(e.target.value)}
-                    className="h-9 rounded-xl border border-gray-200 bg-white px-3 text-xs text-slate-700"
-                  >
-                    <option value="">Tous les statuts</option>
-                    <option value="EN_ATTENTE">EN_ATTENTE</option>
-                    <option value="COMPLETE">COMPLETE</option>
-                    <option value="REJETE">REJETE</option>
-                    <option value="ANNULE">ANNULE</option>
-                  </select>
+                  <div className="w-44">
+                    <SearchableSelect
+                      value={historyStatus}
+                      onChange={(val) => setHistoryStatus(val)}
+                      placeholder="Tous les statuts"
+                      options={[
+                        { value: '', label: 'Tous les statuts' },
+                        { value: 'EN_ATTENTE', label: 'EN_ATTENTE' },
+                        { value: 'COMPLETE', label: 'COMPLETE' },
+                        { value: 'REJETE', label: 'REJETE' },
+                        { value: 'ANNULE', label: 'ANNULE' },
+                      ]}
+                    />
+                  </div>
                 </div>
               </div>
 

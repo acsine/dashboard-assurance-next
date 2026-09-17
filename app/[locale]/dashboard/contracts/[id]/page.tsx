@@ -571,9 +571,9 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
                             {payment.payer_name && (
                               <span className="mt-1 block text-gray-500">Payeur : {payment.payer_name}</span>
                             )}
-                            {needsReference && (
-                              <span className="mt-1 block text-amber-600">
-                                Réf. client : <span className="font-mono font-bold">{payment.reference_externe || '—'}</span>
+                            {payment.status === 'SUCCESS' && payment.reference_externe && (
+                              <span className="mt-1 block text-emerald-700 font-medium">
+                                Réf. validation : <span className="font-mono font-bold">{payment.reference_externe}</span>
                               </span>
                             )}
                           </div>

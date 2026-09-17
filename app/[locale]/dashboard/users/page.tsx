@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { usersApi } from '@/lib/api/mobi-assur'
 import Header from '@/components/dashboard/Header'
 import { Button } from '@/components/ui/button'
+import SearchableSelect from '@/components/ui/searchable-select'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
@@ -180,16 +181,19 @@ function UsersContent() {
             onChange={(event) => setSearch(event.target.value)}
             className="max-w-sm"
           />
-          <select
-            value={roleFilter}
-            onChange={(event) => setRoleFilter(event.target.value as Role | '')}
-            className="h-10 rounded-xl border border-gray-200 bg-white px-4 text-xs"
-          >
-            <option value="">Tous les rôles</option>
-            <option value={ROLES.ADMIN}>Administrateurs</option>
-            <option value={ROLES.RESPONSABLE}>Responsables</option>
-            <option value={ROLES.AGENT}>Agents terrain</option>
-          </select>
+          <div className="w-56">
+            <SearchableSelect
+              value={roleFilter}
+              onChange={(val) => setRoleFilter(val as Role | '')}
+              placeholder="Tous les rôles"
+              options={[
+                { value: '', label: 'Tous les rôles' },
+                { value: ROLES.ADMIN, label: 'Administrateurs' },
+                { value: ROLES.RESPONSABLE, label: 'Responsables' },
+                { value: ROLES.AGENT, label: 'Agents terrain' },
+              ]}
+            />
+          </div>
         </div>
 
         {canManage && showAddForm && (
@@ -254,15 +258,15 @@ function UsersContent() {
                     <label className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wider block">
                       Rôle d'accès *
                     </label>
-                    <select
+                    <SearchableSelect
                       value={role}
-                      onChange={(e) => setRole(e.target.value as Role)}
-                      className="flex h-11 w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-900"
-                    >
-                      <option value="AGENT_TERRAIN">Agent Terrain (RBAC)</option>
-                      <option value="RESPONSABLE_AGENCE">Responsable Agence (Lecture / préparation)</option>
-                      <option value="ADMIN_AGENCE">Admin Agence (Complet)</option>
-                    </select>
+                      onChange={(val) => setRole(val as Role)}
+                      options={[
+                        { value: 'AGENT_TERRAIN', label: 'Agent Terrain (RBAC)' },
+                        { value: 'RESPONSABLE_AGENCE', label: 'Responsable Agence (Lecture / préparation)' },
+                        { value: 'ADMIN_AGENCE', label: 'Admin Agence (Complet)' },
+                      ]}
+                    />
                   </div>
 
                   <div className="space-y-1">

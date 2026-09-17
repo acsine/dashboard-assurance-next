@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { clientsApi, contractsApi, prospectsApi, walletApi, portalClientApi } from '@/lib/api/mobi-assur'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import Header from '@/components/dashboard/Header'
+import SystemSupervisionChart from '@/components/dashboard/SystemSupervisionChart'
 import { useState } from 'react'
 import {
   Users,
@@ -21,8 +22,7 @@ import {
   Inbox,
   Smartphone,
   ShieldCheck,
-  Sparkles,
-  FileSpreadsheet,
+  Calendar,
   CheckCircle2,
   Loader2,
 } from 'lucide-react'
@@ -94,8 +94,8 @@ export default function DashboardOverview() {
   const safeProspects = Array.isArray(prospects) ? prospects : []
   const safeWithdrawals = Array.isArray(withdrawals) ? withdrawals : []
 
-  const totalPremium = safeContracts.reduce((acc, c) => acc + (c.prime_ttc || 0), 0)
   const paidContracts = safeContracts.filter((c) => c.status?.toUpperCase() === 'PAYE')
+  const totalPremium = paidContracts.reduce((acc, c) => acc + (c.pttc ?? c.prime_ttc ?? 0), 0)
   const pendingConversions = safeProspects.filter(
     (p) => p.status === 'EN_ATTENTE_VALIDATION',
   ).length
@@ -203,7 +203,7 @@ export default function DashboardOverview() {
           <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="space-y-1.5">
               <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-400/15 backdrop-blur-md border border-amber-400/30 text-amber-300 text-[11px] font-extrabold capitalize shadow-xs">
-                <Sparkles className="h-3 w-3 text-amber-400" />
+                <Calendar className="h-3 w-3 text-amber-400" />
                 <span>{todayDateStr}</span>
               </div>
               <h2 className="text-xl sm:text-2xl font-black tracking-tight leading-tight text-white drop-shadow-xs">
@@ -219,12 +219,6 @@ export default function DashboardOverview() {
                 <button className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-black bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer border-0">
                   <Plus className="h-3.5 w-3.5 stroke-[3]" />
                   <span>Créer une Police / Devis</span>
-                </button>
-              </Link>
-              <Link href="/dashboard/prospects">
-                <button className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-black bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition-all shadow-sm border border-emerald-400/30 active:scale-95 cursor-pointer">
-                  <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-200" />
-                  <span>Importer Excel</span>
                 </button>
               </Link>
             </div>
@@ -402,64 +396,7 @@ export default function DashboardOverview() {
           </div>
 
           {/* Network System Health Widget */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-6 flex flex-col justify-between space-y-6">
-            <div>
-              <h3 className="font-extrabold text-slate-900 text-base tracking-tight mb-6 pb-3 border-b border-slate-100 flex items-center gap-2">
-                <Activity className="h-5 w-5 text-blue-700" />
-                Supervision Réseau & Services
-              </h3>
-
-              <div className="space-y-5">
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs font-bold">
-                    <span className="text-slate-700">API Gateway & Tarification</span>
-                    <span className="text-emerald-700 font-extrabold inline-flex items-center gap-1 text-[11px]">
-                      <span className="w-1.5 h-1.5 bg-emerald-600 rounded-full animate-ping" />
-                      100% Opérationnel
-                    </span>
-                  </div>
-                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-emerald-600 rounded-full w-[99.8%]" />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs font-bold">
-                    <span className="text-slate-700">Génération Attestation CIMA</span>
-                    <span className="text-emerald-700 font-extrabold inline-flex items-center gap-1 text-[11px]">
-                      <span className="w-1.5 h-1.5 bg-emerald-600 rounded-full animate-ping" />
-                      Opérationnel
-                    </span>
-                  </div>
-                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-emerald-600 rounded-full w-full" />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs font-bold">
-                    <span className="text-slate-700">Synchronisation Mobile App</span>
-                    <span className="text-amber-700 font-extrabold text-[11px]">Actif</span>
-                  </div>
-                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-amber-500 rounded-full w-[95%]" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 bg-gradient-to-br from-blue-50 to-slate-50 rounded-xl border border-blue-200/80 shadow-2xs flex items-start gap-3">
-              <div className="bg-blue-600 text-white p-2 rounded-lg shrink-0">
-                <ShieldCheck className="h-5 w-5" />
-              </div>
-              <div>
-                <h4 className="text-xs font-extrabold text-slate-900">Bethel Insurance Platform</h4>
-                <p className="text-[11px] text-slate-600 mt-1 leading-relaxed font-medium">
-                  Système d'information certifié conforme au Code de la CIMA pour la souscription et l'instruction des sinistres.
-                </p>
-              </div>
-            </div>
-          </div>
+          <SystemSupervisionChart />
 
         </div>
 

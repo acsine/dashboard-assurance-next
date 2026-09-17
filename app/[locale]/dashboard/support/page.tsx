@@ -40,9 +40,6 @@ export default function SupportPage() {
     can(currentRole, 'agency:mutate') || can(currentRole, 'agency:prepare')
   const canManageContacts = currentRole === ROLES.ADMIN
   const markTicketRead = useSupportNotificationsStore((s) => s.markTicketRead)
-  const pushInboundFromMessage = useSupportNotificationsStore(
-    (s) => s.pushInboundFromMessage,
-  )
   const [leftTab, setLeftTab] = useState<'tickets' | 'contacts'>('tickets')
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -60,14 +57,12 @@ export default function SupportPage() {
   const { data: conversations = [], isLoading: conversationsLoading } = useQuery({
     queryKey: ['support-conversations', debouncedSearch],
     queryFn: () => supportApi.listConversations(debouncedSearch || undefined),
-    refetchInterval: 20_000,
   })
 
   // Résolution deep-link ?ticket=… → discussion agent
   const { data: tickets = [] } = useQuery({
     queryKey: ['tickets'],
     queryFn: () => supportApi.listTickets(),
-    refetchInterval: 60_000,
   })
 
   const { data: messages = [], isLoading: messagesLoading } = useQuery({
@@ -77,7 +72,6 @@ export default function SupportPage() {
         ? supportApi.getConversationMessages(selectedAgentId)
         : Promise.resolve([]),
     enabled: !!selectedAgentId,
-    refetchInterval: selectedAgentId ? 12_000 : false,
   })
 
   const sendMessageMutation = useMutation({
@@ -134,51 +128,6 @@ export default function SupportPage() {
       queryClient.invalidateQueries({ queryKey: ['conversation-messages', selectedAgentId] })
     }).catch(() => undefined)
   }, [selectedAgentId, currentUserId, messages, queryClient])
-
-  const seenMessageIdsRef = useRef<Set<string>>(new Set())
-  const bellPrimedRef = useRef(false)
-  useEffect(() => {
-    if (conversations.length === 0) return
-    let cancelled = false
-    const syncOtherConversations = async () => {
-      const others = conversations.filter((c) => c.participant_id !== selectedAgentId)
-      for (const conv of others.slice(0, 12)) {
-        try {
-          const msgs = await supportApi.getConversationMessages(conv.participant_id)
-          if (cancelled) return
-          for (const m of msgs) {
-            const id = m.id?.toString()
-            if (!id) continue
-            if (!bellPrimedRef.current) {
-              seenMessageIdsRef.current.add(id)
-              continue
-            }
-            if (seenMessageIdsRef.current.has(id)) continue
-            seenMessageIdsRef.current.add(id)
-            pushInboundFromMessage(
-              { ...m, ticket_id: m.ticket_id || conv.latest_ticket_id || conv.participant_id },
-              {
-                currentUserId: currentUserId,
-                skipTicketId: selectedAgentId
-                  ? conversations.find((c) => c.participant_id === selectedAgentId)
-                      ?.latest_ticket_id
-                  : null,
-              },
-            )
-          }
-        } catch {
-          // ignore
-        }
-      }
-      bellPrimedRef.current = true
-    }
-    void syncOtherConversations()
-    const timer = setInterval(() => void syncOtherConversations(), 15_000)
-    return () => {
-      cancelled = true
-      clearInterval(timer)
-    }
-  }, [conversations, selectedAgentId, currentUserId, pushInboundFromMessage])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import Header from '@/components/dashboard/Header'
+import SearchableSelect from '@/components/ui/searchable-select'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -366,16 +367,14 @@ export default function NichesPage() {
                   </div>
                   <div className="space-y-1">
                     <label className={labelClass}>Type de prime</label>
-                    <select
-                      className={selectClass}
+                    <SearchableSelect
                       value={form.bonus_type}
-                      onChange={(e) =>
-                        setForm({ ...form, bonus_type: e.target.value as 'FCFA' | 'POINTS' })
-                      }
-                    >
-                      <option value="FCFA">Prime FCFA</option>
-                      <option value="POINTS">Prime points</option>
-                    </select>
+                      onChange={(val) => setForm({ ...form, bonus_type: val as 'FCFA' | 'POINTS' })}
+                      options={[
+                        { value: 'FCFA', label: 'Prime FCFA' },
+                        { value: 'POINTS', label: 'Prime points' },
+                      ]}
+                    />
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 justify-end pt-5 border-t border-gray-50 mt-5">

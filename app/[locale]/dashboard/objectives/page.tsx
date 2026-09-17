@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import Header from '@/components/dashboard/Header'
+import SearchableSelect from '@/components/ui/searchable-select'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -310,28 +311,22 @@ export default function ObjectivesPage() {
                   </div>
                   <div className="space-y-1">
                     <label className={labelClass}>Période</label>
-                    <select
-                      className={selectClass}
+                    <SearchableSelect
                       value={newMetric.period}
-                      onChange={(e) => setNewMetric({ ...newMetric, period: e.target.value })}
-                    >
-                      {PERIODS.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.label}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(val) => setNewMetric({ ...newMetric, period: val })}
+                      options={PERIODS.map((p) => ({ value: p.id, label: p.label }))}
+                    />
                   </div>
                   <div className="space-y-1">
                     <label className={labelClass}>Type</label>
-                    <select
-                      className={selectClass}
+                    <SearchableSelect
                       value={newMetric.kind}
-                      onChange={(e) => setNewMetric({ ...newMetric, kind: e.target.value })}
-                    >
-                      <option value="QUANTITATIVE">Quantitatif</option>
-                      <option value="BOOLEAN">Checklist</option>
-                    </select>
+                      onChange={(val) => setNewMetric({ ...newMetric, kind: val })}
+                      options={[
+                        { value: 'QUANTITATIVE', label: 'Quantitatif' },
+                        { value: 'BOOLEAN', label: 'Checklist' },
+                      ]}
+                    />
                   </div>
                   <div className="space-y-1">
                     <label className={labelClass}>Cible</label>

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import Header from '@/components/dashboard/Header'
+import SearchableSelect from '@/components/ui/searchable-select'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
@@ -298,15 +299,15 @@ export default function RewardsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
                   <div className="space-y-1">
                     <label className={labelClass}>Période</label>
-                    <select
-                      className={selectClass}
+                    <SearchableSelect
                       value={bonusForm.period}
-                      onChange={(e) => setBonusForm({ ...bonusForm, period: e.target.value })}
-                    >
-                      <option value="DAILY">Journalier</option>
-                      <option value="WEEKLY">Hebdomadaire</option>
-                      <option value="MONTHLY">Mensuel</option>
-                    </select>
+                      onChange={(val) => setBonusForm({ ...bonusForm, period: val })}
+                      options={[
+                        { value: 'DAILY', label: 'Journalier' },
+                        { value: 'WEEKLY', label: 'Hebdomadaire' },
+                        { value: 'MONTHLY', label: 'Mensuel' },
+                      ]}
+                    />
                   </div>
                   <div className="space-y-1">
                     <label className={labelClass}>Seuil points</label>
@@ -566,44 +567,39 @@ export default function RewardsPage() {
                   </div>
                   <div className="space-y-1">
                     <label className={labelClass}>Portée</label>
-                    <select
-                      className={selectClass}
+                    <SearchableSelect
                       value={chalForm.scope}
-                      onChange={(e) => setChalForm({ ...chalForm, scope: e.target.value })}
-                    >
-                      <option value="METRIC">Objectif précis</option>
-                      <option value="PERIOD_TYPE">Type d&apos;objectifs</option>
-                    </select>
+                      onChange={(val) => setChalForm({ ...chalForm, scope: val })}
+                      options={[
+                        { value: 'METRIC', label: 'Objectif précis' },
+                        { value: 'PERIOD_TYPE', label: "Type d'objectifs" },
+                      ]}
+                    />
                   </div>
                   <div className="space-y-1">
                     <label className={labelClass}>
                       {chalForm.scope === 'METRIC' ? 'Métrique' : 'Période'}
                     </label>
                     {chalForm.scope === 'METRIC' ? (
-                      <select
-                        className={selectClass}
+                      <SearchableSelect
                         value={chalForm.metric_id}
-                        onChange={(e) =>
-                          setChalForm({ ...chalForm, metric_id: e.target.value })
-                        }
-                      >
-                        <option value="">Choisir…</option>
-                        {metrics.map((m) => (
-                          <option key={m.id} value={m.id}>
-                            {m.label} ({m.period})
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(val) => setChalForm({ ...chalForm, metric_id: val })}
+                        placeholder="Choisir une métrique..."
+                        options={metrics.map((m) => ({
+                          value: m.id,
+                          label: `${m.label} (${m.period})`,
+                        }))}
+                      />
                     ) : (
-                      <select
-                        className={selectClass}
+                      <SearchableSelect
                         value={chalForm.period}
-                        onChange={(e) => setChalForm({ ...chalForm, period: e.target.value })}
-                      >
-                        <option value="DAILY">Journalier</option>
-                        <option value="WEEKLY">Hebdomadaire</option>
-                        <option value="MONTHLY">Mensuel</option>
-                      </select>
+                        onChange={(val) => setChalForm({ ...chalForm, period: val })}
+                        options={[
+                          { value: 'DAILY', label: 'Journalier' },
+                          { value: 'WEEKLY', label: 'Hebdomadaire' },
+                          { value: 'MONTHLY', label: 'Mensuel' },
+                        ]}
+                      />
                     )}
                   </div>
                   <div className="space-y-1">

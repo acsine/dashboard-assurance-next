@@ -21,7 +21,6 @@ import {
   Award,
   CheckCircle2,
   LockKeyhole,
-  Sparkles,
   ArrowLeft,
 } from 'lucide-react'
 
@@ -291,7 +290,7 @@ export default function LoginPage() {
               className="bg-white/15 backdrop-blur-2xl p-8 rounded-3xl border border-white/25 shadow-2xl text-white space-y-4 max-w-lg"
             >
               <div className="w-10 h-10 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center font-black shadow-md">
-                <Sparkles className="h-5 w-5" />
+                <ShieldCheck className="h-5 w-5" />
               </div>
               <h3 className="text-xl font-black leading-snug">
                 "Une plateforme moderne pour gérer la souscription et le suivi des sinistres en toute sécurité."

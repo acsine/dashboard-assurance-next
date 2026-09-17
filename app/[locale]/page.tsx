@@ -35,7 +35,6 @@ import {
   HelpCircle,
   Play,
   TrendingUp,
-  Sparkles,
   ExternalLink,
   ChevronRight,
   Globe,

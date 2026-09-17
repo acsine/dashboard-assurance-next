@@ -4,13 +4,12 @@ import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { usePathname, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { supportApi } from '@/lib/api/mobi-assur'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { useSupportNotificationsStore } from '@/lib/stores/support-notifications-store'
 
 /**
- * Abonnement SSE global (dashboard) pour les messages / tickets support.
- * Filet HTTP : poll des tickets ouverts si le SSE Vercel est coupé / multi-worker.
+ * Abonnement SSE passif global (dashboard) pour les notifications temps réel.
+ * Le frontend écoute uniquement le flux Server-Sent Events émises par le backend.
  */
 export function SupportSseListener() {
   const queryClient = useQueryClient()
@@ -29,7 +28,7 @@ export function SupportSseListener() {
   userIdRef.current = userId
   routerRef.current = router
 
-  // SSE : connexion stable (ne pas recréer à chaque navigation)
+  // Connexion SSE passive : écoute les événements diffusés par le backend
   useEffect(() => {
     const eventSource = new EventSource('/api/sse', { withCredentials: true })
 
@@ -47,7 +46,9 @@ export function SupportSseListener() {
         if (!ticketId) return
 
         queryClient.invalidateQueries({ queryKey: ['tickets'] })
-        queryClient.invalidateQueries({ queryKey: ['messages', ticketId] })
+        queryClient.invalidateQueries({ queryKey: ['messages'] })
+        queryClient.invalidateQueries({ queryKey: ['conversation-messages'] })
+        queryClient.invalidateQueries({ queryKey: ['support-conversations'] })
 
         const me = userIdRef.current
         if (me && data.sender_id?.toString() === me.toString()) return
@@ -55,7 +56,6 @@ export function SupportSseListener() {
         const before = useSupportNotificationsStore.getState().items.length
         pushInboundFromMessage(data, { currentUserId: me })
         const after = useSupportNotificationsStore.getState().items.length
-        // Toast seulement si nouvelle notif (évite doublons canal backoffice)
         if (after <= before) return
 
         const preview =
@@ -93,6 +93,7 @@ export function SupportSseListener() {
         const ticketId = data.id?.toString()
         if (!ticketId) return
         queryClient.invalidateQueries({ queryKey: ['tickets'] })
+        queryClient.invalidateQueries({ queryKey: ['support-conversations'] })
         const before = useSupportNotificationsStore.getState().items.length
         push({
           id: `ticket-${ticketId}`,
@@ -113,21 +114,25 @@ export function SupportSseListener() {
       }
     }
 
-    eventSource.addEventListener('new_message', onNewMessage)
-    eventSource.addEventListener('support_ticket_created', onTicketCreated)
     const onMessageRead = (e: MessageEvent) => {
       try {
         const data = JSON.parse(e.data) as { ticket_id?: string }
         const ticketId = data.ticket_id?.toString()
         if (!ticketId) return
-        queryClient.invalidateQueries({ queryKey: ['messages', ticketId] })
+        queryClient.invalidateQueries({ queryKey: ['tickets'] })
+        queryClient.invalidateQueries({ queryKey: ['messages'] })
+        queryClient.invalidateQueries({ queryKey: ['conversation-messages'] })
+        queryClient.invalidateQueries({ queryKey: ['support-conversations'] })
       } catch (err) {
         console.error('SSE message_read parse error', err)
       }
     }
+
+    eventSource.addEventListener('new_message', onNewMessage)
+    eventSource.addEventListener('support_ticket_created', onTicketCreated)
     eventSource.addEventListener('message_read', onMessageRead)
+
     eventSource.onerror = () => {
-      // EventSource ne donne pas le status HTTP ; si flux fermé, vérifier la session.
       if (eventSource.readyState !== EventSource.CLOSED) return
       void fetch('/api/auth/session', { credentials: 'include', cache: 'no-store' })
         .then(async (response) => {
@@ -150,56 +155,6 @@ export function SupportSseListener() {
       eventSource.close()
     }
   }, [queryClient, push, pushInboundFromMessage])
-
-  // Filet cloche dashboard-wide (SSE KO sur Vercel multi-worker / timeout)
-  useEffect(() => {
-    if (!userId) return
-    let cancelled = false
-    const seen = new Set<string>()
-    let primed = false
-
-    const sync = async () => {
-      try {
-        const tickets = await supportApi.listTickets()
-        if (cancelled) return
-        const open = tickets
-          .filter((t) => t.status === 'OUVERT')
-          .slice(0, 15)
-        for (const ticket of open) {
-          try {
-            const msgs = await supportApi.getMessages(ticket.id)
-            if (cancelled) return
-            for (const m of msgs) {
-              const id = m.id?.toString()
-              if (!id) continue
-              if (!primed) {
-                seen.add(id)
-                continue
-              }
-              if (seen.has(id)) continue
-              seen.add(id)
-              pushInboundFromMessage(
-                { ...m, ticket_id: m.ticket_id || ticket.id },
-                { currentUserId: userId },
-              )
-            }
-          } catch {
-            // ignore per-ticket
-          }
-        }
-        primed = true
-      } catch {
-        // ignore list errors
-      }
-    }
-
-    void sync()
-    const timer = setInterval(() => void sync(), 20_000)
-    return () => {
-      cancelled = true
-      clearInterval(timer)
-    }
-  }, [userId, pushInboundFromMessage])
 
   return null
 }

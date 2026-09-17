@@ -5,10 +5,11 @@ import { useState } from 'react'
 import { contractsApi, clientsApi } from '@/lib/api/mobi-assur'
 import Header from '@/components/dashboard/Header'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import SearchableSelect from '@/components/ui/searchable-select'
 import { Search, FileText, Eye, Download, ShieldAlert, Plus, Filter, FileSpreadsheet } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
 import ExcelImportModal from '@/components/excel/ExcelImportModal'
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -52,16 +53,19 @@ export default function ContractsPage() {
             <span className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-500">
               <Filter className="h-4 w-4" />
             </span>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="flex h-11 w-full sm:w-56 rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2 text-xs font-semibold text-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:bg-white"
-            >
-              <option value="">Tous les statuts ({safeContracts.length})</option>
-              <option value="DEVIS">Devis uniquement</option>
-              <option value="PAYE">Contrats payés</option>
-              <option value="ANNULE">Contrats annulés</option>
-            </select>
+            <div className="w-full sm:w-64">
+              <SearchableSelect
+                value={statusFilter}
+                onChange={(val) => setStatusFilter(val)}
+                placeholder={`Tous les statuts (${safeContracts.length})`}
+                options={[
+                  { value: '', label: `Tous les statuts (${safeContracts.length})` },
+                  { value: 'DEVIS', label: 'Devis uniquement' },
+                  { value: 'PAYE', label: 'Contrats payés' },
+                  { value: 'ANNULE', label: 'Contrats annulés' },
+                ]}
+              />
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -152,7 +156,7 @@ export default function ContractsPage() {
                         </span>
                       </td>
                       <td className="py-4 px-2 font-extrabold text-xs text-slate-900">
-                        {(contract.prime_ttc || 0).toLocaleString('fr-FR')} FCFA
+                        {(contract.pttc ?? contract.prime_ttc ?? 0).toLocaleString('fr-FR')} FCFA
                       </td>
                       <td className="py-4 px-2">
                         <span

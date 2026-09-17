@@ -15,6 +15,7 @@ import {
 } from '@/lib/api/mobi-assur'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { Button } from '@/components/ui/button'
+import SearchableSelect from '@/components/ui/searchable-select'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
@@ -674,18 +675,17 @@ export function RcTariffPanel() {
       <CardContent className="pt-6 space-y-6">
         <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4 space-y-2">
           <FieldLabel>Assureur (obligatoire)</FieldLabel>
-          <select
-            value={insurerId}
-            onChange={(e) => setInsurerId(e.target.value)}
-            className="w-full h-10 text-xs border border-gray-200 rounded-md px-2 bg-white max-w-md"
-          >
-            <option value="">Choisir un assureur auto…</option>
-            {autoInsurers.map((i) => (
-              <option key={i.id} value={i.id}>
-                {i.code} — {i.name}
-              </option>
-            ))}
-          </select>
+          <div className="max-w-md">
+            <SearchableSelect
+              value={insurerId}
+              onChange={(val) => setInsurerId(val)}
+              placeholder="Choisir un assureur auto..."
+              options={autoInsurers.map((i) => ({
+                value: i.id,
+                label: `${i.code} — ${i.name}`,
+              }))}
+            />
+          </div>
           <p className="text-[11px] text-slate-500">
             Les tarifs RC sont stockés par assureur. Importez un Excel ou saisissez manuellement.
           </p>
@@ -720,18 +720,15 @@ export function RcTariffPanel() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <FieldLabel>Catégorie véhicule (nom)</FieldLabel>
-              <select
+              <SearchableSelect
                 value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full h-10 text-xs border border-gray-200 rounded-md px-2 bg-white"
-              >
-                <option value="">Choisir une catégorie…</option>
-                {catList.filter((c) => c.is_active).map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.code} — {c.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setCategoryId(val)}
+                placeholder="Choisir une catégorie..."
+                options={catList.filter((c) => c.is_active).map((c) => ({
+                  value: c.id,
+                  label: `${c.code} — ${c.name}`,
+                }))}
+              />
               {selectedCategory && (
                 <p className="text-[11px] text-slate-500">
                   Nom enregistré : <strong>{selectedCategory.name}</strong> ({selectedCategory.code})
@@ -741,19 +738,18 @@ export function RcTariffPanel() {
 
             <div className="space-y-1">
               <FieldLabel>Zone / région</FieldLabel>
-              <select
+              <SearchableSelect
                 value={zoneId}
-                onChange={(e) => setZoneId(e.target.value)}
-                className="w-full h-10 text-xs border border-gray-200 rounded-md px-2 bg-white"
-              >
-                <option value="">Toutes zones</option>
-                {zoneList.filter((z) => z.is_active).map((z) => (
-                  <option key={z.id} value={z.id}>
-                    {z.name}
-                    {(z.cities || []).length > 0 ? ` — ${(z.cities || []).join(', ')}` : ''}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setZoneId(val)}
+                placeholder="Toutes zones"
+                options={[
+                  { value: '', label: 'Toutes zones' },
+                  ...zoneList.filter((z) => z.is_active).map((z) => ({
+                    value: z.id,
+                    label: `${z.name}${(z.cities || []).length > 0 ? ` — ${(z.cities || []).join(', ')}` : ''}`,
+                  })),
+                ]}
+              />
               <p className="text-[11px] text-slate-500">
                 Région(s) : <strong>{selectedZone.regions}</strong>
               </p>
@@ -761,17 +757,13 @@ export function RcTariffPanel() {
 
             <div className="space-y-1 sm:col-span-2">
               <FieldLabel>Carburant</FieldLabel>
-              <select
-                value={fuel}
-                onChange={(e) => setFuel(e.target.value)}
-                className="w-full h-10 text-xs border border-gray-200 rounded-md px-2 bg-white max-w-xs"
-              >
-                {FUEL_OPTIONS.map((f) => (
-                  <option key={f} value={f}>
-                    {f}
-                  </option>
-                ))}
-              </select>
+              <div className="max-w-xs">
+                <SearchableSelect
+                  value={fuel}
+                  onChange={(val) => setFuel(val)}
+                  options={FUEL_OPTIONS.map((f) => ({ value: f, label: f }))}
+                />
+              </div>
             </div>
           </div>
 

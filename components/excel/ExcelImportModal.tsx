@@ -46,6 +46,7 @@ export default function ExcelImportModal({
   const [parseResult, setParseResult] = useState<ExcelParseOutput | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
+  const [isDownloadingTemplate, setIsDownloadingTemplate] = useState(false)
   const [isDragOver, setIsDragOver] = useState(false)
 
   if (!isOpen) return null
@@ -55,6 +56,7 @@ export default function ExcelImportModal({
     setParseResult(null)
     setIsAnalyzing(false)
     setIsImporting(false)
+    setIsDownloadingTemplate(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -143,6 +145,20 @@ export default function ExcelImportModal({
     }
   }
 
+  const handleDownloadTemplate = async () => {
+    setIsDownloadingTemplate(true)
+    try {
+      await excelImportApi.downloadTemplate(entityType)
+      toast.success(`Modèle officiel ${schema.label}.xlsx téléchargé depuis le backend`)
+    } catch (err: any) {
+      console.warn('Backend template endpoint unavailable, fallback to client generator:', err)
+      toast.info('Génération locale du modèle Excel exemple (mode secours)')
+      generateExcelTemplate(entityType)
+    } finally {
+      setIsDownloadingTemplate(false)
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
       <div className="w-full max-w-2xl bg-white rounded-3xl border border-slate-100 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -183,7 +199,7 @@ export default function ExcelImportModal({
               <div>
                 <span className="font-extrabold text-emerald-950 block">Besoin d'un modèle conforme ?</span>
                 <span className="text-emerald-800 text-[11px]">
-                  Téléchargez le modèle Excel pré-formaté avec les en-têtes officiels.
+                  Téléchargez le modèle officiel récupéré directement du backend.
                 </span>
               </div>
             </div>
@@ -191,10 +207,15 @@ export default function ExcelImportModal({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => generateExcelTemplate(entityType)}
+              disabled={isDownloadingTemplate}
+              onClick={handleDownloadTemplate}
               className="bg-white border-emerald-300 hover:bg-emerald-100 text-emerald-900 font-bold text-xs shrink-0 cursor-pointer"
             >
-              <Download className="h-3.5 w-3.5 mr-1.5 text-emerald-700" />
+              {isDownloadingTemplate ? (
+                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin text-emerald-700" />
+              ) : (
+                <Download className="h-3.5 w-3.5 mr-1.5 text-emerald-700" />
+              )}
               Modèle {schema.label}.xlsx
             </Button>
           </div>

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
+import SearchableSelect from '@/components/ui/searchable-select'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
@@ -89,44 +90,44 @@ export function CommissionRatesPanel() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="space-y-1">
                 <label className={labelClass}>Appliqué à</label>
-                <select
-                  className={selectClass}
+                <SearchableSelect
                   value={form.applies_to}
-                  onChange={(e) => setForm({ ...form, applies_to: e.target.value })}
-                >
-                  <option value="CONTRACT">Contrat</option>
-                  <option value="PROSPECT">Prospect</option>
-                  <option value="CLIENT">Client</option>
-                </select>
+                  onChange={(val) => setForm({ ...form, applies_to: val })}
+                  options={[
+                    { value: 'CONTRACT', label: 'Contrat' },
+                    { value: 'PROSPECT', label: 'Prospect' },
+                    { value: 'CLIENT', label: 'Client' },
+                  ]}
+                />
               </div>
               <div className="space-y-1">
                 <label className={labelClass}>Type produit</label>
-                <select
-                  className={selectClass}
+                <SearchableSelect
                   value={form.product_type}
-                  onChange={(e) => setForm({ ...form, product_type: e.target.value })}
-                >
-                  <option value="*">Tous types</option>
-                  <option value="CAT1">CAT1</option>
-                  <option value="CAT11">CAT11</option>
-                  <option value="SANTE">SANTÉ</option>
-                  <option value="VOYAGE">VOYAGE</option>
-                  <option value="AUTRE">AUTRE</option>
-                </select>
+                  onChange={(val) => setForm({ ...form, product_type: val })}
+                  options={[
+                    { value: '*', label: 'Tous types' },
+                    { value: 'CAT1', label: 'CAT1' },
+                    { value: 'CAT11', label: 'CAT11' },
+                    { value: 'SANTE', label: 'SANTÉ' },
+                    { value: 'VOYAGE', label: 'VOYAGE' },
+                    { value: 'AUTRE', label: 'AUTRE' },
+                  ]}
+                />
               </div>
               <div className="space-y-1">
                 <label className={labelClass}>Ligne produit</label>
-                <select
-                  className={selectClass}
+                <SearchableSelect
                   value={form.product_line}
-                  onChange={(e) => setForm({ ...form, product_line: e.target.value })}
-                >
-                  <option value="*">Toutes lignes</option>
-                  <option value="AUTO">AUTO</option>
-                  <option value="SANTE">SANTÉ</option>
-                  <option value="VOYAGE">VOYAGE</option>
-                  <option value="AUTRE">AUTRE</option>
-                </select>
+                  onChange={(val) => setForm({ ...form, product_line: val })}
+                  options={[
+                    { value: '*', label: 'Toutes lignes' },
+                    { value: 'AUTO', label: 'AUTO' },
+                    { value: 'SANTE', label: 'SANTÉ' },
+                    { value: 'VOYAGE', label: 'VOYAGE' },
+                    { value: 'AUTRE', label: 'AUTRE' },
+                  ]}
+                />
               </div>
               <div className="space-y-1">
                 <label className={labelClass}>Souscription</label>
@@ -139,14 +140,14 @@ export function CommissionRatesPanel() {
               </div>
               <div className="space-y-1">
                 <label className={labelClass}>Mode</label>
-                <select
-                  className={selectClass}
+                <SearchableSelect
                   value={form.rate_mode}
-                  onChange={(e) => setForm({ ...form, rate_mode: e.target.value })}
-                >
-                  <option value="PERCENT">Pourcentage</option>
-                  <option value="FIXED">Montant fixe FCFA</option>
-                </select>
+                  onChange={(val) => setForm({ ...form, rate_mode: val })}
+                  options={[
+                    { value: 'PERCENT', label: 'Pourcentage' },
+                    { value: 'FIXED', label: 'Montant fixe FCFA' },
+                  ]}
+                />
               </div>
               <div className="space-y-1">
                 <label className={labelClass}>Valeur</label>
