@@ -6,6 +6,7 @@ import {
   sinistresApi,
   walletApi,
 } from '@/lib/api/mobi-assur'
+import { toE164OrThrow } from '@/lib/phone'
 
 export type EntityType = 'prospects' | 'clients' | 'contracts' | 'sinistres' | 'objectives'
 
@@ -44,7 +45,7 @@ export const ENTITY_SCHEMAS: Record<EntityType, EntitySchema> = {
     fields: [
       { key: 'full_name', label: 'Nom complet', required: true, aliases: ['nom', 'nom complet', 'name', 'full_name', 'client', 'prenom'], example: 'Marie Nguema' },
       { key: 'phone', label: 'Numéro de Téléphone', required: true, aliases: ['telephone', 'téléphone', 'phone', 'mobile', 'tel', 'contact'], example: '677889900' },
-      { key: 'country_code', label: 'Code Pays (ex: 237)', required: false, aliases: ['code pays', 'country_code', 'pays'], example: '237' },
+      { key: 'country_code', label: 'Code Pays (ex: CM)', required: false, aliases: ['code pays', 'country_code', 'pays'], example: 'CM' },
       { key: 'email', label: 'Adresse Email', required: false, aliases: ['email', 'e-mail', 'courriel', 'mail'], example: 'marie.nguema@example.com' },
       { key: 'address', label: 'Adresse / Quartier', required: false, aliases: ['adresse', 'address', 'quartier', 'residence'], example: 'Akwa' },
       { key: 'city', label: 'Ville', required: false, aliases: ['ville', 'city', 'commune', 'region'], example: 'Douala' },
@@ -116,20 +117,54 @@ export function normalizeHeader(h: string): string {
     .replace(/_+/g, '_')
 }
 
+/** Le libellé et la clé sont reconnus au même titre qu'un alias : le modèle utilise le libellé. */
+function headerCandidates(field: EntityFieldSpec): string[] {
+  return [field.label, field.key, ...field.aliases].map(normalizeHeader).filter(Boolean)
+}
+
+/** `numero_de_telephone` contient `telephone`, mais `telephone_client` ne contient pas `tel`. */
+function containsSegments(header: string, candidate: string): boolean {
+  const segments = header.split('_').filter(Boolean)
+  const target = candidate.split('_').filter(Boolean)
+  if (!target.length || target.length > segments.length) return false
+  for (let start = 0; start <= segments.length - target.length; start++) {
+    if (target.every((part, offset) => segments[start + offset] === part)) return true
+  }
+  return false
+}
+
 export function validateHeaders(headers: string[], entityType: EntityType): HeaderMatchResult {
   const schema = ENTITY_SCHEMAS[entityType]
   const normalizedHeaders = headers.map((h) => ({ original: h, norm: normalizeHeader(h) }))
 
   const mappedFields: Record<string, string> = {}
   const foundKeys = new Set<string>()
+  const usedHeaders = new Set<string>()
+
+  const bind = (header: { original: string }, field: EntityFieldSpec) => {
+    mappedFields[header.original] = field.key
+    foundKeys.add(field.key)
+    usedHeaders.add(header.original)
+  }
 
   for (const field of schema.fields) {
-    const aliasNorms = field.aliases.map(normalizeHeader)
-    const match = normalizedHeaders.find((h) => aliasNorms.includes(h.norm))
-    if (match) {
-      mappedFields[match.original] = field.key
-      foundKeys.add(field.key)
-    }
+    const candidates = headerCandidates(field)
+    const match = normalizedHeaders.find(
+      (h) => !usedHeaders.has(h.original) && candidates.includes(h.norm),
+    )
+    if (match) bind(match, field)
+  }
+
+  // Repli sur les en-têtes enrichis d'un suffixe ou d'une parenthèse : « Numéro de Téléphone (phone) ».
+  for (const field of schema.fields) {
+    if (foundKeys.has(field.key)) continue
+    const candidates = headerCandidates(field).sort((a, b) => b.length - a.length)
+    const match = normalizedHeaders.find(
+      (h) =>
+        !usedHeaders.has(h.original) &&
+        candidates.some((candidate) => containsSegments(h.norm, candidate)),
+    )
+    if (match) bind(match, field)
   }
 
   const missingRequiredFields = schema.fields.filter(
@@ -187,86 +222,84 @@ export async function parseExcelFile(file: File, entityType: EntityType): Promis
   }
 }
 
+/** Exemples saisis par clé de champ : les en-têtes sont ensuite dérivés des libellés du schéma. */
+const TEMPLATE_EXAMPLES: Partial<Record<EntityType, Record<string, any>[]>> = {
+  clients: [
+    {
+      full_name: 'Marie Nguema',
+      phone: '677889900',
+      country_code: 'CM',
+      email: 'marie.nguema@example.com',
+      address: 'Akwa',
+      city: 'Douala',
+      cni_number: '102938475',
+      profession: 'Enseignante',
+      date_naissance: '1990-05-14',
+      sexe: 'FEMININ',
+      vehicle_marque: 'TOYOTA',
+      vehicle_modele: 'COROLLA',
+      vehicle_immatriculation: 'LT458AB',
+      vehicle_chassis_num: 'VF312345678901234',
+      vehicle_energie: 'ESSENCE',
+      vehicle_puissance_cv: 7,
+      vehicle_nb_places: 5,
+      vehicle_usage: 'PERSO',
+      vehicle_zone_circulation: 'ZONE1',
+    },
+    {
+      full_name: 'Paul Alain Mbida',
+      phone: '699001122',
+      country_code: 'CM',
+      email: 'paul.mbida@corp.cm',
+      address: 'Bastos',
+      city: 'Yaoundé',
+      cni_number: '203948576',
+      profession: 'Ingénieur BTP',
+      date_naissance: '1985-11-20',
+      sexe: 'MASCULIN',
+      vehicle_marque: 'HYUNDAI',
+      vehicle_modele: 'TUCSON',
+      vehicle_immatriculation: 'CE892XY',
+      vehicle_chassis_num: 'KM8J33A4123456789',
+      vehicle_energie: 'DIESEL',
+      vehicle_puissance_cv: 9,
+      vehicle_nb_places: 5,
+      vehicle_usage: 'PRO',
+      vehicle_zone_circulation: 'ZONE1',
+    },
+  ],
+  prospects: [
+    {
+      full_name: 'Jean Dupont',
+      phone: '699112233',
+      email: 'jean.dupont@example.com',
+      address: 'Bonapriso, Douala',
+      cni_number: '123456789',
+      profession: 'Architecte',
+      power_cv: 7,
+      fuel: 'ESSENCE',
+    },
+    {
+      full_name: 'Sandrine Bella',
+      phone: '670445566',
+      email: 'sandrine.bella@domain.cm',
+      address: 'Olembe, Yaoundé',
+      cni_number: '987654321',
+      profession: 'Médecin',
+      power_cv: 10,
+      fuel: 'DIESEL',
+    },
+  ],
+}
+
 export function generateExcelTemplate(entityType: EntityType) {
   const schema = ENTITY_SCHEMAS[entityType]
-
-  let exampleRows: Record<string, any>[] = []
-
-  if (entityType === 'clients') {
-    exampleRows = [
-      {
-        'Nom complet': 'Marie Nguema',
-        'Numéro de Téléphone': '677889900',
-        'Code Pays (ex: 237)': '237',
-        'Adresse Email': 'marie.nguema@example.com',
-        'Adresse / Quartier': 'Akwa',
-        'Ville': 'Douala',
-        'Numéro CNI': '102938475',
-        'Profession': 'Enseignante',
-        'Date de Naissance (AAAA-MM-JJ)': '1990-05-14',
-        'Sexe (MASCULIN/FEMININ)': 'FEMININ',
-        'Marque Véhicule': 'TOYOTA',
-        'Modèle Véhicule': 'COROLLA',
-        'Immatriculation Véhicule': 'LT458AB',
-        'Numéro de Châssis (VIN)': 'VF312345678901234',
-        'Carburant (ESSENCE/DIESEL)': 'ESSENCE',
-        'Puissance (CV)': 7,
-        'Nombre de Places': 5,
-        'Usage Véhicule': 'PERSO',
-        'Zone Circulation': 'ZONE1',
-      },
-      {
-        'Nom complet': 'Paul Alain Mbida',
-        'Numéro de Téléphone': '699001122',
-        'Code Pays (ex: 237)': '237',
-        'Adresse Email': 'paul.mbida@corp.cm',
-        'Adresse / Quartier': 'Bastos',
-        'Ville': 'Yaoundé',
-        'Numéro CNI': '203948576',
-        'Profession': 'Ingénieur BTP',
-        'Date de Naissance (AAAA-MM-JJ)': '1985-11-20',
-        'Sexe (MASCULIN/FEMININ)': 'MASCULIN',
-        'Marque Véhicule': 'HYUNDAI',
-        'Modèle Véhicule': 'TUCSON',
-        'Immatriculation Véhicule': 'CE892XY',
-        'Numéro de Châssis (VIN)': 'KM8J33A4123456789',
-        'Carburant (ESSENCE/DIESEL)': 'DIESEL',
-        'Puissance (CV)': 9,
-        'Nombre de Places': 5,
-        'Usage Véhicule': 'PRO',
-        'Zone Circulation': 'ZONE1',
-      },
-    ]
-  } else if (entityType === 'prospects') {
-    exampleRows = [
-      {
-        'Nom complet': 'Jean Dupont',
-        'Numéro de Téléphone': '699112233',
-        'Adresse Email': 'jean.dupont@example.com',
-        'Adresse / Quartier': 'Bonapriso, Douala',
-        'Numéro CNI': '123456789',
-        'Profession': 'Architecte',
-        'Puissance (CV)': 7,
-        'Carburant (ESSENCE/DIESEL)': 'ESSENCE',
-      },
-      {
-        'Nom complet': 'Sandrine Bella',
-        'Numéro de Téléphone': '670445566',
-        'Adresse Email': 'sandrine.bella@domain.cm',
-        'Adresse / Quartier': 'Olembe, Yaoundé',
-        'Numéro CNI': '987654321',
-        'Profession': 'Médecin',
-        'Puissance (CV)': 10,
-        'Carburant (ESSENCE/DIESEL)': 'DIESEL',
-      },
-    ]
-  } else {
-    const singleRow: Record<string, any> = {}
-    for (const field of schema.fields) {
-      singleRow[field.label] = field.example
-    }
-    exampleRows = [singleRow]
-  }
+  const examples = TEMPLATE_EXAMPLES[entityType] ?? [
+    Object.fromEntries(schema.fields.map((f) => [f.key, f.example])),
+  ]
+  const exampleRows = examples.map((example) =>
+    Object.fromEntries(schema.fields.map((f) => [f.label, example[f.key] ?? ''])),
+  )
 
   const ws = XLSX.utils.json_to_sheet(exampleRows, { header: schema.fields.map((f) => f.label) })
 
@@ -301,9 +334,14 @@ export async function executeBatchImport(
         if (!row.full_name || !row.phone) {
           throw new Error(`Ligne ${index + 1}: Nom complet et Téléphone sont obligatoires`)
         }
+        const parsedProspectPhone = toE164OrThrow(
+          String(row.phone),
+          row.country_code,
+          `Ligne ${index + 1}`,
+        )
         await prospectsApi.create({
           full_name: String(row.full_name),
-          phone: String(row.phone),
+          phone: parsedProspectPhone.e164,
           email: row.email ? String(row.email) : undefined,
           address: row.address ? String(row.address) : undefined,
           cni_number: row.cni_number ? String(row.cni_number) : undefined,
@@ -315,6 +353,11 @@ export async function executeBatchImport(
         if (!row.full_name || !row.phone) {
           throw new Error(`Ligne ${index + 1}: Nom complet et Téléphone sont obligatoires`)
         }
+        const parsedClientPhone = toE164OrThrow(
+          String(row.phone),
+          row.country_code,
+          `Ligne ${index + 1}`,
+        )
         const hasVehicle =
           row.vehicle_marque ||
           row.vehicle_modele ||
@@ -325,8 +368,8 @@ export async function executeBatchImport(
 
         await clientsApi.create({
           full_name: String(row.full_name),
-          phone: String(row.phone),
-          country_code: row.country_code ? String(row.country_code) : '237',
+          phone: parsedClientPhone.e164,
+          country_code: parsedClientPhone.country,
           email: row.email ? String(row.email) : undefined,
           address: row.address ? String(row.address) : undefined,
           city: row.city ? String(row.city) : undefined,

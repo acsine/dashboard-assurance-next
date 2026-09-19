@@ -16,6 +16,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
+import { useTranslations } from 'next-intl'
 import { Loader2, Pencil, Plus, RefreshCw, Trash2, Upload } from 'lucide-react'
 
 const ALL_PRODUCT_LINES: { code: ProductLineCode; label: string }[] = [
@@ -302,6 +303,7 @@ function InsurerFeesEditModal({
 }
 
 export function InsurersPanelContent() {
+  const t = useTranslations('insurers')
   const [newInsurerCode, setNewInsurerCode] = useState('')
   const [newInsurerName, setNewInsurerName] = useState('')
   const [newInsurerLines, setNewInsurerLines] = useState<ProductLineCode[]>(['AUTO'])
@@ -577,7 +579,7 @@ export function InsurersPanelContent() {
         <>
           <div className="p-4 border border-blue-100 rounded-lg bg-blue-50/40 space-y-3">
             <h4 className="text-xs font-bold text-blue-800 uppercase tracking-wider">
-              Politique tarifaire globale
+              {t('title')}
             </h4>
             {!agentsQuoteReady && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 font-medium">

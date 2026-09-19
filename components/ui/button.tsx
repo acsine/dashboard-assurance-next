@@ -36,33 +36,50 @@ const buttonVariants = cva(
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
+  /**
+   * État de chargement maîtrisé par l'appelant. Dès qu'il est fourni, la détection automatique
+   * du `onClick` asynchrone est désactivée : sans cela, un appelant affichant son propre
+   * indicateur en verrait deux.
+   */
   isLoading?: boolean
   asChild?: boolean
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, isLoading, children, disabled, onClick, ...props }, ref) => {
+  (
+    { className, variant, size, asChild = false, isLoading, children, disabled, onClick, ...props },
+    ref,
+  ) => {
     const [internalLoading, setInternalLoading] = React.useState(false)
 
     const handleClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
       if (!onClick) return
 
       const result = onClick(e) as unknown
-      
-      // If the onClick handler returns a Promise, automatically show a spinner
-      if (result instanceof Promise) {
-        setInternalLoading(true)
-        try {
-          await result
-        } finally {
-          // Check if component is still mounted (simple way is to just let it update, React handles unmounted state updates better now, but just in case)
-          setInternalLoading(false)
-        }
+      if (isLoading !== undefined || !(result instanceof Promise)) return
+
+      setInternalLoading(true)
+      try {
+        await result
+      } finally {
+        setInternalLoading(false)
       }
     }
 
-    const showLoading = isLoading || internalLoading
-    const Comp = props.asChild ? Slot : "button"
+    const showLoading = isLoading ?? internalLoading
+    const Comp = asChild ? Slot : "button"
+
+    if (asChild) {
+      return (
+        <Comp
+          className={cn(buttonVariants({ variant, size, className }))}
+          ref={ref}
+          {...props}
+        >
+          {children}
+        </Comp>
+      )
+    }
 
     return (
       <Comp

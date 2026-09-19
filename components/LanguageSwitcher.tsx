@@ -1,13 +1,17 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
 import locales from "@/i18n";
 
 const languages = locales;
 
-export default function LanguageSwitcher() {
+type LanguageSwitcherProps = {
+  variant?: 'default' | 'toolbar'
+}
+
+export default function LanguageSwitcher({ variant = 'default' }: LanguageSwitcherProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -17,7 +21,6 @@ export default function LanguageSwitcher() {
   const currentLanguage =
     languages.find((lang) => lang.code === locale) || languages[0];
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
@@ -34,25 +37,28 @@ export default function LanguageSwitcher() {
 
   const switchLanguage = (newLocale: string) => {
     setIsOpen(false);
-
-    // Get the current pathname without the locale prefix
-    const segments = pathname.split("/");
-    const pathnameWithoutLocale = segments.slice(2).join("/") || "";
-
-    // Navigate to the new locale
-    router.push(`/${newLocale}/${pathnameWithoutLocale}`);
+    router.replace(pathname, { locale: newLocale });
   };
 
   return (
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors border border-gray-300 rounded-lg hover:border-blue-600"
+        className={
+          variant === 'toolbar'
+            ? 'inline-flex h-10 items-center gap-1.5 whitespace-nowrap px-3 text-xs font-bold text-slate-700 bg-slate-50/70 hover:bg-white border border-slate-200/90 rounded-xl transition-colors cursor-pointer'
+            : 'flex items-center space-x-2 px-3 py-2 text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors border border-gray-300 rounded-lg hover:border-blue-600'
+        }
         aria-expanded={isOpen}
         aria-haspopup="true"
+        aria-label="Changer de langue"
       >
-        <span className="text-lg">{currentLanguage.flag}</span>
-        <span className="hidden sm:block">{currentLanguage.name}</span>
+        <span className={variant === 'toolbar' ? 'text-sm leading-none' : 'text-lg'}>
+          {currentLanguage.flag}
+        </span>
+        <span className={variant === 'toolbar' ? 'hidden 2xl:block' : 'hidden sm:block'}>
+          {currentLanguage.name}
+        </span>
         <svg
           className={`w-4 h-4 transition-transform ${isOpen ? "rotate-180" : ""}`}
           fill="none"
@@ -79,7 +85,6 @@ export default function LanguageSwitcher() {
                   ? "bg-blue-50 text-blue-600"
                   : "text-gray-900"
               }`}
-              dir={language.code === "ar" ? "rtl" : "ltr"}
             >
               <span className="text-lg">{language.flag}</span>
               <span className="flex-1 text-left">{language.name}</span>

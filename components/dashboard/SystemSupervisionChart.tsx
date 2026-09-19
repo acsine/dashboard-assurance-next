@@ -17,6 +17,7 @@ import {
   Smartphone,
   Cpu,
 } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 
 interface HistoryPoint {
   time: string
@@ -25,18 +26,13 @@ interface HistoryPoint {
 }
 
 export default function SystemSupervisionChart() {
-  const [history, setHistory] = useState<HistoryPoint[]>([
-    { time: '19:20', latency: 38, status: 'healthy' },
-    { time: '19:22', latency: 42, status: 'healthy' },
-    { time: '19:24', latency: 35, status: 'healthy' },
-    { time: '19:26', latency: 48, status: 'healthy' },
-    { time: '19:28', latency: 31, status: 'healthy' },
-    { time: '19:30', latency: 29, status: 'healthy' },
-  ])
+  const t = useTranslations('chart')
+  const [history, setHistory] = useState<HistoryPoint[]>([])
   const [hoveredPoint, setHoveredPoint] = useState<HistoryPoint | null>(null)
 
   const {
     data: health,
+    isLoading,
     isRefetching,
     refetch,
   } = useQuery<SystemHealthData>({
@@ -144,7 +140,7 @@ export default function SystemSupervisionChart() {
             </div>
             <div>
               <h3 className="font-extrabold text-slate-900 text-base tracking-tight flex items-center gap-2">
-                Supervision Réseau & Services
+                {t('title')}
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-black border border-slate-200">
                   <Wifi className="w-3 h-3 text-emerald-600" />
                   Live API
@@ -174,14 +170,21 @@ export default function SystemSupervisionChart() {
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">
                 Latence Backend (Ping API)
               </span>
-              <div className="flex items-baseline gap-2 mt-0.5">
-                <span className="text-2xl font-black text-white tracking-tight">
-                  {health?.overall_latency_ms ?? 35} <span className="text-xs text-emerald-400 font-bold">ms</span>
-                </span>
-                <span className="text-[11px] font-bold text-slate-400">
-                  (Uptime {health?.uptime_percentage ?? 99.98}%)
-                </span>
-              </div>
+              {isLoading ? (
+                <div role="status" aria-label="Mesure de la latence backend" className="flex items-baseline gap-2 mt-1.5">
+                  <span className="block h-6 w-20 rounded-md bg-slate-800 animate-pulse" />
+                  <span className="block h-3 w-24 rounded bg-slate-800/70 animate-pulse" />
+                </div>
+              ) : (
+                <div className="flex items-baseline gap-2 mt-0.5">
+                  <span className="text-2xl font-black text-white tracking-tight">
+                    {health?.overall_latency_ms ?? '—'} <span className="text-xs text-emerald-400 font-bold">ms</span>
+                  </span>
+                  <span className="text-[11px] font-bold text-slate-400">
+                    (Uptime {health?.uptime_percentage ?? '—'}%)
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="text-right">
@@ -201,6 +204,14 @@ export default function SystemSupervisionChart() {
 
           {/* SVG Smooth Area Chart */}
           <div className="relative h-[90px] w-full mt-2">
+            {isLoading && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-slate-900/80 backdrop-blur-[1px]">
+                <span className="inline-flex items-center gap-2 text-[11px] font-bold text-slate-300">
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin text-blue-400" />
+                  Relevé de la télémétrie…
+                </span>
+              </div>
+            )}
             <svg
               viewBox={`0 0 ${svgWidth} ${svgHeight}`}
               className="w-full h-full overflow-visible"
@@ -284,42 +295,32 @@ export default function SystemSupervisionChart() {
 
         {/* Detailed Service Status List */}
         <div className="mt-5 space-y-3">
-          {(
-            health?.services || [
-              {
-                name: 'API Gateway & Tarification',
-                key: 'gateway',
-                status: 'operational',
-                latency_ms: 15,
-                uptime_pct: 100,
-                last_check: 'Maintenant',
-              },
-              {
-                name: 'Génération Attestation CIMA',
-                key: 'cima_generator',
-                status: 'operational',
-                latency_ms: 28,
-                uptime_pct: 99.95,
-                last_check: 'Maintenant',
-              },
-              {
-                name: 'Synchronisation Mobile App',
-                key: 'mobile_sync',
-                status: 'operational',
-                latency_ms: 22,
-                uptime_pct: 99.85,
-                last_check: 'Maintenant',
-              },
-              {
-                name: 'Base de Données CIMA & Audit',
-                key: 'database',
-                status: 'operational',
-                latency_ms: 8,
-                uptime_pct: 100,
-                last_check: 'Maintenant',
-              },
-            ]
-          ).map((service) => {
+          {isLoading &&
+            Array.from({ length: 4 }).map((_, index) => (
+              <div
+                key={`service-skeleton-${index}`}
+                role="status"
+                aria-label="Chargement de l'état des services"
+                className="p-3 rounded-xl bg-slate-50 border border-slate-200/70 flex items-center justify-between gap-3"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-lg bg-slate-200 animate-pulse" />
+                  <div className="space-y-1.5">
+                    <div className="h-3 w-40 rounded bg-slate-200 animate-pulse" />
+                    <div className="h-2.5 w-28 rounded bg-slate-100 animate-pulse" />
+                  </div>
+                </div>
+                <div className="h-5 w-24 rounded-full bg-slate-100 animate-pulse shrink-0" />
+              </div>
+            ))}
+
+          {!isLoading && !health?.services?.length && (
+            <p className="py-6 text-center text-xs font-semibold text-slate-400">
+              État des services indisponible pour le moment.
+            </p>
+          )}
+
+          {(health?.services ?? []).map((service) => {
             const Icon = getServiceIcon(service.key)
             return (
               <div

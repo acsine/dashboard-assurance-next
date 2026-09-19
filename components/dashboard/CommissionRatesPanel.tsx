@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { Loader2, Plus, Trash2 } from 'lucide-react'
 import { commissionRatesApi, asList, type CommissionRateRule } from '@/lib/api/mobi-assur'
+import { useTranslations } from 'next-intl'
 
 const labelClass = 'text-[10px] font-bold text-gray-500 uppercase tracking-wider block'
 const selectClass =
@@ -17,6 +18,7 @@ const thClass = 'pb-4 text-xs font-bold text-gray-400 uppercase tracking-wider'
 const trClass = 'border-b border-gray-50 last:border-0 hover:bg-gray-50/40 transition-colors'
 
 export function CommissionRatesPanel() {
+  const t = useTranslations('commissions')
   const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({
@@ -65,10 +67,9 @@ export function CommissionRatesPanel() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h3 className="text-base font-bold text-gray-950">Grille de commissions</h3>
+          <h3 className="text-base font-bold text-gray-950">{t('title')}</h3>
           <p className="text-xs text-gray-500 mt-1">
-            Taux % ou montant fixe selon le type de contrat. Sinon, le taux global « Commission
-            agent » s&apos;applique.
+            {t('hint')}
           </p>
         </div>
         <button

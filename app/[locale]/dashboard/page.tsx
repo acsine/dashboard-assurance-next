@@ -25,8 +25,10 @@ import {
   Calendar,
   CheckCircle2,
   Loader2,
+  RefreshCw,
 } from 'lucide-react'
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 
 function SpinLinkButton({
   href,
@@ -60,33 +62,60 @@ function SpinLinkButton({
 }
 
 export default function DashboardOverview() {
+  const t = useTranslations('dashboard')
   const { user } = useAuthStore()
 
   // Queries
-  const { data: clients = [], isLoading: loadingClients } = useQuery({
+  const {
+    data: clients = [],
+    isLoading: loadingClients,
+    isFetching: fetchingClients,
+  } = useQuery({
     queryKey: ['clients'],
     queryFn: () => clientsApi.list(),
   })
 
-  const { data: contracts = [], isLoading: loadingContracts } = useQuery({
+  const {
+    data: contracts = [],
+    isLoading: loadingContracts,
+    isFetching: fetchingContracts,
+  } = useQuery({
     queryKey: ['contracts'],
     queryFn: () => contractsApi.list(),
   })
 
-  const { data: prospects = [] } = useQuery({
+  const {
+    data: prospects = [],
+    isLoading: loadingProspects,
+    isFetching: fetchingProspects,
+  } = useQuery({
     queryKey: ['prospects'],
     queryFn: () => prospectsApi.list(),
   })
 
-  const { data: withdrawals = [] } = useQuery({
+  const {
+    data: withdrawals = [],
+    isLoading: loadingWithdrawals,
+    isFetching: fetchingWithdrawals,
+  } = useQuery({
     queryKey: ['withdrawals-pending'],
     queryFn: () => walletApi.listPendingWithdrawals(),
   })
 
-  const { data: portalKpis } = useQuery({
+  const {
+    data: portalKpis,
+    isLoading: loadingPortalKpis,
+    isFetching: fetchingPortalKpis,
+  } = useQuery({
     queryKey: ['portal-kpis'],
     queryFn: () => portalClientApi.kpis(),
   })
+
+  const isInitialLoading =
+    loadingClients || loadingContracts || loadingProspects || loadingWithdrawals || loadingPortalKpis
+  const isRefreshing =
+    !isInitialLoading &&
+    (fetchingClients || fetchingContracts || fetchingProspects || fetchingWithdrawals || fetchingPortalKpis)
 
   // Calculations
   const safeClients = Array.isArray(clients) ? clients : []
@@ -116,6 +145,7 @@ export default function DashboardOverview() {
       description: 'Répertoire national clients',
       link: '/dashboard/clients',
       badge: 'Clientele',
+      loading: loadingClients,
     },
     {
       title: 'Volume Primes (TTC)',
@@ -125,6 +155,7 @@ export default function DashboardOverview() {
       description: `${paidContracts.length} contrats validés`,
       link: '/dashboard/contracts',
       badge: 'Chiffre d\'Affaires',
+      loading: loadingContracts,
     },
     {
       title: 'Prospects en Pipeline',
@@ -137,6 +168,7 @@ export default function DashboardOverview() {
           : 'Prospects synchronisés',
       link: '/dashboard/prospects',
       badge: 'Opportunités',
+      loading: loadingProspects,
     },
     {
       title: 'Retraits de Wallet',
@@ -146,6 +178,7 @@ export default function DashboardOverview() {
       description: 'Demandes agents en attente',
       link: '/dashboard/wallet',
       badge: 'Commissions',
+      loading: loadingWithdrawals,
     },
     {
       title: 'Comptes Portail Client',
@@ -155,6 +188,7 @@ export default function DashboardOverview() {
       description: 'Utilisateurs d\'application mobile',
       link: '/dashboard/clients',
       badge: 'Digital',
+      loading: loadingPortalKpis || loadingClients,
     },
     {
       title: 'Dossiers Sinistres Ouverts',
@@ -164,6 +198,7 @@ export default function DashboardOverview() {
       description: 'File d\'instruction sinistres',
       link: '/dashboard/sinistres',
       badge: 'Urgence',
+      loading: loadingPortalKpis,
     },
     {
       title: 'Paiements Déclarés',
@@ -173,6 +208,7 @@ export default function DashboardOverview() {
       description: 'Justificatifs à valider',
       link: '/dashboard/paiements-declares',
       badge: 'Encaissements',
+      loading: loadingPortalKpis,
     },
     {
       title: 'Demandes & Avenants',
@@ -182,14 +218,15 @@ export default function DashboardOverview() {
       description: 'Requêtes support ouvertes',
       link: '/dashboard/demandes-clients',
       badge: 'Support',
+      loading: loadingPortalKpis,
     },
   ]
 
   return (
     <div className="flex-1 flex flex-col bg-slate-50/60 min-h-screen">
       <Header
-        title="Commandement & Supervision Global"
-        subtitle="Tableau de bord de gestion des polices, sinistres et commissions Bethel Insurance."
+        title={t('title')}
+        subtitle={t('subtitle')}
       />
 
       <div className="p-6 sm:p-8 space-y-8 flex-1">
@@ -202,9 +239,32 @@ export default function DashboardOverview() {
           <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-blue-500/10 blur-[80px] rounded-full pointer-events-none" />
           <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="space-y-1.5">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-400/15 backdrop-blur-md border border-amber-400/30 text-amber-300 text-[11px] font-extrabold capitalize shadow-xs">
-                <Calendar className="h-3 w-3 text-amber-400" />
-                <span>{todayDateStr}</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-400/15 backdrop-blur-md border border-amber-400/30 text-amber-300 text-[11px] font-extrabold capitalize shadow-xs">
+                  <Calendar className="h-3 w-3 text-amber-400" />
+                  <span>{todayDateStr}</span>
+                </div>
+                <div
+                  aria-live="polite"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-slate-100 text-[11px] font-extrabold shadow-xs"
+                >
+                  {isInitialLoading ? (
+                    <>
+                      <Loader2 className="h-3 w-3 animate-spin text-blue-300" />
+                      <span>Chargement des données…</span>
+                    </>
+                  ) : isRefreshing ? (
+                    <>
+                      <RefreshCw className="h-3 w-3 animate-spin text-blue-300" />
+                      <span>Actualisation en cours…</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                      <span>Données à jour</span>
+                    </>
+                  )}
+                </div>
               </div>
               <h2 className="text-xl sm:text-2xl font-black tracking-tight leading-tight text-white drop-shadow-xs">
                 Bonjour, {user?.full_name || 'Gestionnaire'} 👋
@@ -290,10 +350,23 @@ export default function DashboardOverview() {
               </div>
               <div className="mt-4">
                 <span className="text-xs font-bold text-slate-500 block">{kpi.title}</span>
-                <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-tight block mt-1">
-                  {kpi.value}
-                </span>
-                <p className="text-[11px] font-medium text-slate-400 mt-1">{kpi.description}</p>
+                {kpi.loading ? (
+                  <>
+                    <span
+                      role="status"
+                      aria-label={`Chargement de ${kpi.title}`}
+                      className="mt-2 block h-8 w-28 rounded-lg bg-slate-200 animate-pulse"
+                    />
+                    <span className="mt-2 block h-3 w-40 rounded bg-slate-100 animate-pulse" />
+                  </>
+                ) : (
+                  <>
+                    <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-tight block mt-1">
+                      {kpi.value}
+                    </span>
+                    <p className="text-[11px] font-medium text-slate-400 mt-1">{kpi.description}</p>
+                  </>
+                )}
               </div>
               <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between">
                 <Link
@@ -331,7 +404,24 @@ export default function DashboardOverview() {
                 </Link>
               </div>
 
-              {safeContracts.length === 0 ? (
+              {loadingContracts ? (
+                <div role="status" aria-label="Chargement des polices d'assurance" className="space-y-3 py-2">
+                  {Array.from({ length: 5 }).map((_, index) => (
+                    <div key={index} className="flex items-center gap-4">
+                      <div className="flex-1 space-y-1.5">
+                        <div className="h-3.5 w-28 rounded bg-slate-200 animate-pulse" />
+                        <div className="h-2.5 w-16 rounded bg-slate-100 animate-pulse" />
+                      </div>
+                      <div className="h-3 w-14 rounded bg-slate-100 animate-pulse" />
+                      <div className="h-3.5 w-24 rounded bg-slate-200 animate-pulse" />
+                      <div className="h-5 w-16 rounded-full bg-slate-100 animate-pulse" />
+                    </div>
+                  ))}
+                  <p className="pt-2 text-center text-[11px] font-semibold text-slate-400">
+                    Chargement des polices d'assurance…
+                  </p>
+                </div>
+              ) : safeContracts.length === 0 ? (
                 <div className="py-12 text-center text-slate-400">
                   <FileText className="h-10 w-10 mx-auto text-slate-300 mb-3" />
                   <p className="text-sm font-medium">Aucun contrat enregistré</p>

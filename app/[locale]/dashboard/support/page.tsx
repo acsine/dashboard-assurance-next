@@ -8,6 +8,7 @@ import Header from '@/components/dashboard/Header'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import { toast } from 'sonner'
+import { useTranslations } from 'next-intl'
 import {
   MessageSquare,
   Send,
@@ -32,6 +33,7 @@ function formatParticipantLabel(name?: string | null, email?: string | null, cod
 }
 
 export default function SupportPage() {
+  const t = useTranslations('support')
   const queryClient = useQueryClient()
   const searchParams = useSearchParams()
   const currentUserId = useAuthStore((s) => s.user?.id)
@@ -165,8 +167,8 @@ export default function SupportPage() {
   return (
     <div className="flex-1 flex flex-col bg-slate-50 h-screen overflow-hidden">
       <Header
-        title="Support & Assistance Agents"
-        subtitle="Une discussion par agent — recherchez un interlocuteur et suivez les messages non lus."
+        title={t('title')}
+        subtitle={t('subtitle')}
       />
 
       <div className="flex-1 flex overflow-hidden p-6 gap-6">

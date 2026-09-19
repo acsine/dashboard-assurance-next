@@ -16,13 +16,13 @@ import { RoleGuard } from '@/components/auth/RoleGuard'
 import { paymentSummary } from '@/lib/payments'
 import { validateUploadFile } from '@/lib/files/validation'
 import Header from '@/components/dashboard/Header'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
 import {
   FileText,
-  User,
   Loader2,
   Calendar,
   DollarSign,
@@ -42,6 +42,7 @@ function paymentProofUrls(payment: Payment): string[] {
 }
 
 export default function ContractDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const t = useTranslations('contracts')
   const { id } = use(params)
   const queryClient = useQueryClient()
   const [showAddPayment, setShowAddPayment] = useState(false)
@@ -154,8 +155,7 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
   const generatePackMutation = useMutation({
     mutationFn: () => contractsApi.generatePack(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contract-docs', id] })
-      toast.success('Pack de documents généré')
+      toast.success('Classeur Excel téléchargé')
     },
     onError: (err: any) => {
       toast.error(err.message || 'Erreur lors de la génération du pack')
@@ -203,7 +203,7 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
 
   if (loadingContract) {
     return (
-      <div className="flex-grow flex items-center justify-center bg-white">
+      <div className="grow flex items-center justify-center bg-white">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
       </div>
     )
@@ -212,8 +212,8 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
   return (
     <div className="flex-1 flex flex-col bg-white">
       <Header
-        title={`Police d'Assurance #${id.substring(0, 8).toUpperCase()}`}
-        subtitle={`Réglez les cotisations, attribuez les attestations et téléchargez les documents.`}
+        title={`${t('title')} #${id.substring(0, 8).toUpperCase()}`}
+        subtitle={t('subtitle')}
       />
 
 
@@ -248,7 +248,7 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
                   <span className="text-[10px] text-gray-400 uppercase font-semibold block">
                     Date d'Effet
                   </span>
-                  <span className="text-sm font-semibold text-gray-800 mt-1 block flex items-center gap-1.5">
+                  <span className="text-sm font-semibold text-gray-800 mt-1 flex items-center gap-1.5">
                     <Calendar className="h-4 w-4 text-gray-400" />{' '}
                     {contract?.date_effet
                       ? new Date(contract.date_effet).toLocaleDateString('fr-FR')
@@ -319,7 +319,7 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
                     disabled={generatePackMutation.isPending || contract?.status !== 'PAYE'}
                     className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 disabled:bg-gray-150 disabled:text-gray-400 rounded-xl transition-all cursor-pointer border-0"
                   >
-                    {generatePackMutation.isPending ? 'Génération...' : 'Générer le Pack'}
+                    {generatePackMutation.isPending ? 'Génération...' : 'Télécharger le classeur Excel'}
                   </button>
                 </RoleGuard>
               </CardHeader>
@@ -400,7 +400,7 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
                           <button
                             onClick={() => {
                               toast.promise(
-                                contractsApi.downloadDoc(id, doc.id),
+                                contractsApi.downloadDoc(id, doc.id, doc),
                                 {
                                   loading: 'Téléchargement...',
                                   success: 'Document téléchargé',

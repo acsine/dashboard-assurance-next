@@ -2,17 +2,19 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import { clientsApi, asList } from '@/lib/api/mobi-assur'
+import { clientsApi, asList, type Client } from '@/lib/api/mobi-assur'
+import { isUnconvertedProspectClient } from '@/lib/schemas/client-form'
 import Header from '@/components/dashboard/Header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Search, Plus, User, Phone, MapPin, Eye, ArrowRight, FileText, Shield, FileSpreadsheet } from 'lucide-react'
-import Link from 'next/link'
+import { Search, Plus, User, FileText, Shield, FileSpreadsheet } from 'lucide-react'
 import { LinkButton } from '@/components/ui/link-button'
 import ExcelImportModal from '@/components/excel/ExcelImportModal'
 import { useQueryClient } from '@tanstack/react-query'
+import { useTranslations } from 'next-intl'
 
 export default function ClientsPage() {
+  const t = useTranslations('clients')
   const [search, setSearch] = useState('')
   const [isExcelModalOpen, setIsExcelModalOpen] = useState(false)
   const queryClient = useQueryClient()
@@ -22,14 +24,16 @@ export default function ClientsPage() {
     queryFn: () => clientsApi.list(search),
   })
 
-  const safeClients = asList<any>(clients)
+  const safeClients = asList<Client>(clients).filter(
+    (client) => !isUnconvertedProspectClient(client),
+  )
 
   return (
     <div className="flex-1 flex flex-col bg-transparent">
 
       <Header
-        title="Gestion des Clients Assurés"
-        subtitle="Consultez le répertoire national des clients, recherchez ou enregistrez de nouveaux assurés."
+        title={t('title')}
+        subtitle={t('subtitle')}
       />
 
       <div className="p-6 sm:p-8 space-y-6 flex-1">

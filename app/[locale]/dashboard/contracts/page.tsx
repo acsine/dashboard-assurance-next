@@ -4,16 +4,17 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { contractsApi, clientsApi } from '@/lib/api/mobi-assur'
 import Header from '@/components/dashboard/Header'
-import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import SearchableSelect from '@/components/ui/searchable-select'
-import { Search, FileText, Eye, Download, ShieldAlert, Plus, Filter, FileSpreadsheet } from 'lucide-react'
+import { FileText, Eye, Plus, Filter, FileSpreadsheet } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import ExcelImportModal from '@/components/excel/ExcelImportModal'
 import { useQueryClient } from '@tanstack/react-query'
+import { useTranslations } from 'next-intl'
 
 export default function ContractsPage() {
+  const t = useTranslations('contracts')
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [isExcelModalOpen, setIsExcelModalOpen] = useState(false)
   const queryClient = useQueryClient()
@@ -33,17 +34,12 @@ export default function ContractsPage() {
   const safeContracts = Array.isArray(contracts) ? contracts : []
   const safeClients = Array.isArray(clients) ? clients : []
 
-  const getClientName = (clientId: string) => {
-    const client = safeClients.find((c) => c.id === clientId)
-    return client ? client.full_name : `ID: ${clientId.substring(0, 8).toUpperCase()}`
-  }
-
   return (
     <div className="flex-1 flex flex-col bg-transparent">
 
       <Header
-        title="Polices d'Assurances & Devis"
-        subtitle="Visualisez la liste des polices émises, suivez les devis en cours et validez les règlements."
+        title={t('title')}
+        subtitle={t('subtitle')}
       />
 
       <div className="p-6 sm:p-8 space-y-6 flex-1">
@@ -176,12 +172,12 @@ export default function ContractsPage() {
                               onClick={() => {
                                 toast.loading("Génération du pack en cours...", { id: `gen-${contract.id}` })
                                 contractsApi.generatePack(contract.id).then(() => {
-                                  toast.success("Pack généré! Cliquez sur Gérer pour télécharger.", { id: `gen-${contract.id}` })
+                                  toast.success("Classeur Excel téléchargé.", { id: `gen-${contract.id}` })
                                 }).catch(() => {
                                   toast.error("Erreur lors de la génération", { id: `gen-${contract.id}` })
                                 })
                               }}
-                              title="Générer les documents"
+                              title="Télécharger tous les documents en Excel"
                               className="inline-flex items-center justify-center h-8 w-8 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg transition-all cursor-pointer border border-emerald-200/80"
                             >
                               <FileText className="h-4 w-4" />

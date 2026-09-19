@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { Award, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import {
   rewardsApi,
   objectivesApi,
@@ -63,6 +64,7 @@ function toLocalInput(iso?: string | null) {
 }
 
 export default function RewardsPage() {
+  const t = useTranslations('rewards')
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
   const canManage = can(user?.role, 'settings:manage')
@@ -240,8 +242,8 @@ export default function RewardsPage() {
   return (
     <div className="flex-1 flex flex-col bg-white">
       <Header
-        title="Récompenses"
-        subtitle="Bonus de seuils, conversion points → FCFA et challenges agents."
+        title={t('title')}
+        subtitle={t('subtitle')}
       />
 
       <div className="p-8 space-y-6 flex-1">

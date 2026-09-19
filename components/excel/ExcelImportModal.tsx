@@ -10,7 +10,6 @@ import {
   X,
   Loader2,
   FileCheck,
-  HelpCircle,
   ArrowRight,
   RefreshCw,
 } from 'lucide-react'
@@ -24,7 +23,8 @@ import {
   executeBatchImport,
   ExcelParseOutput,
 } from '@/lib/excel/import-engine'
-import { excelImportApi } from '@/lib/api/mobi-assur'
+import { excelImportApi, type ExcelImportRowError } from '@/lib/api/mobi-assur'
+import { useTranslations } from 'next-intl'
 
 export interface ExcelImportModalProps {
   entityType: EntityType
@@ -39,6 +39,7 @@ export default function ExcelImportModal({
   onClose,
   onSuccess,
 }: ExcelImportModalProps) {
+  const t = useTranslations('excel')
   const schema = ENTITY_SCHEMAS[entityType]
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -48,6 +49,7 @@ export default function ExcelImportModal({
   const [isImporting, setIsImporting] = useState(false)
   const [isDownloadingTemplate, setIsDownloadingTemplate] = useState(false)
   const [isDragOver, setIsDragOver] = useState(false)
+  const [rejectedRows, setRejectedRows] = useState<ExcelImportRowError[]>([])
 
   if (!isOpen) return null
 
@@ -57,6 +59,7 @@ export default function ExcelImportModal({
     setIsAnalyzing(false)
     setIsImporting(false)
     setIsDownloadingTemplate(false)
+    setRejectedRows([])
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -64,7 +67,7 @@ export default function ExcelImportModal({
     const isExcel =
       file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || file.name.endsWith('.csv')
     if (!isExcel) {
-      toast.error('Veuillez fournir un fichier au format Excel (.xlsx, .xls) ou CSV (.csv).')
+      toast.error(t('invalidFile'))
       return
     }
 
@@ -76,10 +79,10 @@ export default function ExcelImportModal({
       if (!res.validation.isValid) {
         toast.warning(`Champs obligatoires manquants dans ${file.name}`)
       } else {
-        toast.success(`Fichier ${file.name} analysé avec succès (${res.mappedRows.length} lignes)`)
+        toast.success(t('parsed', { name: file.name, count: res.mappedRows.length }))
       }
     } catch (err: any) {
-      toast.error(err.message || "Erreur lors de l'analyse du fichier Excel.")
+      toast.error(err.message || t('parseError'))
       setParseResult(null)
     } finally {
       setIsAnalyzing(false)
@@ -101,25 +104,31 @@ export default function ExcelImportModal({
   const handleStartImport = async () => {
     if (!parseResult || !parseResult.validation.isValid || !selectedFile) return
     setIsImporting(true)
+    setRejectedRows([])
     try {
       // 1. Try sending directly to backend Python Excel import endpoint first
       try {
-        await excelImportApi.uploadFile(entityType, selectedFile)
-        toast.success(`Importation réussie de ${parseResult.mappedRows.length} ${schema.label.toLowerCase()}`)
-        onSuccess()
-        onClose()
-        handleReset()
+        const report = await excelImportApi.uploadFile(entityType, selectedFile)
+        setRejectedRows(report.errors)
+        if (report.imported_count > 0) {
+          toast.success(t('imported', { count: report.imported_count, label: schema.label.toLowerCase() }))
+          if (report.skipped_count > 0) {
+            toast.warning(`${report.skipped_count} ligne(s) rejetée(s) — détail ci-dessous.`)
+          }
+          onSuccess()
+          if (report.skipped_count === 0) {
+            onClose()
+            handleReset()
+          }
+          return
+        }
+        toast.error(`Aucune ligne importée : ${report.errors[0]?.message || 'fichier non conforme'}`)
         return
       } catch (backendErr: any) {
-        // Handle backend structured 422 error
-        if (backendErr.status === 422 && backendErr.detail) {
-          try {
-            const detailObj = typeof backendErr.detail === 'string' ? JSON.parse(backendErr.detail) : backendErr.detail
-            if (detailObj.missing_fields) {
-              toast.error(`Backend: Champs manquants - ${detailObj.missing_fields.join(', ')}`)
-              return
-            }
-          } catch {}
+        // Le backend refuse le fichier (colonnes manquantes, droits, taille) : message explicite.
+        if (backendErr.status === 422 || backendErr.status === 413 || backendErr.status === 403) {
+          toast.error(backendErr.message || 'Fichier refusé par le backend')
+          return
         }
         // Fallback to client batch processing if backend endpoint not yet deployed
         console.warn('Backend endpoint unavailable, executing client batch fallback:', backendErr)
@@ -128,7 +137,7 @@ export default function ExcelImportModal({
       // 2. Client-side fallback batch processing
       const res = await executeBatchImport(entityType, parseResult.mappedRows)
       if (res.successCount > 0) {
-        toast.success(`Importation terminée : ${res.successCount} élément(s) ajouté(s) avec succès !`)
+        toast.success(t('done', { count: res.successCount }))
         if (res.failCount > 0) {
           toast.warning(`${res.failCount} ligne(s) non importée(s) en raison d'erreurs.`)
         }
@@ -136,10 +145,10 @@ export default function ExcelImportModal({
         onClose()
         handleReset()
       } else {
-        toast.error(`Aucun élément importé. ${res.errors[0] || ''}`)
+        toast.error(`${t('none')} ${res.errors[0] || ''}`)
       }
     } catch (err: any) {
-      toast.error(err.message || "Erreur lors de l'exécution de l'importation.")
+      toast.error(err.message || t('runError'))
     } finally {
       setIsImporting(false)
     }
@@ -149,10 +158,10 @@ export default function ExcelImportModal({
     setIsDownloadingTemplate(true)
     try {
       await excelImportApi.downloadTemplate(entityType)
-      toast.success(`Modèle officiel ${schema.label}.xlsx téléchargé depuis le backend`)
+      toast.success(t('templateOk', { label: schema.label }))
     } catch (err: any) {
       console.warn('Backend template endpoint unavailable, fallback to client generator:', err)
-      toast.info('Génération locale du modèle Excel exemple (mode secours)')
+      toast.info(t('templateFallback'))
       generateExcelTemplate(entityType)
     } finally {
       setIsDownloadingTemplate(false)
@@ -207,13 +216,11 @@ export default function ExcelImportModal({
               type="button"
               variant="outline"
               size="sm"
-              disabled={isDownloadingTemplate}
+              isLoading={isDownloadingTemplate}
               onClick={handleDownloadTemplate}
               className="bg-white border-emerald-300 hover:bg-emerald-100 text-emerald-900 font-bold text-xs shrink-0 cursor-pointer"
             >
-              {isDownloadingTemplate ? (
-                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin text-emerald-700" />
-              ) : (
+              {!isDownloadingTemplate && (
                 <Download className="h-3.5 w-3.5 mr-1.5 text-emerald-700" />
               )}
               Modèle {schema.label}.xlsx
@@ -358,6 +365,23 @@ export default function ExcelImportModal({
                 </div>
               )}
 
+              {/* BACKEND REPORT: Rejected rows */}
+              {rejectedRows.length > 0 && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-extrabold text-amber-950 uppercase tracking-wider">
+                    <AlertTriangle className="h-4 w-4 text-amber-600" />
+                    {rejectedRows.length} ligne(s) rejetée(s) par le backend
+                  </div>
+                  <ul className="max-h-40 overflow-y-auto space-y-1 text-[11.5px] font-medium text-amber-950">
+                    {rejectedRows.map((item, index) => (
+                      <li key={`${item.row}-${index}`} className="bg-white/80 rounded-lg px-2.5 py-1.5 border border-amber-200">
+                        <span className="font-bold">Ligne {item.row ?? '?'}</span> — {item.message}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {/* SUCCESS STATE: Preview Parsed Rows */}
               {parseResult && parseResult.validation.isValid && (
                 <div className="space-y-3">
@@ -372,13 +396,13 @@ export default function ExcelImportModal({
                   </div>
 
                   {/* Table Preview */}
-                  <div className="border border-slate-200 rounded-2xl overflow-hidden max-h-48 overflow-y-auto">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead className="bg-slate-100 text-slate-700 font-bold uppercase tracking-wider text-[10px] sticky top-0">
+                  <div className="border border-slate-200 rounded-2xl max-h-48 overflow-auto overscroll-contain">
+                    <table className="w-max min-w-full text-left text-xs border-collapse">
+                      <thead className="text-slate-700 font-bold uppercase tracking-wider text-[10px] sticky top-0 z-10">
                         <tr>
-                          <th className="p-2.5 px-3">#</th>
+                          <th className="p-2.5 px-3 bg-slate-100 sticky left-0 z-20">#</th>
                           {schema.fields.map((f) => (
-                            <th key={f.key} className="p-2.5 px-3">
+                            <th key={f.key} className="p-2.5 px-3 bg-slate-100 whitespace-nowrap">
                               {f.label}
                             </th>
                           ))}
@@ -386,23 +410,28 @@ export default function ExcelImportModal({
                       </thead>
                       <tbody className="divide-y divide-slate-100 bg-white">
                         {parseResult.mappedRows.slice(0, 5).map((r, i) => (
-                          <tr key={i} className="hover:bg-slate-50">
-                            <td className="p-2.5 px-3 text-slate-400 font-bold">{i + 1}</td>
+                          <tr key={i} className="group hover:bg-slate-50">
+                            <td className="p-2.5 px-3 text-slate-400 font-bold bg-white group-hover:bg-slate-50 sticky left-0">
+                              {i + 1}
+                            </td>
                             {schema.fields.map((f) => (
-                              <td key={f.key} className="p-2.5 px-3 text-slate-800 font-medium">
-                                {r[f.key] != null ? String(r[f.key]) : '—'}
+                              <td
+                                key={f.key}
+                                className="p-2.5 px-3 text-slate-800 font-medium whitespace-nowrap"
+                              >
+                                {r[f.key] != null && r[f.key] !== '' ? String(r[f.key]) : '—'}
                               </td>
                             ))}
                           </tr>
                         ))}
                       </tbody>
                     </table>
-                    {parseResult.mappedRows.length > 5 && (
-                      <div className="p-2 text-center text-[11px] text-slate-400 font-semibold bg-slate-50 border-t border-slate-100">
-                        + {parseResult.mappedRows.length - 5} autres lignes
-                      </div>
-                    )}
                   </div>
+                  {parseResult.mappedRows.length > 5 && (
+                    <p className="text-center text-[11px] text-slate-400 font-semibold">
+                      + {parseResult.mappedRows.length - 5} autres lignes
+                    </p>
+                  )}
                 </div>
               )}
             </div>
@@ -426,17 +455,15 @@ export default function ExcelImportModal({
           <Button
             type="button"
             onClick={handleStartImport}
-            disabled={!parseResult || !parseResult.validation.isValid || isImporting}
+            isLoading={isImporting}
+            disabled={!parseResult || !parseResult.validation.isValid}
             className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold text-xs px-6 py-2.5 rounded-xl cursor-pointer shadow-xs flex items-center gap-2"
           >
             {isImporting ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin text-white" />
-                <span>Importation en cours...</span>
-              </>
+              <span>Importation en cours...</span>
             ) : (
               <>
-                <span>Lancer l'Importation ({parseResult?.mappedRows.length || 0})</span>
+                <span>{t('launch', { count: parseResult?.mappedRows.length || 0 })}</span>
                 <ArrowRight className="h-4 w-4" />
               </>
             )}

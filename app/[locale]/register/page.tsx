@@ -5,12 +5,17 @@ import { useRouter } from '@/i18n/navigation'
 import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Breadcrumb } from '@/components/ui/breadcrumb'
+import { PhoneField } from '@/components/ui/phone-field'
+import { parseValidPhone, DEFAULT_PHONE_COUNTRY } from '@/lib/phone'
+import type { CountryCode } from 'libphonenumber-js'
 import { toast } from 'sonner'
+import { useTranslations } from 'next-intl'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
 import { motion } from 'framer-motion'
 import {
   Mail,
   Lock,
-  Phone,
   User,
   ArrowRight,
   Loader2,
@@ -18,13 +23,14 @@ import {
   ShieldCheck,
   Eye,
   EyeOff,
-  ArrowLeft,
   LockKeyhole,
 } from 'lucide-react'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://gestion-d-assurance-v1-ten.vercel.app'
+const API_BASE = process.env.NEXT_PUBLIC_API_URL
 
 export default function RegisterPage() {
+  const t = useTranslations('auth.register')
+  const tCommon = useTranslations('common')
   const router = useRouter()
   const searchParams = useSearchParams()
   const simulationId = searchParams.get('simulation_id')
@@ -32,6 +38,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
+  const [phoneCountry, setPhoneCountry] = useState<CountryCode>(DEFAULT_PHONE_COUNTRY)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -40,7 +47,13 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!fullName || !phone || !email || !password) {
-      toast.error('Veuillez remplir tous les champs obligatoires')
+      toast.error(tCommon('fillRequired'))
+      return
+    }
+
+    const parsedPhone = parseValidPhone(phone, phoneCountry)
+    if (!parsedPhone) {
+      toast.error(tCommon('phoneInvalid'))
       return
     }
 
@@ -51,7 +64,8 @@ export default function RegisterPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           full_name: fullName,
-          phone: phone,
+          phone: parsedPhone.e164,
+          country_code: parsedPhone.country,
           email: email,
           password: password,
           quote_simulation_id: simulationId || null,
@@ -62,16 +76,16 @@ export default function RegisterPage() {
 
       if (resp.ok && data?.data?.access_token) {
         localStorage.setItem('client_access_token', data.data.access_token)
-        toast.success(data.message || 'Création de compte réussie ! Redirection...')
+        toast.success(data.message || t('success'))
         setTimeout(() => {
           router.push('/dashboard')
         }, 1200)
       } else {
-        toast.error(data?.message || 'Erreur lors de la création de votre compte')
+        toast.error(data?.message || t('error'))
       }
     } catch (err: any) {
       console.error(err)
-      toast.error("Impossible de contacter le serveur d'inscription.")
+      toast.error(t('server'))
     } finally {
       setLoading(false)
     }
@@ -88,20 +102,22 @@ export default function RegisterPage() {
         {/* Left Side: Form Container */}
         <div className="w-full lg:w-1/2 flex flex-col justify-between p-6 sm:p-12 lg:p-16 bg-white/95 backdrop-blur-2xl border-r border-white/20 shadow-2xl relative overflow-y-auto">
           
-          {/* Top Return Button */}
+          {/* Top Navigation */}
           <div className="flex items-center justify-between">
-            <button
-              onClick={() => router.push('/')}
-              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold text-slate-600 hover:text-blue-900 bg-slate-100 hover:bg-blue-50 border border-slate-200/80 transition-all cursor-pointer group"
-            >
-              <ArrowLeft className="h-3.5 w-3.5 group-hover:-translate-x-1 transition-transform text-blue-600" />
-              <span>Retour à l'accueil</span>
-            </button>
+            <Breadcrumb
+              items={[
+                { label: tCommon('breadcrumb.home'), href: '/' },
+                { label: tCommon('breadcrumb.register') },
+              ]}
+            />
 
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-blue-50 text-blue-800 border border-blue-200/80">
-              <ShieldCheck className="h-3.5 w-3.5 text-blue-600" />
-              Création d'Espace Assuré
-            </span>
+            <div className="flex items-center gap-2">
+              <LanguageSwitcher />
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-blue-50 text-blue-800 border border-blue-200/80">
+                <ShieldCheck className="h-3.5 w-3.5 text-blue-600" />
+                {t('badge')}
+              </span>
+            </div>
           </div>
 
           {/* Form Content */}
@@ -119,10 +135,10 @@ export default function RegisterPage() {
                 className="h-28 sm:h-36 w-auto object-contain drop-shadow-md transition-transform hover:scale-105"
               />
               <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-[#1b365d] mt-1">
-                Inscription Assuré
+                {t('title')}
               </h1>
               <p className="text-slate-500 text-xs sm:text-sm font-medium mt-1 max-w-sm">
-                Créez votre espace personnel pour suivre vos devis, attestation et réclamations.
+                {t('subtitle')}
               </p>
             </div>
 
@@ -144,7 +160,7 @@ export default function RegisterPage() {
               {/* Nom complet */}
               <div className="space-y-1">
                 <label className="text-[11px] font-extrabold text-slate-800 uppercase tracking-wider block">
-                  Nom complet *
+                  {t('fullName')} *
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -164,27 +180,22 @@ export default function RegisterPage() {
               {/* Téléphone */}
               <div className="space-y-1">
                 <label className="text-[11px] font-extrabold text-slate-800 uppercase tracking-wider block">
-                  N° de Téléphone (+237) *
+                  {t('phone')} *
                 </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Phone className="h-4 w-4 text-emerald-600" />
-                  </div>
-                  <Input
-                    type="tel"
-                    placeholder="+237 699 11 22 33"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="pl-11 h-11 bg-slate-50/60 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#1b365d] focus:ring-2 focus:ring-[#1b365d]/20 rounded-xl text-xs font-medium"
-                    required
-                  />
-                </div>
+                <PhoneField
+                  value={phone}
+                  onChange={setPhone}
+                  country={phoneCountry}
+                  onCountryChange={setPhoneCountry}
+                  required
+                  placeholder="677000000"
+                />
               </div>
 
               {/* Email */}
               <div className="space-y-1">
                 <label className="text-[11px] font-extrabold text-slate-800 uppercase tracking-wider block">
-                  Adresse E-mail *
+                  {t('email')} *
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -204,7 +215,7 @@ export default function RegisterPage() {
               {/* Mot de passe */}
               <div className="space-y-1">
                 <label className="text-[11px] font-extrabold text-slate-800 uppercase tracking-wider block">
-                  Mot de passe *
+                  {t('password')} *
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -237,11 +248,11 @@ export default function RegisterPage() {
                 {loading ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin text-white" />
-                    <span>Création du compte en cours...</span>
+                    <span>{tCommon('loading')}</span>
                   </>
                 ) : (
                   <>
-                    <span>Créer mon compte et souscrire</span>
+                    <span>{t('submit')}</span>
                     <ArrowRight className="h-4 w-4" />
                   </>
                 )}
@@ -251,7 +262,7 @@ export default function RegisterPage() {
             {/* Login Link */}
             <div className="text-center pt-3 border-t border-slate-100">
               <p className="text-xs text-slate-500 font-medium">
-                Vous possédez déjà un compte ?{' '}
+                {t('hasAccount')}{' '}
                 <button
                   type="button"
                   onClick={() => {
@@ -261,7 +272,7 @@ export default function RegisterPage() {
                   className="font-extrabold text-[#1b365d] hover:text-blue-700 hover:underline cursor-pointer inline-flex items-center gap-1"
                 >
                   {isNavigatingLogin && <Loader2 className="h-3 w-3 animate-spin" />}
-                  <span>Se connecter</span>
+                  <span>{t('signIn')}</span>
                 </button>
               </p>
             </div>

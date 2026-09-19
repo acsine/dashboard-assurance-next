@@ -18,6 +18,7 @@ import {
 import { InsurersPanelContent } from '@/components/dashboard/InsurersPanel'
 import { CommissionRatesPanel } from '@/components/dashboard/CommissionRatesPanel'
 import Header from '@/components/dashboard/Header'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -57,6 +58,7 @@ const DEFAULT_GUIDE =
   '4. Ne promettez jamais un tarif avant validation du dossier.'
 
 function SettingsContent() {
+  const t = useTranslations('settings')
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<SettingsTab>('pricing')
 
@@ -148,8 +150,8 @@ function SettingsContent() {
   return (
     <div className="flex flex-col gap-8 p-6 md:p-8 bg-slate-50/50 min-h-screen">
       <Header
-        title="Paramètres de tarification"
-        subtitle="Guide agent, assureurs, zones CIMA A/B/C, frais légaux et code de validation."
+        title={t('title')}
+        subtitle={t('subtitle')}
       />
 
       <div className="bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-slate-200/80 shadow-xs">

@@ -6,12 +6,14 @@ import { usePathname, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { useSupportNotificationsStore } from '@/lib/stores/support-notifications-store'
+import { useTranslations } from 'next-intl'
 
 /**
  * Abonnement SSE passif global (dashboard) pour les notifications temps réel.
  * Le frontend écoute uniquement le flux Server-Sent Events émises par le backend.
  */
 export function SupportSseListener() {
+  const t = useTranslations('supportSse')
   const queryClient = useQueryClient()
   const router = useRouter()
   const pathname = usePathname()
@@ -24,9 +26,11 @@ export function SupportSseListener() {
   const pathnameRef = useRef(pathname)
   const userIdRef = useRef(userId)
   const routerRef = useRef(router)
+  const tRef = useRef(t)
   pathnameRef.current = pathname
   userIdRef.current = userId
   routerRef.current = router
+  tRef.current = t
 
   // Connexion SSE passive : écoute les événements diffusés par le backend
   useEffect(() => {
@@ -62,15 +66,15 @@ export function SupportSseListener() {
           data.content && data.content !== '[Message Vocal]'
             ? data.content
             : data.content === '[Message Vocal]'
-              ? 'Message vocal reçu'
-              : 'Nouveau message support'
+              ? tRef.current('voice')
+              : tRef.current('newMessage')
 
         const path = pathnameRef.current
         if (!path?.includes('/support')) {
-          toast.message(`Message de ${data.sender_name || 'agent'}`, {
+          toast.message(tRef.current('from', { name: data.sender_name || tRef.current('agent') }), {
             description: preview,
             action: {
-              label: 'Ouvrir',
+              label: tRef.current('open'),
               onClick: () => {
                 const locale = path?.split('/')[1] || 'fr'
                 routerRef.current.push(`/${locale}/dashboard/support`)
@@ -98,14 +102,14 @@ export function SupportSseListener() {
         push({
           id: `ticket-${ticketId}`,
           ticketId,
-          title: 'Nouveau ticket support',
-          body: data.subject || 'Ticket ouvert par un agent',
+          title: tRef.current('newTicket'),
+          body: data.subject || tRef.current('ticketBody'),
           createdAt: data.created_at || new Date().toISOString(),
         })
         const after = useSupportNotificationsStore.getState().items.length
         if (after <= before) return
         if (!pathnameRef.current?.includes('/support')) {
-          toast.info('Nouveau ticket support', {
+          toast.info(tRef.current('newTicket'), {
             description: data.subject,
           })
         }

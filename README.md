@@ -42,6 +42,19 @@ npm run dev
 
 Ouvrez [http://localhost:3000](http://localhost:3000) dans votre navigateur.
 
+### Configuration du backend
+
+Configurez une seule variable, côté serveur et au moment du build :
+
+```env
+API_URL=https://api.exemple.com
+```
+
+`next.config.ts` dérive la valeur publique nécessaire aux écrans publics depuis `API_URL`.
+Ne configurez pas `NEXT_PUBLIC_API_URL` séparément : si elle est encore présente et pointe vers
+une autre origine, l'application refuse de démarrer afin d'éviter d'envoyer des requêtes vers deux
+backends différents. Aucun jeton ni secret ne doit être inclus dans cette URL.
+
 ### Build de Production
 ```bash
 npm run build
@@ -306,5 +319,6 @@ npm run lint         # Linting ESLint
 ## 📄 Licence
 
 SYGALIN SAS - Tous droits réservés.
-#   d a s h b o a r d - a s s u r a n c e - n e x t  
+#   d a s h b o a r d - a s s u r a n c e - n e x t 
+ 
  

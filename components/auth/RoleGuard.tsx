@@ -4,14 +4,16 @@ import type { ReactNode } from 'react'
 import { ShieldX } from 'lucide-react'
 import { can, type Permission } from '@/lib/auth/roles'
 import { useAuthStore } from '@/lib/stores/auth-store'
+import { useTranslations } from 'next-intl'
 
 export function Forbidden() {
+  const t = useTranslations('common')
   return (
     <div className="flex min-h-[50vh] items-center justify-center p-8">
       <div className="max-w-md rounded-2xl border border-red-100 bg-red-50 p-8 text-center text-red-800">
         <ShieldX className="mx-auto mb-3 h-10 w-10" />
-        <h2 className="font-bold">Accès interdit</h2>
-        <p className="mt-2 text-sm">Votre rôle ne permet pas d’effectuer cette action.</p>
+        <h2 className="font-bold">{t('forbiddenTitle')}</h2>
+        <p className="mt-2 text-sm">{t('forbiddenBody')}</p>
       </div>
     </div>
   )

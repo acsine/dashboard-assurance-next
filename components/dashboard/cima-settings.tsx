@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button'
 import SearchableSelect from '@/components/ui/searchable-select'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { Loader2, Plus, Save, Trash2, RefreshCw, KeyRound, Pencil, X } from 'lucide-react'
 
@@ -79,6 +80,7 @@ function ActiveBadge({ active }: { active: boolean }) {
 }
 
 export function CategoriesPanel() {
+  const t = useTranslations('cima')
   const qc = useQueryClient()
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
@@ -151,7 +153,7 @@ export function CategoriesPanel() {
     <Card className="border-gray-100 shadow-sm">
       <CardHeader className="pb-4 border-b border-gray-50">
         <CardTitle className="text-sm font-bold uppercase tracking-wider text-gray-400">
-          Catégories de véhicules CIMA
+          {t('categories')}
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-6 space-y-4">
@@ -292,6 +294,7 @@ export function CategoriesPanel() {
 }
 
 export function ZonesPanel() {
+  const t = useTranslations('cima')
   const qc = useQueryClient()
 
   const { data: zones = [], isLoading } = useQuery({
@@ -356,7 +359,7 @@ export function ZonesPanel() {
     <Card className="border-gray-100 shadow-sm">
       <CardHeader className="pb-4 border-b border-gray-50">
         <CardTitle className="text-sm font-bold uppercase tracking-wider text-gray-400">
-          Zones de circulation CIMA
+          {t('zones')}
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-6 space-y-4">

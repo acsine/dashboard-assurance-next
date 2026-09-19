@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { usePathname, useRouter } from '@/i18n/navigation'
+import { usePathname } from '@/i18n/navigation'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { useSidebarStore } from '@/lib/stores/sidebar-store'
 import {
@@ -23,14 +23,18 @@ import {
   AlertTriangle,
   CreditCard,
   Inbox,
+  ClipboardList,
 } from 'lucide-react'
 import Link from 'next/link'
 import { authApi } from '@/lib/api/mobi-assur'
 import { ROLES } from '@/lib/auth/roles'
+import { useLocale, useTranslations } from 'next-intl'
 
 export default function Sidebar() {
   const pathname = usePathname()
-  const router = useRouter()
+  const locale = useLocale()
+  const t = useTranslations('nav')
+  const tCommon = useTranslations('common')
   const { logout, user } = useAuthStore()
   const { isMobileOpen, setIsMobileOpen } = useSidebarStore()
   const [isCollapsed, setIsCollapsed] = useState(false)
@@ -49,7 +53,7 @@ export default function Sidebar() {
     try {
       await authApi.logout().catch(() => undefined)
       logout()
-      window.location.href = '/'
+      window.location.href = `/${locale}`
     } catch {
       setIsLoggingOut(false)
     }
@@ -65,85 +69,91 @@ export default function Sidebar() {
 
   const menuItems = [
     {
-      name: 'Vue d\'ensemble',
+      name: t('overview'),
       path: '/dashboard',
       icon: LayoutDashboard,
       roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
     },
     {
-      name: 'Clients',
+      name: t('clients'),
       path: '/dashboard/clients',
       icon: Users,
       roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
     },
     {
-      name: 'Sinistres',
+      name: t('claims'),
       path: '/dashboard/sinistres',
       icon: AlertTriangle,
       roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
     },
     {
-      name: 'Paiements déclarés',
+      name: t('declaredPayments'),
       path: '/dashboard/paiements-declares',
       icon: CreditCard,
       roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
     },
     {
-      name: 'Demandes clients',
+      name: t('clientRequests'),
       path: '/dashboard/demandes-clients',
       icon: Inbox,
       roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
     },
     {
-      name: 'Contrats',
+      name: t('contracts'),
       path: '/dashboard/contracts',
       icon: FileText,
       roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
     },
     {
-      name: 'Prospects',
+      name: t('prospects'),
       path: '/dashboard/prospects',
       icon: UserCheck,
       roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
     },
     {
-      name: 'Portefeuille / Wallet',
+      name: t('dailyReports'),
+      path: '/dashboard/rapports-journaliers',
+      icon: ClipboardList,
+      roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
+    },
+    {
+      name: t('wallet'),
       path: '/dashboard/wallet',
       icon: Wallet,
       roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
     },
     {
-      name: 'Objectifs agents',
+      name: t('objectives'),
       path: '/dashboard/objectives',
       icon: Target,
       roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
     },
     {
-      name: 'Niches',
+      name: t('niches'),
       path: '/dashboard/niches',
       icon: Building2,
       roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
     },
     {
-      name: 'Récompenses',
+      name: t('rewards'),
       path: '/dashboard/rewards',
       icon: Gift,
       roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
     },
     {
-      name: 'Support & Chat',
+      name: t('support'),
       path: '/dashboard/support',
       icon: MessageSquare,
       roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
     },
     {
-      name: 'Utilisateurs',
+      name: t('users'),
       path: '/dashboard/users',
       icon: ShieldAlert,
       roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
     },
     {
-      name: 'Paramètres',
+      name: t('settings'),
       path: '/dashboard/settings',
       icon: Settings,
       roles: [ROLES.ADMIN],
@@ -162,7 +172,7 @@ export default function Sidebar() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
           <div className="flex flex-col items-center gap-3 rounded-2xl bg-white px-8 py-6 shadow-xl">
             <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-            <p className="text-sm font-semibold text-slate-700">Déconnexion en cours...</p>
+            <p className="text-sm font-semibold text-slate-700">{t('loggingOut')}</p>
           </div>
         </div>
       )}
@@ -193,7 +203,7 @@ export default function Sidebar() {
                 <div className="whitespace-nowrap">
                   <h1 className="text-white font-black text-sm tracking-tight leading-none">Bethel Insurance</h1>
                   <span className="text-[10px] text-amber-400 font-extrabold uppercase tracking-widest block mt-1">
-                    Management Portal
+                    {t('portal')}
                   </span>
                 </div>
               )}
@@ -274,7 +284,7 @@ export default function Sidebar() {
           <button
             onClick={handleLogout}
             disabled={isLoggingOut}
-            title={isCollapsed && !isMobileOpen ? 'Déconnexion' : undefined}
+            title={isCollapsed && !isMobileOpen ? tCommon('logout') : undefined}
             className={`w-full min-h-10 flex items-center ${isCollapsed && !isMobileOpen ? 'justify-center' : 'gap-2.5'} px-3 py-2 rounded-xl text-xs font-bold transition-all text-slate-400 hover:bg-rose-950/40 hover:text-rose-400 hover:border-rose-900/40 border border-transparent cursor-pointer disabled:cursor-wait disabled:opacity-50`}
           >
             {isLoggingOut ? (
@@ -282,7 +292,7 @@ export default function Sidebar() {
             ) : (
               <LogOut className="h-4 w-4 shrink-0" strokeWidth={2.2} />
             )}
-            {(!isCollapsed || isMobileOpen) && <span>Déconnexion</span>}
+            {(!isCollapsed || isMobileOpen) && <span>{tCommon('logout')}</span>}
           </button>
         </div>
       </aside>

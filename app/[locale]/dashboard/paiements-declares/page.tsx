@@ -11,6 +11,7 @@ import { Loader2, CreditCard, Bell, AlertTriangle, CheckCircle2, DollarSign, Eye
 import { asList, portalClientApi, contractsApi, proxiedAssetUrl } from '@/lib/api/mobi-assur'
 import { RoleGuard } from '@/components/auth/RoleGuard'
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 
 function paymentProofUrls(payment: Record<string, any>): string[] {
   if (Array.isArray(payment.proof_urls) && payment.proof_urls.length > 0) {
@@ -21,6 +22,7 @@ function paymentProofUrls(payment: Record<string, any>): string[] {
 }
 
 export default function PaiementsDeclaresPage() {
+  const t = useTranslations('paiements')
   const qc = useQueryClient()
   const { data, isLoading } = useQuery({
     queryKey: ['pending-client-payments'],
@@ -72,8 +74,8 @@ export default function PaiementsDeclaresPage() {
   return (
     <div className="flex flex-col gap-8 p-6 md:p-8 bg-slate-50/50 min-h-screen">
       <Header
-        title="Paiements déclarés"
-        subtitle="File globale des déclarations Mobile Money, virements et règlements clients"
+        title={t('title')}
+        subtitle={t('subtitle')}
       />
 
       <div className="flex items-center justify-between gap-4 bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-slate-200/80 shadow-xs">

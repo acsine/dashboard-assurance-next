@@ -124,18 +124,23 @@ export function asList<T>(data: unknown): T[] {
   return []
 }
 
-export async function downloadFileWithAuth(path: string, filename: string): Promise<void> {
-  const res = await fetch(`${BFF_BASE}${path}`, { credentials: 'include' })
-  if (!res.ok) {
-    let msg = 'Erreur lors du téléchargement du fichier modèle'
+/** Nom de fichier imposé par le serveur, qui seul connaît le format réellement généré. */
+export function filenameFromResponse(res: Response, fallback: string): string {
+  const header = res.headers.get('content-disposition')
+  if (!header) return fallback
+  const encoded = /filename\*=(?:UTF-8'')?([^;]+)/i.exec(header)
+  if (encoded) {
     try {
-      const errJson = await res.json()
-      if (errJson.detail) msg = errJson.detail
-    } catch {}
-    throw new Error(msg)
+      return decodeURIComponent(encoded[1].replace(/^"|"$/g, '').trim())
+    } catch {
+      return encoded[1].replace(/^"|"$/g, '').trim()
+    }
   }
-  
-  const blob = await res.blob()
+  const plain = /filename=("?)([^";]+)\1/i.exec(header)
+  return plain ? plain[2].trim() : fallback
+}
+
+function saveBlob(blob: Blob, filename: string): void {
   const url = window.URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -146,11 +151,57 @@ export async function downloadFileWithAuth(path: string, filename: string): Prom
   document.body.removeChild(a)
 }
 
+async function fetchFile(path: string, init?: RequestInit): Promise<Response> {
+  const res = await fetch(`${BFF_BASE}${path}`, {
+    credentials: 'include',
+    ...init,
+  })
+  if (res.status === 401) {
+    const { forceSessionExpiredLogout } = await import('@/lib/auth/session-expired')
+    await forceSessionExpiredLogout('Session expirée. Veuillez vous reconnecter.')
+    throw new MobiAssurApiError('Session expirée', 401)
+  }
+  if (!res.ok) {
+    let msg = 'Erreur lors du téléchargement du fichier'
+    try {
+      const errJson = await res.json()
+      msg = errJson.message || errJson.detail || msg
+    } catch {}
+    throw new MobiAssurApiError(msg, res.status, msg)
+  }
+  return res
+}
+
+function isJsonResponse(res: Response): boolean {
+  return (res.headers.get('content-type') || '').includes('application/json')
+}
+
+/**
+ * Une réponse JSON là où un fichier est attendu correspond à des métadonnées : l'enregistrer
+ * telle quelle produit un fichier illisible portant une extension bureautique.
+ */
+function assertBinary(res: Response): Response {
+  if (isJsonResponse(res)) {
+    throw new MobiAssurApiError(
+      'Le serveur a renvoyé des données JSON au lieu du fichier attendu',
+      res.status,
+    )
+  }
+  return res
+}
+
+export async function downloadFileWithAuth(
+  path: string,
+  filename: string,
+  init?: RequestInit,
+): Promise<void> {
+  const res = assertBinary(await fetchFile(path, init))
+  saveBlob(await res.blob(), filenameFromResponse(res, filename))
+}
+
 export async function previewFileWithAuth(path: string): Promise<string> {
-  const res = await fetch(`${BFF_BASE}${path}`, { credentials: 'include' })
-  if (!res.ok) throw new Error('Erreur lors de l\'aperçu du document')
-  const blob = await res.blob()
-  return window.URL.createObjectURL(blob)
+  const res = assertBinary(await fetchFile(path))
+  return window.URL.createObjectURL(await res.blob())
 }
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
@@ -260,6 +311,73 @@ export const usersApi = {
     mobiRequest<unknown>(`/users/${id}`, { method: 'DELETE' }),
   regeneratePassword: (id: string) =>
     mobiRequest<{ temporary_password: string }>(`/users/${id}/regenerate-password`, { method: 'POST' }),
+}
+
+// ─── Rapports journaliers (administration) ──────────────────────────────────
+
+export interface DailyReport {
+  id: string
+  agent_id: string
+  /** Champ d'enrichissement de la vue admin, absent de certaines versions backend. */
+  agent_name?: string | null
+  report_date: string
+  status: 'DRAFT' | 'SUBMITTED'
+  visits_count: number
+  calls_count: number
+  prospects_count: number
+  contracts_count: number
+  collections_amount: number
+  difficulties?: string | null
+  next_day_plan?: string | null
+  submitted_at?: string | null
+  locked_at?: string | null
+  attachments: Array<{
+    id: string
+    file_url: string
+    file_name: string
+    mime_type?: string | null
+    created_at?: string | null
+    [key: string]: unknown
+  }>
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export interface DailyReportFilters {
+  from_date?: string
+  to_date?: string
+  status?: DailyReport['status']
+  agent_id?: string
+}
+
+export interface DailyReportsResult {
+  items: DailyReport[]
+  total?: number
+}
+
+function dailyReportQuery(filters?: DailyReportFilters): string {
+  const search = new URLSearchParams()
+  if (filters?.from_date) search.set('from_date', filters.from_date)
+  if (filters?.to_date) search.set('to_date', filters.to_date)
+  if (filters?.status === 'DRAFT' || filters?.status === 'SUBMITTED') {
+    search.set('status', filters.status)
+  }
+  if (filters?.agent_id) search.set('agent_id', filters.agent_id)
+  const qs = search.toString()
+  return qs ? `?${qs}` : ''
+}
+
+export const dailyReportsApi = {
+  list: (filters?: DailyReportFilters) =>
+    mobiRequest<DailyReport[] | DailyReportsResult>(
+      `/admin/daily-reports${dailyReportQuery(filters)}`,
+    ),
+  get: (id: string) => mobiRequest<DailyReport>(`/admin/daily-reports/${id}`),
+  downloadPdf: (id: string) =>
+    downloadFileWithAuth(
+      `/admin/daily-reports/${id}/pdf`,
+      `rapport-journalier-${id.slice(0, 8)}.pdf`,
+    ),
 }
 
 export interface SupportTicket {
@@ -406,11 +524,13 @@ export interface Client {
   sexe?: string
   cni_photo_url?: string
   permis_photo_url?: string
+  prospect_id?: string
   created_at?: string
 }
 
 export interface Vehicle {
   id: string
+  client_id?: string
   marque: string
   modele?: string
   immatriculation?: string
@@ -423,7 +543,27 @@ export interface Vehicle {
   usage?: string
   genre?: string
   zone_circulation?: string
+  category_id?: string
+  has_trailer: boolean
 }
+
+export interface VehicleInput {
+  marque: string
+  modele?: string
+  chassis_num: string
+  immatriculation?: string
+  energie?: string
+  puissance_cv?: number
+  nb_places?: number
+  date_mise_circulation?: string
+  usage?: string
+  genre?: string
+  zone_circulation?: string
+  category_id?: string
+  has_trailer?: boolean
+}
+
+export type UpdateVehicleRequest = Partial<VehicleInput>
 
 export interface CreateClientRequest {
   full_name: string
@@ -438,19 +578,47 @@ export interface CreateClientRequest {
   sexe?: 'MASCULIN' | 'FEMININ'
   cni_photo_url?: string
   permis_photo_url?: string
-  vehicle?: {
-    marque: string
-    modele?: string
-    chassis_num: string
-    immatriculation?: string
-    energie?: string
-    puissance_cv?: number
-    nb_places?: number
-    date_mise_circulation?: string
-    usage?: string
-    genre?: string
-    zone_circulation?: string
-  }
+  prospect_id?: string
+  vehicle?: VehicleInput
+}
+
+export type DriverType = 'ASSURE' | 'AUTRE'
+export type AutoProductType = 'CAT1' | 'CAT11'
+export type GuaranteeValues = Record<string, boolean | string | number | null>
+
+export interface DossierContractRequest {
+  quote_id: string
+  product_type: 'CAT1'
+  product_line: 'AUTO'
+  subscription_type: string
+  zone_circulation: string
+  date_effet: string
+  duree_jours: number
+  driver_type: DriverType
+  conducteur_nom: string
+  conducteur_date_naissance: string
+  conducteur_permis_cat: string
+  conducteur_permis_num: string
+  conducteur_permis_date: string
+  vehicles: Array<{
+    prime_vehicule?: number
+    guarantees?: GuaranteeValues
+  }>
+  prime_nette?: number
+  insurer_id?: string
+  category_id?: string
+  zone_id?: string
+}
+
+export interface CreateDossierRequest {
+  client: CreateClientRequest & { vehicle: VehicleInput }
+  contract: DossierContractRequest
+}
+
+export interface CreateDossierResponse {
+  client: Client
+  vehicle: Vehicle
+  contract: Contract
 }
 
 export interface ClientDossier {
@@ -495,6 +663,16 @@ export const clientsApi = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+  updateVehicle: (clientId: string, vehicleId: string, data: UpdateVehicleRequest) =>
+    mobiRequest<Vehicle>(`/clients/${clientId}/vehicles/${vehicleId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  createDossier: (data: CreateDossierRequest) =>
+    mobiRequest<CreateDossierResponse>('/clients/dossier', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
   uploadDoc: async (file: File): Promise<{ url: string }> => {
     validateUploadFile(file)
     const formData = new FormData()
@@ -529,6 +707,7 @@ export type PaymentMethod = 'ESPECES' | 'ORANGE_MONEY' | 'MTN_MOMO' | 'CHEQUE' |
 
 export interface Contract {
   id: string
+  quote_id?: string
   client_id: string
   agent_id?: string
   product_type: string
@@ -584,6 +763,7 @@ export function suggestCarteRoseSerial(contractId: string): string {
 
 export interface CreateContractRequest {
   client_id: string
+  quote_id?: string
   agent_id?: string
   product_type: 'CAT1' | string
   product_line?: string
@@ -591,6 +771,7 @@ export interface CreateContractRequest {
   zone_circulation?: string
   date_effet: string
   duree_jours?: number
+  driver_type?: DriverType
   conducteur_nom?: string
   conducteur_date_naissance?: string
   conducteur_permis_cat?: string
@@ -605,7 +786,23 @@ export interface CreateContractRequest {
   prime_nette?: number
   prime_ttc?: number
   insurer_id?: string
+  category_id?: string
+  zone_id?: string
   insurer_name?: string
+}
+
+export interface ContractDocument {
+  id: string
+  doc_type?: string
+  format?: string
+  generated_at?: string
+}
+
+/** Utilisé seulement si le serveur n'impose pas de nom : l'extension doit suivre le format réel. */
+function contractDocumentFilename(contractId: string, doc?: ContractDocument): string {
+  const label = (doc?.doc_type || 'document').toLowerCase().replace(/[^a-z0-9]+/g, '-')
+  const extension = (doc?.format || 'pdf').toLowerCase().replace(/^\./, '')
+  return `${label}-${contractId.slice(0, 8)}.${extension}`
 }
 
 export const contractsApi = {
@@ -631,9 +828,30 @@ export const contractsApi = {
       body: JSON.stringify(data || {}),
     }),
   listDocs: (contractId: string) =>
-    mobiRequest<unknown[]>(`/contracts/${contractId}/documents`),
-  generatePack: (contractId: string) =>
-    mobiRequest<unknown>(`/contracts/${contractId}/documents/generate-pack`, { method: 'POST' }),
+    mobiRequest<ContractDocument[]>(`/contracts/${contractId}/documents`),
+  generatePack: async (contractId: string) => {
+    const res = await fetchFile(`/contracts/${contractId}/documents/generate-pack`, {
+      method: 'POST',
+    })
+    if (!isJsonResponse(res)) {
+      const fallback = `documents-contrat-${contractId.slice(0, 8)}.xlsx`
+      saveBlob(await res.blob(), filenameFromResponse(res, fallback))
+      return
+    }
+
+    // Le backend ne renvoie pas le classeur mais la liste des documents qu'il vient de générer.
+    const payload = await res.json().catch(() => null)
+    const generated = asList<ContractDocument>(payload?.data ?? payload)
+    const documents = generated.length
+      ? generated
+      : asList<ContractDocument>(await contractsApi.listDocs(contractId))
+    if (!documents.length) {
+      throw new MobiAssurApiError('Aucun document généré pour ce contrat', res.status)
+    }
+    for (const doc of documents) {
+      await contractsApi.downloadDoc(contractId, doc.id, doc)
+    }
+  },
   addPhysicalDocs: (
     contractId: string,
     data: {
@@ -644,8 +862,11 @@ export const contractsApi = {
     mobiRequest<unknown>(`/contracts/${contractId}/physical-docs`, { method: 'POST', body: JSON.stringify(data) }),
   generateDoc: (contractId: string) =>
     mobiRequest<unknown>(`/contracts/${contractId}/documents/generate`, { method: 'POST' }),
-  downloadDoc: (contractId: string, docId: string) =>
-    downloadFileWithAuth(`/contracts/${contractId}/documents/${docId}/download`, `document_${docId}.pdf`),
+  downloadDoc: (contractId: string, docId: string, doc?: ContractDocument) =>
+    downloadFileWithAuth(
+      `/contracts/${contractId}/documents/${docId}/download`,
+      contractDocumentFilename(contractId, doc),
+    ),
   previewDoc: (contractId: string, docId: string) =>
     previewFileWithAuth(`/contracts/${contractId}/documents/${docId}/download`),
   estimateContract: (data: any) =>
@@ -662,25 +883,30 @@ export const contractsApi = {
 export type PaymentMode = 'UNPAID' | 'MANUAL_PAYMENT'
 
 export interface QuoteBreakdown {
-  months?: number
-  rc_annual?: number
-  rc_prorata?: number
-  remise_pct?: number
-  remise_amount?: number
-  rc_net?: number
-  dr?: number
-  ipt?: number
-  acc?: number
-  fc?: number
-  cr?: number
-  vignette?: number
-  vignette_tva?: number
-  tax_assurance?: number
-  tva_accessoires?: number
-  total?: number
-  insurer_id?: string
-  insurer_name?: string
-  insurer_code?: string
+  months: number
+  coeff: number
+  rc_annual: number
+  rc: number
+  rc_duree: number
+  remise_pct: number
+  remise_amount: number
+  dr: number
+  ipt: number
+  acc: number
+  fc: number
+  tva: number
+  cr: number
+  total: number
+  currency: 'FCFA'
+  insurer_id: string
+  insurer_name?: string | null
+  insurer_code?: string | null
+}
+
+export interface QuoteLineItem {
+  code: string
+  label: string
+  amount: number
 }
 
 export interface Prospect {
@@ -817,11 +1043,28 @@ export interface ApproveConversionBody {
 }
 
 export const prospectsApi = {
-  list: (params?: { needs_recontact?: boolean }) => {
-    const qs = params?.needs_recontact
-      ? '?needs_recontact=true'
-      : ''
-    return mobiRequest<Prospect[]>(`/prospects${qs}`)
+  list: (params?: { needs_recontact?: boolean; agent_id?: string }) => {
+    const search = new URLSearchParams()
+    if (params?.needs_recontact) search.set('needs_recontact', 'true')
+    if (params?.agent_id) search.set('agent_id', params.agent_id)
+    const qs = search.toString()
+    return mobiRequest<Prospect[]>(`/prospects${qs ? `?${qs}` : ''}`)
+  },
+  exportExpiringPdf: (params?: { days?: number; agent_id?: string }) => {
+    const search = new URLSearchParams({ days: String(params?.days ?? 30) })
+    if (params?.agent_id) search.set('agent_id', params.agent_id)
+    return downloadFileWithAuth(
+      `/admin/prospects/expiring/export.pdf?${search}`,
+      'prospects-a-relancer-j30.pdf',
+    )
+  },
+  exportExpiringExcel: (params?: { days?: number; agent_id?: string }) => {
+    const search = new URLSearchParams({ days: String(params?.days ?? 30) })
+    if (params?.agent_id) search.set('agent_id', params.agent_id)
+    return downloadFileWithAuth(
+      `/admin/prospects/expiring/export.xlsx?${search}`,
+      'prospects-a-relancer-j30.xlsx',
+    )
   },
   get: (id: string) => mobiRequest<Prospect>(`/prospects/${id}`),
   listPendingConversions: () =>
@@ -1058,16 +1301,27 @@ export const settingsApi = {
     }),
   deletePricing: () =>
     mobiRequest<unknown>('/settings/pricing', { method: 'DELETE' }),
-  addBrand: (data: { marque: string; mode: 'fixed' | 'percent'; value: number }) =>
-    mobiRequest<PricingSettings>('/settings/pricing/bareme/brands', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  deleteBrand: (marque: string) =>
-    mobiRequest<PricingSettings>(
-      `/settings/pricing/bareme/brands/${encodeURIComponent(marque)}`,
-      { method: 'DELETE' },
-    ),
+  // Le backend ne gère pas les marques individuellement : on réécrit brand_factors via PATCH /settings/pricing.
+  addBrand: async (data: { marque: string; mode: 'fixed' | 'percent'; value: number }) => {
+    const current = await settingsApi.getPricing()
+    return settingsApi.updatePricing({
+      bareme_config: {
+        ...(current.bareme_config as BaremeConfig),
+        brand_factors: {
+          ...(current.bareme_config?.brand_factors || {}),
+          [data.marque]: { mode: data.mode, value: data.value },
+        },
+      },
+    })
+  },
+  deleteBrand: async (marque: string) => {
+    const current = await settingsApi.getPricing()
+    const brandFactors = { ...(current.bareme_config?.brand_factors || {}) }
+    delete brandFactors[marque]
+    return settingsApi.updatePricing({
+      bareme_config: { ...(current.bareme_config as BaremeConfig), brand_factors: brandFactors },
+    })
+  },
 }
 
 // ─── Tarification CIMA ───────────────────────────────────────────────────────
@@ -1087,10 +1341,19 @@ export interface CirculationZone {
   id: string
   agency_id?: string
   name: string
+  code: string
+  label: string
+  zone_description?: string | null
   cities: string[]
   is_active: boolean
   created_at?: string
   updated_at?: string
+}
+
+export interface CirculationZoneInput {
+  name: string
+  cities: string[]
+  is_active: boolean
 }
 
 export interface ContractDuration {
@@ -1120,8 +1383,9 @@ export interface RcRate {
 }
 
 export interface FeeSchedule {
+  id: string
   agency_id?: string
-  insurer_id?: string
+  insurer_id: string
   dr_amount: number
   dr_rate?: number
   ipt_amount: number
@@ -1236,11 +1500,9 @@ export interface TariffBootstrap {
   zones: CirculationZone[]
   durations: ContractDuration[]
   rc_rates: RcRate[]
-  insurers?: Insurer[]
-  policy?: InsurerPolicy
-  fee_schedules?: FeeSchedule[]
-  /** @deprecated use fee_schedules */
-  fees?: FeeSchedule
+  insurers: Insurer[]
+  policy: InsurerPolicy
+  fee_schedules: FeeSchedule[]
 }
 
 export interface GeoRegion {
@@ -1265,17 +1527,22 @@ export interface QuoteComputeRequest {
 
 export interface QuoteComputeResult {
   quote_id: string
-  insurer_id?: string
+  insurer_id: string
+  insurer_name?: string | null
+  best_insurer_name?: string | null
   total: number
+  line_items?: QuoteLineItem[]
   breakdown: QuoteBreakdown
-  comparison?: Array<{
+  comparison: Array<{
     insurer_id: string
     insurer_code?: string
     insurer_name?: string
     total: number
-    breakdown?: QuoteBreakdown
+    is_best_price?: boolean
+    line_items?: QuoteLineItem[]
+    breakdown: QuoteBreakdown
   }>
-  inputs?: Record<string, unknown>
+  inputs: QuoteComputeRequest
 }
 
 export const tariffApi = {
@@ -1298,12 +1565,12 @@ export const tariffApi = {
 
   listZones: () => mobiRequest<CirculationZone[]>('/settings/zones'),
   geoRegions: () => mobiRequest<GeoRegion[]>('/settings/zones/geo/regions'),
-  createZone: (data: Omit<CirculationZone, 'id' | 'agency_id' | 'created_at' | 'updated_at'>) =>
+  createZone: (data: CirculationZoneInput) =>
     mobiRequest<CirculationZone>('/settings/zones', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  updateZone: (id: string, data: Partial<CirculationZone>) =>
+  updateZone: (id: string, data: Partial<CirculationZoneInput>) =>
     mobiRequest<CirculationZone>(`/settings/zones/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -1405,6 +1672,23 @@ export const tariffApi = {
     }),
 }
 
+export interface FormOption {
+  value: string
+  label: string
+}
+
+export interface FormOptions {
+  cities: FormOption[]
+  energies: FormOption[]
+  usages: FormOption[]
+  genres: FormOption[]
+  garanties: FormOption[]
+}
+
+export const formOptionsApi = {
+  get: () => mobiRequest<FormOptions>('/settings/form-options'),
+}
+
 // ─── Sync ────────────────────────────────────────────────────────────────────
 export const syncApi = {
   batch: (data: any) => mobiRequest<unknown>('/sync/batch', { method: 'POST', body: JSON.stringify(data) }),
@@ -1446,6 +1730,9 @@ export interface ObjectiveMetric {
   default_points: number
   default_minimum: number
   default_target: number
+  proof_required: boolean
+  proof_type: 'PHONE' | 'REFERENCE' | 'FILE'
+  proof_instructions?: string | null
   is_system: boolean
   is_active: boolean
   sort_order: number
@@ -1467,25 +1754,94 @@ export interface ObjectivesTemplate {
   items: TemplateItem[]
 }
 
-export interface Niche {
+export interface ObjectiveProofItem {
   id: string
-  name: string
+  unit_index: number
+  proof_type: 'PHONE' | 'REFERENCE' | 'FILE'
+  value: string
+  attachment_url?: string | null
+  amount?: number | null
+}
+
+export type ObjectiveProofScope = 'STANDARD_OBJECTIVE' | 'NICHE_OBJECTIVE'
+export type NicheObjectiveRecurrence = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'CUSTOM'
+export type NicheObjectiveKind = 'QUANTITATIVE' | 'MONETARY'
+
+export interface NicheObjectivePeriod {
+  id: string
+  period_key: string
+  starts_on: string
+  ends_on: string
+  target_value: number
+  approved_progress: number
+  pending_progress: number
+  progress_pct: number
+  status: string
+  succeeded: boolean
+  points_awarded: number
+}
+
+export interface NicheObjective {
+  id?: string
+  niche_id?: string
+  agreement_id?: string
+  source_template_id?: string | null
+  code: string
+  label: string
   description?: string | null
-  category?: string | null
-  location?: string | null
-  contact_name?: string | null
-  contact_phone?: string | null
-  special_bonus_amount: number
-  bonus_type: 'FCFA' | 'POINTS'
+  kind: NicheObjectiveKind
+  target_value: number
+  recurrence: NicheObjectiveRecurrence
+  custom_interval_days?: number | null
+  anchor_date?: string | null
+  proof_type: 'PHONE' | 'REFERENCE' | 'FILE'
+  proof_instructions?: string | null
+  points: number
   is_active: boolean
+  sort_order?: number
+  niche_name?: string
+  agreement_status?: string
+  period?: NicheObjectivePeriod
+}
+
+export interface ObjectiveProofSubmission {
+  id: string
+  agency_id: string
+  agent_id: string
+  agent_name?: string | null
+  metric_id?: string | null
+  metric_label?: string | null
+  metric_code?: string | null
+  scope: ObjectiveProofScope
+  niche_period_id?: string | null
+  niche_id?: string | null
+  niche_name?: string | null
+  objective_label?: string | null
+  objective_kind?: NicheObjectiveKind | ObjectiveMetric['kind'] | null
+  proof_type: 'PHONE' | 'REFERENCE' | 'FILE'
+  proof_instructions?: string | null
+  period_key: string
+  declared_value: number
+  approved_value: number
+  declared_amount?: number
+  approved_amount?: number
+  status: 'PENDING' | 'APPROVED' | 'REJECTED'
+  points_awarded: number
+  credit_applied: boolean
+  reviewed_by?: string | null
+  reviewed_at?: string | null
+  review_notes?: string | null
+  rejection_reason?: string | null
+  submitted_at: string
+  proofs: ObjectiveProofItem[]
 }
 
 export interface NicheAgreement {
   id: string
   niche_id: string
   agent_id: string
-  agency_id: string
-  status: 'PENDING_VALIDATION' | 'ACTIVE' | 'REJECTED' | 'EXPIRED' | 'CANCELLED'
+  agency_id?: string
+  status: 'ASSIGNED' | 'PENDING_VALIDATION' | 'ACTIVE' | 'REJECTED' | 'EXPIRED' | 'CANCELLED' | 'SUPERSEDED'
   contact_name?: string | null
   contact_phone?: string | null
   contact_role?: string | null
@@ -1507,6 +1863,77 @@ export interface NicheAgreement {
   rejection_reason?: string | null
   agent_name?: string | null
   niche_name?: string | null
+  assigned_by?: string | null
+  assigned_at?: string | null
+  closed_at?: string | null
+  objective_members?: number
+  objective_contracts?: number
+  objective_premium?: number
+  objective_due_at?: string | null
+  objective_note?: string | null
+  collect_contact_required?: boolean
+  collect_contact_done?: boolean
+  implicit_objectives?: { code: string; status: string; required: boolean }[]
+  objectives?: NicheObjective[]
+}
+
+export interface Niche {
+  id: string
+  name: string
+  description?: string | null
+  category?: string | null
+  location?: string | null
+  contact_name?: string | null
+  contact_phone?: string | null
+  special_bonus_amount: number
+  bonus_type: 'FCFA' | 'POINTS'
+  is_active: boolean
+  assigned_agent_id?: string | null
+  assigned_agent_name?: string | null
+  assignment?: NicheAgreement | null
+  objective_templates?: NicheObjective[]
+  contact_incomplete?: boolean
+}
+
+export interface AgentRanking {
+  agent_id: string
+  agent_name: string
+  agent_code?: string | null
+  rank: number
+  score: number
+  score_breakdown: {
+    objectives: number
+    sales: number
+    points: number
+    availability: number
+    weights?: Record<string, number>
+  }
+  points_balance: number
+  points_period: number
+  metrics_ok: number
+  metrics_below: number
+  metrics_total: number
+  niche_objectives_ok?: number
+  niche_objectives_total?: number
+  objectives_pct: number
+  clients_month: number
+  contracts_month: number
+  active_niches: number
+  history: { period: string; points: number }[]
+  assigned_niches?: NicheAgreement[]
+  daily_objectives?: any[]
+  monthly_objectives?: any[]
+}
+
+export interface NicheAssignPayload {
+  agent_id: string
+  objective_members?: number
+  objective_contracts?: number
+  objective_premium?: number
+  objective_due_at?: string | null
+  objective_note?: string | null
+  notes?: string | null
+  objectives?: NicheObjective[]
 }
 
 export interface Challenge {
@@ -1554,6 +1981,74 @@ export interface CommissionRateRule {
   is_active: boolean
 }
 
+function isUnavailableRoute(error: unknown): error is MobiAssurApiError {
+  return (
+    error instanceof MobiAssurApiError &&
+    (error.status === 404 || error.status === 405)
+  )
+}
+
+async function buildLegacyAgentRankings(period: string): Promise<{
+  items: AgentRanking[]
+  period: string
+}> {
+  const [performanceData, walletsData, agreementsData, contractsData] = await Promise.all([
+    mobiRequest<{ items: any[]; period?: string }>(
+      `/admin/objectives/performance?period=${encodeURIComponent(period)}`,
+    ),
+    mobiRequest<AgentWallet[]>('/wallet/agents'),
+    mobiRequest<{ items: NicheAgreement[] }>('/admin/niche-agreements'),
+    mobiRequest<Contract[]>('/contracts'),
+  ])
+  const wallets = asList<AgentWallet>(walletsData)
+  const agreements = asList<NicheAgreement>(agreementsData)
+  const contracts = asList<Contract>(contractsData)
+  const activeStatuses = new Set(['ASSIGNED', 'PENDING_VALIDATION', 'ACTIVE'])
+  const rows = asList<any>(performanceData)
+
+  const items = rows.map((row) => {
+    const agentId = String(row.agent_id || row.id || '')
+    const wallet = wallets.find((item) => item.agent_id === agentId)
+    const assignedNiches = agreements.filter(
+      (agreement) =>
+        agreement.agent_id === agentId && activeStatuses.has(agreement.status),
+    )
+    const contractsMonth = contracts.filter((contract) => contract.agent_id === agentId).length
+    const objectivesPct = Number(row.objectives_pct ?? row.progress_pct ?? 0)
+    const pointsPeriod = Number(row.points_period ?? row.points ?? 0)
+    const score = Number(row.score ?? objectivesPct * 0.35 + pointsPeriod * 0.2)
+    return {
+      agent_id: agentId,
+      agent_name: String(row.agent_name || wallet?.agent_name || agentId),
+      agent_code: row.agent_code ?? null,
+      rank: 0,
+      score,
+      score_breakdown: {
+        objectives: Number(row.score_breakdown?.objectives ?? objectivesPct),
+        sales: Number(row.score_breakdown?.sales ?? contractsMonth),
+        points: Number(row.score_breakdown?.points ?? pointsPeriod),
+        availability: Number(row.score_breakdown?.availability ?? 0),
+      },
+      points_balance: Number(row.points_balance ?? 0),
+      points_period: pointsPeriod,
+      metrics_ok: Number(row.metrics_ok ?? 0),
+      metrics_below: Number(row.metrics_below ?? 0),
+      metrics_total: Number(row.metrics_total ?? 0),
+      objectives_pct: objectivesPct,
+      clients_month: Number(wallet?.clients_this_month ?? row.clients_month ?? 0),
+      contracts_month: contractsMonth,
+      active_niches: assignedNiches.length,
+      history: [],
+      assigned_niches: assignedNiches,
+    } satisfies AgentRanking
+  })
+  items.sort((a, b) => b.score - a.score)
+  items.forEach((item, index) => {
+    item.rank = index + 1
+  })
+  return { items, period: performanceData.period || period }
+}
+
 export const objectivesApi = {
   listMetrics: (period?: string) => {
     const qs = period ? `?period=${period}` : ''
@@ -1566,8 +2061,19 @@ export const objectivesApi = {
   deleteMetric: (id: string) =>
     mobiRequest<unknown>(`/admin/objective-metrics/${id}`, { method: 'DELETE' }),
   getTemplate: () => mobiRequest<ObjectivesTemplate>('/admin/objectives/template'),
-  putTemplate: (items: { metric_id: string; target_value: number; points: number; minimum: number }[]) =>
-    mobiRequest<unknown>('/admin/objectives/template', { method: 'PUT', body: JSON.stringify({ items }) }),
+  putTemplate: (
+    items: { metric_id: string; target_value: number; points: number; minimum: number }[],
+    options?: { applyToAgents?: boolean },
+  ) =>
+    mobiRequest<unknown>('/admin/objectives/template', {
+      method: 'PUT',
+      body: JSON.stringify({
+        items,
+        ...(options?.applyToAgents !== undefined
+          ? { apply_to_agents: options.applyToAgents }
+          : {}),
+      }),
+    }),
   listAgents: (period = 'DAILY') =>
     mobiRequest<{ items: any[]; period: string }>(`/admin/objectives/agents?period=${period}`),
   getAgent: (agentId: string) =>
@@ -1579,6 +2085,43 @@ export const objectivesApi = {
     }),
   performance: (period = 'DAILY') =>
     mobiRequest<{ items: any[]; period: string }>(`/admin/objectives/performance?period=${period}`),
+  listProofSubmissions: async (filters?: ObjectiveProofSubmission['status'] | {
+    status?: ObjectiveProofSubmission['status']
+    scope?: ObjectiveProofScope
+    niche_id?: string
+    period_key?: string
+    agent_id?: string
+  }) => {
+    const params = typeof filters === 'string' ? { status: filters } : filters
+    const search = new URLSearchParams()
+    if (params?.status) search.set('status', params.status)
+    if (params?.scope) search.set('scope', params.scope)
+    if (params?.niche_id) search.set('niche_id', params.niche_id)
+    if (params?.period_key) search.set('period_key', params.period_key)
+    if (params?.agent_id) search.set('agent_id', params.agent_id)
+    const qs = search.toString()
+    try {
+      return await mobiRequest<{ items: ObjectiveProofSubmission[] }>(
+        `/admin/objectives/proof-submissions${qs ? `?${qs}` : ''}`,
+      )
+    } catch (error) {
+      // Les environnements antérieurs au déploiement n'exposent aucune source équivalente.
+      if (isUnavailableRoute(error)) return { items: [] }
+      throw error
+    }
+  },
+  getProofSubmission: (id: string) =>
+    mobiRequest<ObjectiveProofSubmission>(`/admin/objectives/proof-submissions/${id}`),
+  approveProofSubmission: (id: string, notes?: string) =>
+    mobiRequest<{ id: string; status: string; approved_value: number; points_awarded: number }>(
+      `/admin/objectives/proof-submissions/${id}/approve`,
+      { method: 'POST', body: JSON.stringify({ notes: notes || null }) },
+    ),
+  rejectProofSubmission: (id: string, rejectionReason: string) =>
+    mobiRequest<{ id: string; status: string }>(
+      `/admin/objectives/proof-submissions/${id}/reject`,
+      { method: 'POST', body: JSON.stringify({ rejection_reason: rejectionReason }) },
+    ),
 }
 
 export const nichesApi = {
@@ -1589,6 +2132,28 @@ export const nichesApi = {
     mobiRequest<Niche>(`/admin/niches/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (id: string) => mobiRequest<unknown>(`/admin/niches/${id}`, { method: 'DELETE' }),
   agreements: (id: string) => mobiRequest<{ items: NicheAgreement[] }>(`/admin/niches/${id}/agreements`),
+  listObjectiveTemplates: (nicheId: string) =>
+    mobiRequest<{ items: NicheObjective[] }>(`/admin/niches/${nicheId}/objective-templates`),
+  putObjectiveTemplates: (nicheId: string, items: NicheObjective[]) =>
+    mobiRequest<{ items: NicheObjective[] }>(`/admin/niches/${nicheId}/objective-templates`, {
+      method: 'PUT',
+      body: JSON.stringify({ items }),
+    }),
+  createObjectiveTemplate: (nicheId: string, item: NicheObjective) =>
+    mobiRequest<NicheObjective>(`/admin/niches/${nicheId}/objective-templates`, {
+      method: 'POST',
+      body: JSON.stringify(item),
+    }),
+  updateObjectiveTemplate: (nicheId: string, templateId: string, item: NicheObjective) =>
+    mobiRequest<NicheObjective>(
+      `/admin/niches/${nicheId}/objective-templates/${templateId}`,
+      { method: 'PATCH', body: JSON.stringify(item) },
+    ),
+  deleteObjectiveTemplate: (nicheId: string, templateId: string) =>
+    mobiRequest<{ id: string }>(
+      `/admin/niches/${nicheId}/objective-templates/${templateId}`,
+      { method: 'DELETE' },
+    ),
   listAllAgreements: (status?: string) => {
     const qs = status ? `?status=${encodeURIComponent(status)}` : ''
     return mobiRequest<{ items: NicheAgreement[] }>(`/admin/niche-agreements${qs}`)
@@ -1614,6 +2179,48 @@ export const nichesApi = {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
+  putAgreementObjectives: (agreementId: string, items: NicheObjective[]) =>
+    mobiRequest<{ items: NicheObjective[] }>(
+      `/admin/niche-agreements/${agreementId}/objectives`,
+      { method: 'PUT', body: JSON.stringify({ items }) },
+    ),
+  listAgentObjectives: () =>
+    mobiRequest<{ items: NicheObjective[] }>('/agent/niche-objectives'),
+  listRankings: async (period = 'MONTHLY') => {
+    try {
+      return await mobiRequest<{ items: AgentRanking[]; period: string }>(
+        `/admin/niches/agents-ranking?period=${encodeURIComponent(period)}`,
+      )
+    } catch (error) {
+      if (isUnavailableRoute(error)) return buildLegacyAgentRankings(period)
+      throw error
+    }
+  },
+  getAgentRanking: async (agentId: string): Promise<AgentRanking | null> => {
+    try {
+      return await mobiRequest<AgentRanking>(`/admin/niches/agents-ranking/${agentId}`)
+    } catch (error) {
+      if (
+        error instanceof MobiAssurApiError &&
+        error.status === 404 &&
+        /agent.*introuvable/i.test(error.detail || error.message)
+      ) {
+        return null
+      }
+      if (isUnavailableRoute(error)) {
+        const legacy = await buildLegacyAgentRankings('MONTHLY')
+        return legacy.items.find((item) => item.agent_id === agentId) || null
+      }
+      throw error
+    }
+  },
+  assign: (nicheId: string, data: NicheAssignPayload) =>
+    mobiRequest<NicheAgreement>(`/admin/niches/${nicheId}/assign`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  unassign: (nicheId: string) =>
+    mobiRequest<NicheAgreement>(`/admin/niches/${nicheId}/unassign`, { method: 'POST' }),
 }
 
 export const rewardsApi = {
@@ -1702,8 +2309,9 @@ export const sinistresApi = {
     return mobiRequest<{ items: SinistreItem[] }>(`/admin/sinistres${qs}`)
   },
   get: (id: string) => mobiRequest<SinistreItem>(`/admin/sinistres/${id}`),
+  // La déclaration passe par le canal agent : /admin/sinistres est en lecture seule.
   create: (data: any) =>
-    mobiRequest<SinistreItem>('/admin/sinistres', { method: 'POST', body: JSON.stringify(data) }),
+    mobiRequest<SinistreItem>('/agent/sinistres', { method: 'POST', body: JSON.stringify(data) }),
   updateStatus: (id: string, data: { status: string; note?: string }) =>
     mobiRequest<SinistreItem>(`/admin/sinistres/${id}/status`, {
       method: 'POST',
@@ -1711,16 +2319,28 @@ export const sinistresApi = {
     }),
 }
 
+export interface ExcelImportRowError {
+  row: number | null
+  message: string
+}
+
+export interface ExcelImportReport {
+  entity_type: string
+  dry_run: boolean
+  total_rows: number
+  imported_count: number
+  valid_count: number
+  skipped_count: number
+  created_items: Array<Record<string, unknown>>
+  errors: ExcelImportRowError[]
+}
+
 export const excelImportApi = {
-  uploadFile: (entityType: string, file: File) => {
+  uploadFile: (entityType: string, file: File, options?: { dryRun?: boolean }) => {
     const formData = new FormData()
     formData.append('file', file)
-    return mobiRequest<{
-      status: number
-      message: string
-      imported_count?: number
-      created_items?: any[]
-    }>(`/${entityType}/import-excel`, {
+    const qs = options?.dryRun ? '?dry_run=true' : ''
+    return mobiRequest<ExcelImportReport>(`/${entityType}/import-excel${qs}`, {
       method: 'POST',
       body: formData,
     })

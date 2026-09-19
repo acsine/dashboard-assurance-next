@@ -11,18 +11,23 @@ import {
   Tag,
   ShieldAlert,
 } from 'lucide-react'
-import type { QuoteBreakdown } from '@/lib/api/mobi-assur'
+import type { QuoteBreakdown, QuoteLineItem } from '@/lib/api/mobi-assur'
+import { useTranslations } from 'next-intl'
 
 export interface InsurerComparisonItem {
   insurer_id: string
   insurer_code?: string
   insurer_name?: string
   total: number
+  is_best_price?: boolean
+  line_items?: QuoteLineItem[]
   breakdown?: QuoteBreakdown
 }
 
 export interface QuoteDetailsAndGuaranteesProps {
   breakdown?: QuoteBreakdown | Record<string, unknown> | null
+  lineItems?: QuoteLineItem[] | null
+  insurerName?: string | null
   total?: number | null
   comparison?: InsurerComparisonItem[] | null
   selectedInsurerId?: string
@@ -38,6 +43,8 @@ export function formatFcfa(value?: number | null): string {
 
 export default function QuoteDetailsAndGuarantees({
   breakdown,
+  lineItems,
+  insurerName,
   total,
   comparison,
   selectedInsurerId,
@@ -45,6 +52,7 @@ export default function QuoteDetailsAndGuarantees({
   showCompanyComparison = true,
   className = '',
 }: QuoteDetailsAndGuaranteesProps) {
+  const t = useTranslations('quote')
   const [isRcTutorialOpen, setIsRcTutorialOpen] = useState(false)
   const [isComparisonOpen, setIsComparisonOpen] = useState(false)
 
@@ -66,6 +74,9 @@ export default function QuoteDetailsAndGuarantees({
   const vignette = num('vignette')
   const bdTotal = num('total')
   const displayTotal = total ?? bdTotal ?? 0
+  const selectedInsurerName =
+    insurerName ?? (typeof b.insurer_name === 'string' ? b.insurer_name : null)
+  const hasLineItems = Array.isArray(lineItems) && lineItems.length > 0
 
   const hasComparison = Array.isArray(comparison) && comparison.length > 0
 
@@ -81,17 +92,17 @@ export default function QuoteDetailsAndGuarantees({
             </div>
             <div>
               <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-900">
-                Décomposition du Devis Estimé
+                {t('breakdown')}
               </h4>
               <p className="text-[11px] font-medium text-slate-500">
-                Inclus taxes & vignette légale d'assurance
+                {t('taxes')}
               </p>
             </div>
           </div>
-          {typeof b.insurer_name === 'string' && (
+          {selectedInsurerName && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
               <Building2 className="h-3 w-3 text-blue-600" />
-              {b.insurer_name}
+              {selectedInsurerName}
             </span>
           )}
         </div>
@@ -125,6 +136,18 @@ export default function QuoteDetailsAndGuarantees({
 
         {/* Detailed Financial Lines */}
         <div className="space-y-1.5 text-xs">
+          {hasLineItems ? (
+            lineItems.map((item) => (
+              <div
+                key={`${item.code}-${item.label}`}
+                className="flex justify-between items-center py-1 border-b border-slate-100"
+              >
+                <span className="text-slate-600 font-medium">{item.label}</span>
+                <span className="font-bold text-slate-900">{formatFcfa(item.amount)}</span>
+              </div>
+            ))
+          ) : (
+            <>
           {rc != null && (
             <div className="flex justify-between items-center py-1 border-b border-slate-100">
               <span className="text-slate-600 font-medium">Prime RC nette (Responsabilité Civile)</span>
@@ -183,6 +206,8 @@ export default function QuoteDetailsAndGuarantees({
               <span>TVA (19.25%)</span>
               <span className="font-semibold">{formatFcfa(tva)}</span>
             </div>
+          )}
+            </>
           )}
         </div>
 
@@ -295,7 +320,7 @@ export default function QuoteDetailsAndGuarantees({
                   </span>
                 </h5>
                 <p className="text-[11px] font-medium text-slate-500">
-                  Comparez les primes et tarifs de nos partenaires agréés Code CIMA
+                  {t('compare')}
                 </p>
               </div>
             </div>
@@ -309,7 +334,6 @@ export default function QuoteDetailsAndGuarantees({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {comparison.map((item) => {
                   const isSelected = selectedInsurerId === item.insurer_id || item.insurer_id === b.insurer_id
-                  const itemVignette = item.breakdown?.vignette
                   return (
                     <div
                       key={item.insurer_id}
@@ -334,19 +358,18 @@ export default function QuoteDetailsAndGuarantees({
                             Sélectionné
                           </span>
                         )}
+                        {item.is_best_price && (
+                          <span className="ml-1 px-2 py-0.5 rounded-md text-[9px] font-bold bg-emerald-600 text-white uppercase tracking-wider">
+                            Mieux-disant
+                          </span>
+                        )}
                       </div>
 
                       <div className="space-y-1 text-[11px]">
-                        {item.breakdown?.rc_net != null && (
+                        {item.breakdown?.rc != null && (
                           <div className="flex justify-between text-slate-600">
                             <span>RC Nette :</span>
-                            <span className="font-semibold">{formatFcfa(item.breakdown.rc_net)}</span>
-                          </div>
-                        )}
-                        {itemVignette != null && itemVignette > 0 && (
-                          <div className="flex justify-between text-amber-900 font-medium">
-                            <span>Vignette :</span>
-                            <span className="font-bold">{formatFcfa(itemVignette)}</span>
+                            <span className="font-semibold">{formatFcfa(item.breakdown.rc)}</span>
                           </div>
                         )}
                       </div>

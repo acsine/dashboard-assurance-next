@@ -11,6 +11,7 @@ import { toast } from 'sonner'
 import { Loader2, AlertTriangle, ShieldAlert, FileText, CheckCircle2, Clock, Filter, Send, FileSpreadsheet } from 'lucide-react'
 import { asList, sinistresApi, type SinistreItem } from '@/lib/api/mobi-assur'
 import ExcelImportModal from '@/components/excel/ExcelImportModal'
+import { useTranslations } from 'next-intl'
 
 const STATUSES = ['DECLARE', 'EN_COURS', 'COMPLEMENT', 'VALIDE', 'REJETE', 'CLOS'] as const
 
@@ -24,6 +25,7 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; b
 }
 
 export default function SinistresPage() {
+  const t = useTranslations('sinistres')
   const qc = useQueryClient()
   const [statusFilter, setStatusFilter] = useState('')
   const [isExcelModalOpen, setIsExcelModalOpen] = useState(false)
@@ -60,8 +62,8 @@ export default function SinistresPage() {
   return (
     <div className="flex flex-col gap-8 p-6 md:p-8 bg-slate-50/50 min-h-screen">
       <Header
-        title="Gestion des Sinistres"
-        subtitle="File d'attente et instruction des déclarations de sinistres du portail client"
+        title={t('title')}
+        subtitle={t('subtitle')}
       />
 
       <div className="flex items-center justify-between gap-4 bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-slate-200/80 shadow-xs">

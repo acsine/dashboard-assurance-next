@@ -5,21 +5,22 @@ import { useState } from 'react'
 import { supportApi, type SupportContact } from '@/lib/api/mobi-assur'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PhoneField } from '@/components/ui/phone-field'
+import { parseValidPhone, DEFAULT_PHONE_COUNTRY } from '@/lib/phone'
+import type { CountryCode } from 'libphonenumber-js'
 import { toast } from 'sonner'
 import { Loader2, Pencil, Phone, Plus, Save, Trash2, X } from 'lucide-react'
-
-function normalizePhone(value: string): string {
-  return value.replace(/[^\d+]/g, '').trim()
-}
 
 export function SupportContactsPanel() {
   const qc = useQueryClient()
   const [label, setLabel] = useState('')
   const [phone, setPhone] = useState('')
+  const [phoneCountry, setPhoneCountry] = useState<CountryCode>(DEFAULT_PHONE_COUNTRY)
   const [description, setDescription] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editLabel, setEditLabel] = useState('')
   const [editPhone, setEditPhone] = useState('')
+  const [editPhoneCountry, setEditPhoneCountry] = useState<CountryCode>(DEFAULT_PHONE_COUNTRY)
   const [editDescription, setEditDescription] = useState('')
   const [editActive, setEditActive] = useState(true)
 
@@ -29,13 +30,16 @@ export function SupportContactsPanel() {
   })
 
   const createMutation = useMutation({
-    mutationFn: () =>
-      supportApi.createContact({
+    mutationFn: () => {
+      const parsed = parseValidPhone(phone, phoneCountry)
+      if (!parsed) throw new Error('Le numéro de téléphone est invalide pour ce code pays')
+      return supportApi.createContact({
         label: label.trim(),
-        phone: normalizePhone(phone),
+        phone: parsed.e164,
         description: description.trim() || undefined,
         is_active: true,
-      }),
+      })
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['support-contacts-admin'] })
       setLabel('')
@@ -47,13 +51,16 @@ export function SupportContactsPanel() {
   })
 
   const updateMutation = useMutation({
-    mutationFn: () =>
-      supportApi.updateContact(editingId!, {
+    mutationFn: () => {
+      const parsed = parseValidPhone(editPhone, editPhoneCountry)
+      if (!parsed) throw new Error('Le numéro de téléphone est invalide pour ce code pays')
+      return supportApi.updateContact(editingId!, {
         label: editLabel.trim(),
-        phone: normalizePhone(editPhone),
+        phone: parsed.e164,
         description: editDescription.trim() || null,
         is_active: editActive,
-      }),
+      })
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['support-contacts-admin'] })
       setEditingId(null)
@@ -77,14 +84,13 @@ export function SupportContactsPanel() {
     setEditingId(c.id)
     setEditLabel(c.label)
     setEditPhone(c.phone)
+    setEditPhoneCountry(DEFAULT_PHONE_COUNTRY)
     setEditDescription(c.description || '')
     setEditActive(c.is_active)
   }
 
-  const validatePhone = (value: string) => {
-    const cleaned = normalizePhone(value)
-    return cleaned.length >= 5 && cleaned.length <= 20
-  }
+  const validatePhone = (value: string, country: CountryCode) =>
+    Boolean(parseValidPhone(value, country))
 
   return (
     <div className="flex flex-col h-full">
@@ -117,11 +123,12 @@ export function SupportContactsPanel() {
                     placeholder="Libellé (ex. Support commercial)"
                     className="h-9 text-xs"
                   />
-                  <Input
+                  <PhoneField
                     value={editPhone}
-                    onChange={(e) => setEditPhone(e.target.value)}
-                    placeholder="Téléphone (+237…)"
-                    className="h-9 text-xs font-mono"
+                    onChange={setEditPhone}
+                    country={editPhoneCountry}
+                    onCountryChange={setEditPhoneCountry}
+                    placeholder="Téléphone"
                   />
                   <Input
                     value={editDescription}
@@ -149,8 +156,8 @@ export function SupportContactsPanel() {
                           toast.error('Libellé requis (min. 2 caractères)')
                           return
                         }
-                        if (!validatePhone(editPhone)) {
-                          toast.error('Numéro invalide (5 à 20 caractères)')
+                        if (!validatePhone(editPhone, editPhoneCountry)) {
+                          toast.error('Le numéro de téléphone est invalide pour ce code pays')
                           return
                         }
                         updateMutation.mutate()
@@ -223,11 +230,12 @@ export function SupportContactsPanel() {
           placeholder="Libellé (ex. Hotline agence)"
           className="h-9 text-xs"
         />
-        <Input
+        <PhoneField
           value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          placeholder="Numéro (+2376…)"
-          className="h-9 text-xs font-mono"
+          onChange={setPhone}
+          country={phoneCountry}
+          onCountryChange={setPhoneCountry}
+          placeholder="Numéro"
         />
         <Input
           value={description}
@@ -245,8 +253,8 @@ export function SupportContactsPanel() {
               toast.error('Libellé requis (min. 2 caractères)')
               return
             }
-            if (!validatePhone(phone)) {
-              toast.error('Numéro invalide (5 à 20 caractères)')
+            if (!validatePhone(phone, phoneCountry)) {
+              toast.error('Le numéro de téléphone est invalide pour ce code pays')
               return
             }
             createMutation.mutate()

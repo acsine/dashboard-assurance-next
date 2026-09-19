@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import SearchableSelect from '@/components/ui/searchable-select'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
+import { useTranslations } from 'next-intl'
 import {
   Wallet,
   Check,
@@ -114,6 +115,7 @@ function AgentDetailsBlock({ w }: { w: WithdrawalRequest }) {
 }
 
 export default function WalletPage() {
+  const t = useTranslations('wallet')
   const queryClient = useQueryClient()
   const pathname = usePathname()
   const locale = pathname?.split('/')[1] || 'fr'
@@ -243,8 +245,8 @@ export default function WalletPage() {
   return (
     <div className="flex flex-col gap-8 p-6 md:p-8 bg-slate-50/50 min-h-screen">
       <Header
-        title="Gestion Financière"
-        subtitle="Validez les décaissements et suivez la progression financière des agents."
+        title={t('title')}
+        subtitle={t('subtitle')}
       />
 
       <div className="space-y-6">

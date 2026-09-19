@@ -8,6 +8,8 @@ import { Bell, HelpCircle, Search, Menu, MessageSquare, CheckCheck, LogOut, Load
 import { Input } from '../ui/input'
 import { usePathname, useRouter } from 'next/navigation'
 import { authApi } from '@/lib/api/mobi-assur'
+import { useTranslations } from 'next-intl'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
 
 interface HeaderProps {
   title?: string
@@ -15,6 +17,7 @@ interface HeaderProps {
 }
 
 export default function Header({ title, subtitle }: HeaderProps) {
+  const t = useTranslations('header')
   const { user, logout: logoutStore } = useAuthStore()
   const { toggleMobileOpen } = useSidebarStore()
   const { items, unreadCount, markAllRead, markTicketRead } = useSupportNotificationsStore()
@@ -43,8 +46,8 @@ export default function Header({ title, subtitle }: HeaderProps) {
   }
 
   return (
-    <header className="min-h-[5rem] py-3.5 bg-white/80 backdrop-blur-2xl border-b border-slate-200/80 flex flex-col md:flex-row md:items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-40 gap-4 transition-all duration-200 shadow-2xs">
-      <div className="flex items-center gap-3 w-full md:w-auto md:flex-1 min-w-0">
+    <header className="min-h-16 py-3 bg-white/80 backdrop-blur-2xl border-b border-slate-200/80 flex flex-col md:flex-row md:items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-40 gap-3 transition-all duration-200 shadow-2xs">
+      <div className="flex items-center gap-3 w-full md:min-w-0 md:flex-1">
         <button
           onClick={toggleMobileOpen}
           className="md:hidden p-2 -ml-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
@@ -64,35 +67,38 @@ export default function Header({ title, subtitle }: HeaderProps) {
         </div>
       </div>
 
-      <div className="flex items-center gap-3 lg:gap-4 shrink-0">
+      <div className="flex items-center gap-2 shrink-0 flex-nowrap">
         {/* Global Search Bar */}
-        <div className="relative w-full sm:w-64 lg:w-72 hidden sm:block">
-          <Search className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 h-4 w-4 mt-3" />
+        <div className="relative hidden md:block w-40 xl:w-44 2xl:w-56">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
             type="search"
-            placeholder="Rechercher clients, polices..."
-            className="pl-9 pr-12 h-10 text-xs border-slate-200/90 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 rounded-xl bg-slate-50/70 focus:bg-white transition-all font-medium"
+            placeholder={t('searchPlaceholder')}
+            className="h-10 pl-9 pr-11 text-xs border-slate-200/90 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 rounded-xl bg-slate-50/70 focus:bg-white transition-all font-medium"
           />
-          <kbd className="absolute right-2.5 top-2.5 hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-bold text-slate-400 bg-slate-100 border border-slate-200 rounded-md">
+          <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden sm:inline-flex -translate-y-1/2 items-center px-1.5 py-0.5 text-[10px] font-bold leading-none text-slate-400 bg-slate-100 border border-slate-200 rounded-md">
             ⌘K
           </kbd>
         </div>
 
         {/* System Live Pill */}
-        <div className="bg-blue-50/90 border border-blue-200/80 text-blue-900 text-[11px] px-3 py-1.5 rounded-full font-bold hidden lg:flex items-center gap-2 shadow-2xs">
-          <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping" />
-          <span>Bethel System Live</span>
+        <div className="hidden 2xl:inline-flex h-10 items-center gap-2 whitespace-nowrap bg-blue-50/90 border border-blue-200/80 text-blue-900 text-[11px] px-3 rounded-xl font-bold shadow-2xs">
+          <span className="relative flex h-2 w-2 shrink-0">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+          </span>
+          <span>{t('systemLive')}</span>
         </div>
 
         {/* Notifications Button */}
-        <div className="flex items-center gap-2 relative">
+        <div className="relative flex items-center">
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
-            className="h-10 w-10 rounded-xl bg-slate-100/80 hover:bg-slate-200/80 flex items-center justify-center text-slate-600 transition-all border border-slate-200/60 relative cursor-pointer"
+            className="h-10 w-10 rounded-xl bg-slate-100/80 hover:bg-slate-200/80 inline-flex items-center justify-center text-slate-600 transition-all border border-slate-200/60 relative cursor-pointer"
             aria-label="Notifications support"
           >
-            <Bell className="h-4.5 w-4.5" />
+            <Bell className="h-4 w-4" />
             {unreadCount > 0 && (
               <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-rose-600 text-white text-[10px] font-black rounded-full border-2 border-white flex items-center justify-center">
                 {unreadCount > 9 ? '9+' : unreadCount}
@@ -111,7 +117,7 @@ export default function Header({ title, subtitle }: HeaderProps) {
               <div className="absolute right-0 top-12 z-50 w-80 max-h-96 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/80">
                   <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">
-                    Notifications & Support
+                    {t('notifications')}
                   </span>
                   <button
                     type="button"
@@ -119,13 +125,13 @@ export default function Header({ title, subtitle }: HeaderProps) {
                     className="text-[10px] font-semibold text-blue-600 hover:text-blue-700 inline-flex items-center gap-1 cursor-pointer"
                   >
                     <CheckCheck className="h-3 w-3" />
-                    Tout lu
+                    {t('markAllRead')}
                   </button>
                 </div>
                 <div className="overflow-y-auto max-h-80">
                   {items.length === 0 ? (
                     <div className="p-6 text-center text-xs text-slate-400">
-                      Aucune notification pour le moment
+                      {t('noNotifications')}
                     </div>
                   ) : (
                     items.map((n) => (
@@ -159,36 +165,41 @@ export default function Header({ title, subtitle }: HeaderProps) {
           )}
         </div>
 
-        <div className="w-px h-7 bg-slate-200 hidden sm:block" />
+        <div className="hidden sm:block w-px h-5 self-center bg-slate-200" />
 
         {/* User Profile Badge */}
-        <div className="items-center gap-2.5 hidden sm:flex">
-          <div className="text-right leading-tight">
+        <div className="hidden sm:flex items-center gap-2 h-10">
+          <div className="hidden 2xl:block text-right leading-tight min-w-0">
             <span className="text-xs font-extrabold text-slate-900 block truncate max-w-[140px]">
-              {user?.full_name || 'Utilisateur Bethel'}
+              {user?.full_name || t('defaultUser')}
             </span>
-            <span className="text-[10px] text-blue-700 font-bold uppercase tracking-wider block">
+            <span className="text-[10px] text-blue-700 font-bold uppercase tracking-wider block truncate max-w-[140px]">
               {user?.role || 'GESTIONNAIRE'}
             </span>
           </div>
-          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-[#1b365d] to-blue-700 text-white flex items-center justify-center font-black text-xs shadow-xs border border-blue-300">
+          <div
+            title={user?.full_name || t('defaultUser')}
+            className="h-10 w-10 rounded-xl bg-gradient-to-br from-[#1b365d] to-blue-700 text-white inline-flex items-center justify-center font-black text-xs shadow-xs border border-blue-300 shrink-0"
+          >
             {user?.full_name?.substring(0, 2).toUpperCase() || 'BE'}
           </div>
         </div>
+
+        <LanguageSwitcher variant="toolbar" />
 
         {/* Logout Button */}
         <button
           onClick={handleHeaderLogout}
           disabled={isLoggingOut}
-          title="Se déconnecter"
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-extrabold text-xs transition-all border border-rose-200/80 shadow-2xs cursor-pointer active:scale-95 shrink-0"
+          title={t('logout')}
+          className="inline-flex h-10 items-center gap-1.5 px-3 whitespace-nowrap rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-extrabold text-xs transition-all border border-rose-200/80 shadow-2xs cursor-pointer active:scale-95 shrink-0 disabled:opacity-60"
         >
           {isLoggingOut ? (
             <Loader2 className="h-4 w-4 animate-spin text-rose-600" />
           ) : (
             <LogOut className="h-4 w-4 text-rose-600" />
           )}
-          <span className="hidden md:inline">Déconnexion</span>
+          <span className="hidden 2xl:inline">{t('logout')}</span>
         </button>
 
       </div>

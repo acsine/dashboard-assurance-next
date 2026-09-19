@@ -1,53 +1,349 @@
 {
-    "pages": {
-        "home": {
-            "title": "Innovate Solutions Partners",
-            "description": "We are a team of experts in the field of software development and design.",
-            "demoPackages": "Demo Packages",
-            "demoApi": "Demo API",
-            "zustandStateManagement": "State management with Zustand",
-            "globalStore": "Simple and performant global store",
-            "skeletonLoading": "Skeleton loading",
-            "elegantUI": "Elegant user interfaces while loading",
-            "loading": "Loading...",
-            "trySkeleton": "Try Skeleton loading experience",
-            "triggerAsync": "Trigger Async Action",
-            "tryNuqs": "Try Nuqs Query Parameters",
-            "tryNuqsDescription": "Auto-sync with URL",
-            "tryNuqsContent": "Detected parameter :",
-            "zustandEnabled": "Zustand enabled",
-            "TanStackEnabled": "TanStack Query enabled",
-            "sonnerEnabled": "Sonner enabled",
-            "zodEnabled": "Zod enabled",
-            "skeletonLoadingEnabled": "Skeleton loading enabled",
-            "nuqsEnabled": "Nuqs enabled",
-            "jsonPlaceholderIntegrated": "JSONPlaceholder API integrated"
-        }
-    },
-    "postsDemo": {
-        "error": {
-            "title": "Error loading posts",
-            "description": "Failed to load posts. Check your network connection."
-        },
-        "title": "Posts",
-        "description": "Demo with JSONPlaceholder API",
-        "newPostButton": "New Post",
-        "newPostTitle": "Create new post",
-        "newPostDescription": "Share your ideas with the community",
-        "postTitle": "Post title",
-        "postTitlePlaceholder": "A catchy title",
-        "postContent": "Content",
-        "postContentPlaceholder": "Write something interesting...",
-        "postSubmitButton": "Publish post",
-        "postSubmitLoading": "Publishing...",
-        "postCancelButton": "Cancel",
-        "postPaginationMessage": "Showing <bold>{displayCount, number}</bold> posts out of <bold>{totalCount, number}</bold>",
-        "postDisplayMessage": "Data from JSONPlaceholder API"
-    },
-    "alert": {
-        "success": {
-            "title": "Success",
-            "message": "Action performed successfully"
-        }
+  "pages": {
+    "home": {
+      "title": "Innovate Solutions Partners",
+      "description": "We are a team of experts in the field of software development and design.",
+      "demoPackages": "Demo Packages",
+      "demoApi": "Demo API",
+      "zustandStateManagement": "State management with Zustand",
+      "globalStore": "Simple and performant global store",
+      "skeletonLoading": "Skeleton loading",
+      "elegantUI": "Elegant user interfaces while loading",
+      "loading": "Loading...",
+      "trySkeleton": "Try Skeleton loading experience",
+      "triggerAsync": "Trigger Async Action",
+      "tryNuqs": "Try Nuqs Query Parameters",
+      "tryNuqsDescription": "Auto-sync with URL",
+      "tryNuqsContent": "Detected parameter :",
+      "zustandEnabled": "Zustand enabled",
+      "TanStackEnabled": "TanStack Query enabled",
+      "sonnerEnabled": "Sonner enabled",
+      "zodEnabled": "Zod enabled",
+      "skeletonLoadingEnabled": "Skeleton loading enabled",
+      "nuqsEnabled": "Nuqs enabled",
+      "jsonPlaceholderIntegrated": "JSONPlaceholder API integrated"
     }
+  },
+  "postsDemo": {
+    "error": {
+      "title": "Error loading posts",
+      "description": "Failed to load posts. Check your network connection."
+    },
+    "title": "Posts",
+    "description": "Demo with JSONPlaceholder API",
+    "newPostButton": "New Post",
+    "newPostTitle": "Create new post",
+    "newPostDescription": "Share your ideas with the community",
+    "postTitle": "Post title",
+    "postTitlePlaceholder": "A catchy title",
+    "postContent": "Content",
+    "postContentPlaceholder": "Write something interesting...",
+    "postSubmitButton": "Publish post",
+    "postSubmitLoading": "Publishing...",
+    "postCancelButton": "Cancel",
+    "postPaginationMessage": "Showing <bold>{displayCount, number}</bold> posts out of <bold>{totalCount, number}</bold>",
+    "postDisplayMessage": "Data from JSONPlaceholder API"
+  },
+  "alert": {
+    "success": {
+      "title": "Success",
+      "message": "Action performed successfully"
+    }
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "search": "Search",
+    "loading": "Loading...",
+    "logout": "Log out",
+    "required": "Required fields",
+    "error": "Something went wrong",
+    "success": "Success",
+    "phoneInvalid": "The phone number is invalid for this country code",
+    "phoneRequired": "Phone number is required",
+    "fillRequired": "Please fill in all required fields",
+    "na": "N/A",
+    "actions": "Actions",
+    "create": "Create",
+    "back": "Back",
+    "yes": "Yes",
+    "no": "No",
+    "forbiddenTitle": "Access denied",
+    "forbiddenBody": "Your role does not allow this action.",
+    "breadcrumb": {
+      "home": "Home",
+      "login": "Sign in",
+      "register": "Create account",
+      "clients": "Clients",
+      "newClient": "New client",
+      "contracts": "Policies",
+      "newPolicy": "New policy"
+    }
+  },
+  "nav": {
+    "overview": "Overview",
+    "clients": "Clients",
+    "claims": "Claims",
+    "declaredPayments": "Declared payments",
+    "clientRequests": "Client requests",
+    "contracts": "Policies",
+    "prospects": "Prospects",
+    "dailyReports": "Daily reports",
+    "wallet": "Wallet",
+    "objectives": "Agent targets",
+    "niches": "Niches",
+    "rewards": "Rewards",
+    "support": "Support & Chat",
+    "users": "Users",
+    "settings": "Settings",
+    "portal": "Management portal",
+    "loggingOut": "Signing out..."
+  },
+  "header": {
+    "searchPlaceholder": "Search clients, policies...",
+    "systemLive": "Bethel System Live",
+    "notifications": "Notifications & Support",
+    "markAllRead": "Mark all read",
+    "noNotifications": "No notifications yet",
+    "logout": "Log out",
+    "defaultUser": "Bethel user"
+  },
+  "session": {
+    "warningTitle": "Session about to expire",
+    "warningBody": "Your session will expire in 1 minute due to inactivity. Click to continue.",
+    "continue": "Continue",
+    "expiredIdle": "Your session expired due to inactivity. Please sign in again."
+  },
+  "auth": {
+    "login": {
+      "badge": "Secure CIMA portal",
+      "title": "Sign in",
+      "subtitle": "Sign in to your manager or client space to manage policies and claims.",
+      "emailTab": "Email",
+      "phoneTab": "Phone",
+      "emailLabel": "Email address",
+      "phoneLabel": "Client / agent phone number",
+      "emailPlaceholder": "e.g. name@domain.cm",
+      "phonePlaceholder": "677000000",
+      "password": "Password",
+      "forgot": "Forgot password?",
+      "forgotHint": "Please contact agency support to reset your access.",
+      "submit": "Sign in to my account",
+      "noAccount": "Don't have a client space yet?",
+      "createAccount": "Create an insured account",
+      "success": "Signed in successfully",
+      "noProfile": "User profile was not received",
+      "invalid": "Invalid credentials",
+      "cimaLicense": "CIMA regulatory license",
+      "quote": "A modern platform to manage subscription and claims tracking securely.",
+      "insuredCount": "+16,500 insured in Cameroon",
+      "ssl": "256-bit SSL encryption"
+    },
+    "register": {
+      "badge": "Insured account setup",
+      "title": "Insured registration",
+      "subtitle": "Create your personal space to track quotes, certificates and claims.",
+      "fullName": "Full name",
+      "phone": "Phone number",
+      "email": "Email address",
+      "password": "Password",
+      "submit": "Create my account and subscribe",
+      "hasAccount": "Already have an account?",
+      "signIn": "Sign in",
+      "success": "Account created! Redirecting...",
+      "error": "Could not create your account",
+      "server": "Unable to reach the registration server."
+    }
+  },
+  "landing": {
+    "navHome": "Home",
+    "navServices": "Our services",
+    "navWhy": "Why us",
+    "navPerf": "Performance",
+    "navSim": "Simulator",
+    "navContact": "Contact",
+    "clientSpace": "Client space",
+    "subscribe": "Subscribe",
+    "badge": "Smart insurance • CIMA licensed in Cameroon",
+    "heroTitle1": "Innovate today,",
+    "heroTitle2": "Inspire tomorrow",
+    "heroBody": "We deliver smart insurance solutions that accelerate growth, protect businesses and secure families with full transparency.",
+    "ctaServices": "Our services",
+    "ctaQuote": "Get a quote",
+    "footerAbout": "Insurance company licensed by CIMA. Issuance of auto, health, travel and business policies with real-time tracking.",
+    "contactTitle": "Send us a message",
+    "contactHint": "A MobiAssur advisor will get back to you within 2 hours.",
+    "fullName": "Full name",
+    "phone": "Phone",
+    "helpPlaceholder": "How can we help you?",
+    "send": "Send request",
+    "rights": "© 2026 Bethel Comprehensive Insurance Ltd. All rights reserved.",
+    "legal": "Legal notice",
+    "cimaPolicy": "CIMA policy",
+    "dataSecurity": "Data security",
+    "authRegisterTitle": "Create an account",
+    "authLoginTitle": "Sign in",
+    "authRegisterHint": "Create your client account to confirm your quote",
+    "authLoginHint": "Sign in to your account",
+    "accountCreated": "Account created successfully! Redirecting to subscription...",
+    "accountError": "Error creating the account."
+  },
+  "dashboard": {
+    "title": "Overview",
+    "subtitle": "Agency steering and key indicators."
+  },
+  "clients": {
+    "title": "Clients",
+    "subtitle": "Insured portfolio.",
+    "new": "New client",
+    "newTitle": "New client",
+    "newSubtitle": "Complete file: insured, vehicle, driver, covers and documents.",
+    "search": "Search by name, phone, ID...",
+    "detailTitle": "Client file"
+  },
+  "contracts": {
+    "title": "Policies",
+    "subtitle": "Policies and pricing.",
+    "newTitle": "Policy creation / pricing",
+    "newSubtitle": "Enter subscription parameters and compare best offers in real time."
+  },
+  "prospects": {
+    "title": "Prospects",
+    "subtitle": "Pipeline and conversions."
+  },
+  "dailyReports": {
+    "title": "Daily reports",
+    "subtitle": "Daily tracking of field-agent activity.",
+    "submitted": "Submitted reports",
+    "missing": "Missing reports",
+    "missingHint": "Estimate of expected reports not submitted: relevant agents × included calendar days, minus submitted reports.",
+    "fromDate": "From",
+    "toDate": "To",
+    "agent": "Agent",
+    "allAgents": "All agents",
+    "status": "Status",
+    "allStatuses": "All statuses",
+    "statusDraft": "Draft",
+    "statusSubmitted": "Submitted",
+    "loading": "Loading reports…",
+    "refreshing": "Refreshing…",
+    "empty": "No reports match these filters",
+    "date": "Date",
+    "visits": "Visits",
+    "calls": "Calls",
+    "collections": "Collections",
+    "actions": "Actions",
+    "view": "View",
+    "detailTitle": "Report details",
+    "submittedAt": "Submitted at",
+    "lockedAt": "Locked at",
+    "prospects": "Prospects",
+    "contracts": "Policies",
+    "difficulties": "Difficulties",
+    "nextDayPlan": "Next-day plan",
+    "attachments": "Attachments",
+    "noAttachments": "No attachments",
+    "file": "File",
+    "downloadPdf": "Download PDF",
+    "downloadSuccess": "Report PDF downloaded",
+    "downloadError": "Unable to download report",
+    "close": "Close"
+  },
+  "wallet": {
+    "title": "Wallet",
+    "subtitle": "Agent balances and history."
+  },
+  "sinistres": {
+    "title": "Claims",
+    "subtitle": "Declarations and file tracking."
+  },
+  "paiements": {
+    "title": "Declared payments",
+    "subtitle": "Collections to validate."
+  },
+  "demandes": {
+    "title": "Client requests",
+    "subtitle": "Requests from the insured portal."
+  },
+  "objectives": {
+    "title": "Agent targets",
+    "subtitle": "Sales targets, unit evidence and administrative review.",
+    "proofValidations": "Evidence review",
+    "proofPending": "Pending",
+    "proofApproved": "Approved",
+    "proofRejected": "Rejected",
+    "scopeAgency": "Agency",
+    "scopeNiche": "Niche",
+    "periodFilter": "Period",
+    "approvedProgress": "Approved progress",
+    "pendingProgress": "Pending"
+  },
+  "niches": {
+    "title": "Niches",
+    "subtitle": "Catalog, exclusive assignment and niche objectives.",
+    "objectiveTemplates": "Objective templates",
+    "assignmentObjectives": "Assignment objectives",
+    "addObjective": "Add an objective",
+    "saveTemplates": "Save templates"
+  },
+  "rewards": {
+    "title": "Rewards",
+    "subtitle": "Bonuses and agent programs."
+  },
+  "support": {
+    "title": "Support & Chat",
+    "subtitle": "Tickets and agent messages."
+  },
+  "users": {
+    "title": "Team members",
+    "subtitle": "Accounts, field-agent performance and ranking profiles."
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "CIMA configuration, insurers and commissions."
+  },
+  "excel": {
+    "invalidFile": "Please provide an Excel (.xlsx, .xls) or CSV (.csv) file.",
+    "parsed": "File {name} parsed successfully ({count} rows)",
+    "parseError": "Error while parsing the Excel file.",
+    "imported": "Successfully imported {count} {label}",
+    "done": "Import complete: {count} item(s) added successfully!",
+    "none": "No items imported.",
+    "runError": "Error while running the import.",
+    "templateOk": "Official {label}.xlsx template downloaded from the backend",
+    "templateFallback": "Generating a local sample Excel template (fallback)",
+    "launch": "Start import ({count})"
+  },
+  "quote": {
+    "title": "Quote details and covers",
+    "breakdown": "Estimated quote breakdown",
+    "taxes": "Includes taxes and legal insurance stamp",
+    "compare": "Compare premiums from our CIMA-licensed partners"
+  },
+  "cima": {
+    "title": "CIMA settings",
+    "categories": "CIMA vehicle categories",
+    "zones": "CIMA circulation zones"
+  },
+  "chart": {
+    "title": "Network & services supervision"
+  },
+  "commissions": {
+    "title": "Commission grid",
+    "hint": "Percentage or fixed amount by contract type. Otherwise the global agent commission rate applies."
+  },
+  "insurers": {
+    "title": "Partner insurers"
+  },
+  "supportSse": {
+    "voice": "Voice message received",
+    "newMessage": "New support message",
+    "from": "Message from {name}",
+    "agent": "agent",
+    "open": "Open",
+    "newTicket": "New support ticket",
+    "ticketBody": "Ticket opened by an agent"
+  }
 }

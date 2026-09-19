@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { Loader2, Inbox, MessageSquare, Clock, CheckCircle2, AlertCircle, Filter, FileText, Send } from 'lucide-react'
 import { asList, portalClientApi, type ClientRequestItem } from '@/lib/api/mobi-assur'
+import { useTranslations } from 'next-intl'
 
 const STATUSES = ['OUVERT', 'EN_COURS', 'RESOLU', 'REJETE', 'CLOS'] as const
 
@@ -22,6 +23,7 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; b
 }
 
 export default function DemandesClientsPage() {
+  const t = useTranslations('demandes')
   const qc = useQueryClient()
   const [statusFilter, setStatusFilter] = useState('')
   const [selected, setSelected] = useState<ClientRequestItem | null>(null)
@@ -50,7 +52,7 @@ export default function DemandesClientsPage() {
 
   return (
     <div className="flex flex-col gap-8 p-6 md:p-8 bg-slate-50/50 min-h-screen">
-      <Header title="Demandes clients" subtitle="Gestion centralisée des avenants, résiliations et demandes de support" />
+      <Header title={t('title')} subtitle={t('subtitle')} />
 
       {/* Filter Bar */}
       <div className="flex items-center justify-between gap-4 bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-slate-200/80 shadow-xs">

@@ -7,7 +7,13 @@ import { authApi } from '@/lib/api/mobi-assur'
 import { consumeAuthToast } from '@/lib/auth/session-expired'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Breadcrumb } from '@/components/ui/breadcrumb'
+import { PhoneField } from '@/components/ui/phone-field'
+import { parseValidPhone, DEFAULT_PHONE_COUNTRY } from '@/lib/phone'
+import type { CountryCode } from 'libphonenumber-js'
 import { toast } from 'sonner'
+import { useTranslations } from 'next-intl'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
 import { motion } from 'framer-motion'
 import {
   Mail,
@@ -21,16 +27,18 @@ import {
   Award,
   CheckCircle2,
   LockKeyhole,
-  ArrowLeft,
 } from 'lucide-react'
 
 export default function LoginPage() {
+  const t = useTranslations('auth.login')
+  const tCommon = useTranslations('common')
   const router = useRouter()
   const loginStore = useAuthStore((state) => state.login)
   const [loading, setLoading] = useState(false)
   const [loginMethod, setLoginMethod] = useState<'email' | 'phone'>('email')
 
   const [identifier, setIdentifier] = useState('')
+  const [phoneCountry, setPhoneCountry] = useState<CountryCode>(DEFAULT_PHONE_COUNTRY)
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
 
@@ -42,27 +50,37 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!identifier || !password) {
-      toast.error('Veuillez remplir tous les champs obligatoires')
+      toast.error(tCommon('fillRequired'))
       return
+    }
+
+    let login = identifier.trim()
+    if (loginMethod === 'phone') {
+      const parsed = parseValidPhone(login, phoneCountry)
+      if (!parsed) {
+        toast.error(tCommon('phoneInvalid'))
+        return
+      }
+      login = parsed.e164
     }
 
     setLoading(true)
     try {
       const response = await authApi.login({
-        login: identifier,
+        login,
         password: password,
       })
 
       if (response.user) {
         loginStore(response.user)
-        toast.success(response.message || 'Connexion réussie')
+        toast.success(response.message || t('success'))
         router.push('/dashboard')
       } else {
-        toast.error('Profil utilisateur non reçu')
+        toast.error(t('noProfile'))
       }
     } catch (err: any) {
       console.error(err)
-      toast.error(err.message || 'Identifiants invalides')
+      toast.error(err.message || t('invalid'))
     } finally {
       setLoading(false)
     }
@@ -82,18 +100,20 @@ export default function LoginPage() {
           
           {/* Top Header Navigation */}
           <div className="flex items-center justify-between">
-            <button
-              onClick={() => router.push('/')}
-              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold text-slate-600 hover:text-blue-900 bg-slate-100 hover:bg-blue-50 border border-slate-200/80 transition-all cursor-pointer group"
-            >
-              <ArrowLeft className="h-3.5 w-3.5 group-hover:-translate-x-1 transition-transform text-blue-600" />
-              <span>Retour à l'accueil</span>
-            </button>
+            <Breadcrumb
+              items={[
+                { label: tCommon('breadcrumb.home'), href: '/' },
+                { label: tCommon('breadcrumb.login') },
+              ]}
+            />
 
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200/80">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-              Portail Sécurisé CIMA
-            </span>
+            <div className="flex items-center gap-2">
+              <LanguageSwitcher />
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200/80">
+                <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                {t('badge')}
+              </span>
+            </div>
           </div>
 
           {/* Center Form Section */}
@@ -113,10 +133,10 @@ export default function LoginPage() {
                 />
               </div>
               <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-[#1b365d]">
-                Espace Connexion
+                {t('title')}
               </h1>
               <p className="text-slate-500 text-xs sm:text-sm font-medium mt-1.5 max-w-sm">
-                Connectez-vous à votre espace gestionnaire ou client pour piloter vos polices et déclarations.
+                {t('subtitle')}
               </p>
             </div>
 
@@ -135,7 +155,7 @@ export default function LoginPage() {
                 }`}
               >
                 <Mail className="h-3.5 w-3.5 text-blue-600" />
-                <span>Adresse Email</span>
+                <span>{t('emailTab')}</span>
               </button>
 
               <button
@@ -151,7 +171,7 @@ export default function LoginPage() {
                 }`}
               >
                 <Phone className="h-3.5 w-3.5 text-emerald-600" />
-                <span>Téléphone (+237)</span>
+                <span>{t('phoneTab')}</span>
               </button>
             </div>
 
@@ -159,43 +179,48 @@ export default function LoginPage() {
             <form onSubmit={handleSubmit} className="space-y-4 pt-1">
               <div className="space-y-1.5">
                 <label className="text-xs font-extrabold text-slate-800 uppercase tracking-wider block">
-                  {loginMethod === 'email' ? 'Adresse Email' : 'N° de Téléphone Client / Agent'}
+                  {loginMethod === 'email' ? t('emailLabel') : t('phoneLabel')}
                 </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    {loginMethod === 'email' ? (
+                {loginMethod === 'email' ? (
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                       <Mail className="h-4 w-4 text-blue-600" />
-                    ) : (
-                      <Phone className="h-4 w-4 text-emerald-600" />
-                    )}
+                    </div>
+                    <Input
+                      type="email"
+                      placeholder={t('emailPlaceholder')}
+                      value={identifier}
+                      onChange={(e) => setIdentifier(e.target.value)}
+                      className="pl-11 h-12 bg-slate-50/60 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#1b365d] focus:ring-2 focus:ring-[#1b365d]/20 rounded-xl text-xs font-medium"
+                      required
+                    />
                   </div>
-                  <Input
-                    type={loginMethod === 'email' ? 'email' : 'text'}
-                    placeholder={
-                      loginMethod === 'email' ? 'ex: nom@domaine.cm' : '+237 699 11 22 33'
-                    }
+                ) : (
+                  <PhoneField
                     value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value)}
-                    className="pl-11 h-12 bg-slate-50/60 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#1b365d] focus:ring-2 focus:ring-[#1b365d]/20 rounded-xl text-xs font-medium"
+                    onChange={setIdentifier}
+                    country={phoneCountry}
+                    onCountryChange={setPhoneCountry}
                     required
+                    placeholder={t('phonePlaceholder')}
                   />
-                </div>
+                )}
               </div>
 
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-extrabold text-slate-800 uppercase tracking-wider block">
-                    Mot de passe
+                    {t('password')}
                   </label>
                   <a
                     href="#"
                     onClick={(e) => {
                       e.preventDefault()
-                      toast.info("Veuillez contacter le support de l'agence pour réinitialiser votre accès.")
+                      toast.info(t('forgotHint'))
                     }}
                     className="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline transition-colors"
                   >
-                    Mot de passe oublié ?
+                    {t('forgot')}
                   </a>
                 </div>
                 <div className="relative">
@@ -229,11 +254,11 @@ export default function LoginPage() {
                 {loading ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin text-white" />
-                    <span>Vérification des identifiants...</span>
+                    <span>{tCommon('loading')}</span>
                   </>
                 ) : (
                   <>
-                    <span>Se connecter à mon compte</span>
+                    <span>{t('submit')}</span>
                     <ArrowRight className="h-4 w-4" />
                   </>
                 )}
@@ -243,13 +268,13 @@ export default function LoginPage() {
             {/* Registration Redirect */}
             <div className="text-center pt-4 border-t border-slate-100 space-y-2">
               <p className="text-xs text-slate-500 font-medium">
-                Vous n'avez pas encore d'espace client ?{' '}
+                {t('noAccount')}{' '}
                 <button
                   type="button"
                   onClick={() => router.push('/register')}
                   className="font-extrabold text-[#1b365d] hover:text-blue-700 hover:underline cursor-pointer"
                 >
-                  Créer un compte assuré
+                  {t('createAccount')}
                 </button>
               </p>
             </div>
@@ -259,7 +284,7 @@ export default function LoginPage() {
           <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-400">
             <span>© 2026 Bethel Comprehensive Insurance Ltd.</span>
             <span className="flex items-center gap-1 font-semibold text-slate-500">
-              <Lock className="h-3 w-3 text-emerald-600" /> Cryptage SSL 256-bit
+              <Lock className="h-3 w-3 text-emerald-600" /> {t('ssl')}
             </span>
           </div>
         </div>
@@ -278,7 +303,7 @@ export default function LoginPage() {
             <div className="flex justify-end">
               <div className="bg-white/10 backdrop-blur-xl border border-white/20 px-4 py-2 rounded-full text-white text-xs font-bold flex items-center gap-2 shadow-lg">
                 <Award className="h-4 w-4 text-amber-400" />
-                <span>Agrément Réglementaire CIMA</span>
+                <span>{t('cimaLicense')}</span>
               </div>
             </div>
 
@@ -293,12 +318,12 @@ export default function LoginPage() {
                 <ShieldCheck className="h-5 w-5" />
               </div>
               <h3 className="text-xl font-black leading-snug">
-                "Une plateforme moderne pour gérer la souscription et le suivi des sinistres en toute sécurité."
+                "{t('quote')}"
               </h3>
               <div className="pt-3 border-t border-white/15 flex items-center justify-between text-xs text-slate-200">
                 <span className="font-bold flex items-center gap-1.5">
                   <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                  +16 500 Assurés au Cameroun
+                  {t('insuredCount')}
                 </span>
                 <span className="text-amber-400 font-extrabold">Bethel Live</span>
               </div>

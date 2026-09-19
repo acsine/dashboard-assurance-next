@@ -14,6 +14,7 @@ import {
   type Prospect,
   type QuoteBreakdown,
   type QuoteComputeResult,
+  type QuoteLineItem,
 } from '@/lib/api/mobi-assur'
 import Header from '@/components/dashboard/Header'
 import QuoteDetailsAndGuarantees from '@/components/insurance/QuoteDetailsAndGuarantees'
@@ -35,8 +36,13 @@ import {
   Eye,
   BellRing,
   FileSpreadsheet,
+  FileDown,
 } from 'lucide-react'
 import { RoleGuard } from '@/components/auth/RoleGuard'
+import { PhoneField } from '@/components/ui/phone-field'
+import { parseValidPhone, DEFAULT_PHONE_COUNTRY } from '@/lib/phone'
+import type { CountryCode } from 'libphonenumber-js'
+import { useTranslations } from 'next-intl'
 
 type Tab = 'all' | 'pending' | 'recontact'
 
@@ -156,6 +162,7 @@ function emptyTariffForm(p?: Prospect): TariffFormState {
 interface ConvertFormState {
   full_name: string
   phone: string
+  country_code: CountryCode
   cni_number: string
   validation_code: string
   marque: string
@@ -168,6 +175,7 @@ function emptyConvertForm(p?: Prospect): ConvertFormState {
   return {
     full_name: p?.full_name || '',
     phone: p?.phone || '',
+    country_code: DEFAULT_PHONE_COUNTRY,
     cni_number: p?.cni_number || '',
     validation_code: '',
     marque: '',
@@ -179,12 +187,16 @@ function emptyConvertForm(p?: Prospect): ConvertFormState {
 
 function QuoteBreakdownView({
   breakdown,
+  lineItems,
+  insurerName,
   total,
   comparison,
   selectedInsurerId,
   onSelectInsurer,
 }: {
   breakdown?: QuoteBreakdown | Record<string, unknown> | null
+  lineItems?: QuoteLineItem[] | null
+  insurerName?: string | null
   total?: number | null
   comparison?: any[] | null
   selectedInsurerId?: string
@@ -194,6 +206,8 @@ function QuoteBreakdownView({
   return (
     <QuoteDetailsAndGuarantees
       breakdown={breakdown}
+      lineItems={lineItems}
+      insurerName={insurerName}
       total={total}
       comparison={comparison}
       selectedInsurerId={selectedInsurerId}
@@ -530,11 +544,14 @@ function TariffFields({
 }
 
 export default function ProspectsPage() {
+  const t = useTranslations('prospects')
   const queryClient = useQueryClient()
   const [tab, setTab] = useState<Tab>('all')
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [rejectMotif, setRejectMotif] = useState('')
   const [search, setSearch] = useState('')
+  const [agentFilter, setAgentFilter] = useState('')
+  const [exporting, setExporting] = useState<'pdf' | 'xlsx' | null>(null)
   const [isExcelModalOpen, setIsExcelModalOpen] = useState(false)
   const [convertingProspect, setConvertingProspect] = useState<Prospect | null>(null)
   const [convertForm, setConvertForm] = useState<ConvertFormState>(emptyConvertForm())
@@ -550,6 +567,31 @@ export default function ProspectsPage() {
   const { data: prospects = [], isLoading: loadingProspects } = useQuery({
     queryKey: ['prospects'],
     queryFn: () => prospectsApi.list(),
+  })
+
+  const { data: backendRecontactProspects = [], isLoading: loadingRecontacts } = useQuery({
+    queryKey: ['prospects', 'needs-recontact', agentFilter],
+    queryFn: async () => {
+      try {
+        return await prospectsApi.list({
+          needs_recontact: true,
+          agent_id: agentFilter || undefined,
+        })
+      } catch (error) {
+        if (
+          error instanceof MobiAssurApiError &&
+          (error.status === 404 || error.status === 405)
+        ) {
+          const legacyProspects = await prospectsApi.list()
+          return legacyProspects.filter(
+            (prospect) =>
+              needsRecontact(prospect) &&
+              (!agentFilter || prospect.agent_id === agentFilter),
+          )
+        }
+        throw error
+      }
+    },
   })
 
   const { data: pendingRequests = [], isLoading: loadingPending } = useQuery({
@@ -626,12 +668,12 @@ export default function ProspectsPage() {
     return map
   }, [agents])
 
-  const resolveAgentLabel = (agentId?: string) => {
+  const resolveAgentLabel = useCallback((agentId?: string) => {
     if (!agentId) return 'Agent inconnu'
     const name = agentNameById.get(agentId)
     const shortId = agentId.substring(0, 8).toUpperCase()
     return name ? `${name} (${shortId})` : shortId
-  }
+  }, [agentNameById])
 
   const canComputeQuote = useCallback(
     (form: TariffFormState) =>
@@ -814,6 +856,11 @@ export default function ProspectsPage() {
       toast.error('Nom et téléphone sont requis')
       return
     }
+    const parsedPhone = parseValidPhone(convertForm.phone, convertForm.country_code)
+    if (!parsedPhone) {
+      toast.error('Le numéro de téléphone est invalide pour ce code pays')
+      return
+    }
     if (!convertForm.cni_number.trim()) {
       toast.error('Numéro CNI requis')
       return
@@ -825,8 +872,8 @@ export default function ProspectsPage() {
 
     const body: ConversionPayload & { validation_code: string } = {
       full_name: convertForm.full_name.trim(),
-      phone: convertForm.phone.trim(),
-      country_code: 'CM',
+      phone: parsedPhone.e164,
+      country_code: parsedPhone.country,
       cni_number: convertForm.cni_number.trim(),
       validation_code: convertForm.validation_code,
     }
@@ -909,15 +956,20 @@ export default function ProspectsPage() {
     })
   }
 
-  const safeProspects = Array.isArray(prospects) ? prospects : []
+  const safeProspects = useMemo(
+    () => (Array.isArray(prospects) ? prospects : []),
+    [prospects],
+  )
   const safePendingRequests = Array.isArray(pendingRequests) ? pendingRequests : []
   const recontactProspects = useMemo(
-    () => safeProspects.filter((p) => needsRecontact(p)),
-    [safeProspects],
+    () => (Array.isArray(backendRecontactProspects) ? backendRecontactProspects : []),
+    [backendRecontactProspects],
   )
 
   const filteredProspects = useMemo(() => {
-    const source = tab === 'recontact' ? recontactProspects : safeProspects
+    const source = tab === 'recontact'
+      ? recontactProspects
+      : safeProspects.filter((prospect) => !agentFilter || prospect.agent_id === agentFilter)
     const q = search.trim().toLowerCase()
     if (!q) return source
     return source.filter((p: Prospect) => {
@@ -925,13 +977,28 @@ export default function ProspectsPage() {
       const hay = `${p.full_name || ''} ${p.phone || ''} ${p.status || ''} ${p.cni_number || ''} ${p.agent_id || ''} ${agentLabel} ${p.external_insurer_name || ''}`.toLowerCase()
       return hay.includes(q)
     })
-  }, [safeProspects, recontactProspects, search, agentNameById, tab])
+  }, [safeProspects, recontactProspects, search, resolveAgentLabel, agentFilter, tab])
+
+  const handleExpiringExport = async (format: 'pdf' | 'xlsx') => {
+    if (exporting) return
+    setExporting(format)
+    try {
+      const params = { days: 30, agent_id: agentFilter || undefined }
+      if (format === 'pdf') await prospectsApi.exportExpiringPdf(params)
+      else await prospectsApi.exportExpiringExcel(params)
+      toast.success(`Export ${format.toUpperCase()} téléchargé`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Impossible de télécharger l'export")
+    } finally {
+      setExporting(null)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-8 p-6 md:p-8 bg-slate-50/50 min-h-screen">
       <Header
-        title="Prospects & Conversions"
-        subtitle="Consultez les prospects, marquez les intéressés avec devis CIMA et validez les conversions."
+        title={t('title')}
+        subtitle={t('subtitle')}
       />
 
       <div className="space-y-6">
@@ -976,6 +1043,20 @@ export default function ProspectsPage() {
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="w-full sm:w-56">
+              <SearchableSelect
+                value={agentFilter}
+                onChange={setAgentFilter}
+                placeholder="Tous les agents"
+                options={[
+                  { value: '', label: 'Tous les agents' },
+                  ...agents.map((agent) => ({
+                    value: agent.id,
+                    label: agent.full_name || agent.email || agent.id,
+                  })),
+                ]}
+              />
+            </div>
             {(tab === 'all' || tab === 'recontact') && (
               <Input
                 placeholder="Rechercher nom, téléphone, CNI, statut…"
@@ -992,6 +1073,32 @@ export default function ProspectsPage() {
               <FileSpreadsheet className="h-4 w-4" />
               Importer Excel
             </Button>
+            {tab === 'recontact' && (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleExpiringExport('pdf')}
+                  disabled={exporting !== null}
+                  isLoading={exporting === 'pdf'}
+                  className="h-9 text-xs"
+                >
+                  <FileDown className="h-4 w-4 mr-1.5" />
+                  PDF
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleExpiringExport('xlsx')}
+                  disabled={exporting !== null}
+                  isLoading={exporting === 'xlsx'}
+                  className="h-9 text-xs"
+                >
+                  <FileSpreadsheet className="h-4 w-4 mr-1.5" />
+                  Excel
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
@@ -1005,7 +1112,7 @@ export default function ProspectsPage() {
               </h3>
             </div>
 
-            {loadingProspects ? (
+            {loadingProspects || (tab === 'recontact' && loadingRecontacts) ? (
               <div className="py-20 text-center text-gray-400 font-medium">
                 Chargement des prospects...
               </div>
@@ -1306,6 +1413,8 @@ export default function ProspectsPage() {
                 )}
                 <QuoteBreakdownView
                   breakdown={liveQuote?.breakdown}
+                  lineItems={liveQuote?.line_items}
+                  insurerName={liveQuote?.insurer_name || liveQuote?.best_insurer_name}
                   total={liveQuote?.total}
                   comparison={liveQuote?.comparison}
                 />
@@ -1374,12 +1483,13 @@ export default function ProspectsPage() {
                   <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
                     Téléphone *
                   </label>
-                  <Input
+                  <PhoneField
                     value={convertForm.phone}
-                    onChange={(e) =>
-                      setConvertForm({ ...convertForm, phone: e.target.value })
+                    onChange={(phone) => setConvertForm({ ...convertForm, phone })}
+                    country={convertForm.country_code}
+                    onCountryChange={(country) =>
+                      setConvertForm({ ...convertForm, country_code: country })
                     }
-                    className="h-10 text-xs border-gray-200"
                     required
                   />
                 </div>

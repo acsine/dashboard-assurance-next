@@ -8,18 +8,26 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
-import { Loader2, Plus, Save, Target, Trash2, FileSpreadsheet } from 'lucide-react'
+import { CheckCircle2, Eye, FileSpreadsheet, Loader2, Plus, Save, Target, Trash2, XCircle } from 'lucide-react'
 import ExcelImportModal from '@/components/excel/ExcelImportModal'
+import { useTranslations } from 'next-intl'
 import {
   objectivesApi,
+  nichesApi,
   asList,
+  proxiedAssetUrl,
   type ObjectiveMetric,
+  type ObjectiveProofSubmission,
+  type ObjectiveProofScope,
+  type Niche,
   type TemplateItem,
 } from '@/lib/api/mobi-assur'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { can } from '@/lib/auth/roles'
+import { ProofConfigFields } from '@/components/objectives/ProofConfigFields'
+import { proofTypeLabel } from '@/lib/objectives/proof-types'
 
-type Tab = 'template' | 'agents' | 'performance'
+type Tab = 'template' | 'agents' | 'performance' | 'validations'
 
 const PERIODS = [
   { id: 'DAILY', label: 'Journalier' },
@@ -28,13 +36,12 @@ const PERIODS = [
   { id: 'ACTIVITY', label: 'Activités' },
 ] as const
 
-const selectClass =
-  'flex h-10 w-full rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs transition-colors focus-visible:outline-none'
 const labelClass = 'text-[10px] font-bold text-gray-500 uppercase tracking-wider block'
 const thClass = 'pb-4 text-xs font-bold text-gray-400 uppercase tracking-wider'
 const trClass = 'border-b border-gray-50 last:border-0 hover:bg-gray-50/40 transition-colors'
 
 export default function ObjectivesPage() {
+  const t = useTranslations('objectives')
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
   const canManage = can(user?.role, 'settings:manage') || can(user?.role, 'users:manage')
@@ -54,7 +61,18 @@ export default function ObjectivesPage() {
     default_points: '1',
     default_minimum: '0',
     default_target: '0',
+    proof_type: 'REFERENCE' as ObjectiveMetric['proof_type'],
+    proof_instructions: '',
   })
+  const [proofStatusFilter, setProofStatusFilter] =
+    useState<ObjectiveProofSubmission['status']>('PENDING')
+  const [proofScopeFilter, setProofScopeFilter] = useState<ObjectiveProofScope | ''>('')
+  const [proofNicheFilter, setProofNicheFilter] = useState('')
+  const [proofPeriodFilter, setProofPeriodFilter] = useState('')
+  const [selectedSubmission, setSelectedSubmission] =
+    useState<ObjectiveProofSubmission | null>(null)
+  const [rejectionReason, setRejectionReason] = useState('')
+  const [reviewNotes, setReviewNotes] = useState('')
 
   const { data: template, isLoading } = useQuery({
     queryKey: ['objectives-template'],
@@ -73,6 +91,29 @@ export default function ObjectivesPage() {
     enabled: tab === 'performance',
   })
 
+  const { data: proofSubmissionsData, isLoading: loadingProofSubmissions } = useQuery({
+    queryKey: ['objective-proof-submissions', proofStatusFilter, proofScopeFilter, proofNicheFilter, proofPeriodFilter],
+    queryFn: () => objectivesApi.listProofSubmissions({
+      status: proofStatusFilter,
+      scope: proofScopeFilter || undefined,
+      niche_id: proofNicheFilter || undefined,
+      period_key: proofPeriodFilter.trim() || undefined,
+    }),
+    enabled: tab === 'validations',
+  })
+  const { data: proofNichesData } = useQuery({
+    queryKey: ['niches', 'proof-filters'],
+    queryFn: () => nichesApi.list(),
+    enabled: tab === 'validations' && proofScopeFilter === 'NICHE_OBJECTIVE',
+  })
+  const proofNiches = asList<Niche>(proofNichesData)
+  const proofSubmissions = asList<ObjectiveProofSubmission>(proofSubmissionsData)
+  const { data: pendingProofsData } = useQuery({
+    queryKey: ['objective-proof-submissions', 'PENDING', 'count'],
+    queryFn: () => objectivesApi.listProofSubmissions('PENDING'),
+  })
+  const pendingProofCount = asList<ObjectiveProofSubmission>(pendingProofsData).length
+
   useEffect(() => {
     if (template?.items) setItems(template.items)
   }, [template])
@@ -82,25 +123,44 @@ export default function ObjectivesPage() {
     [items, periodFilter],
   )
 
-  const saveMutation = useMutation({
-    mutationFn: () =>
-      objectivesApi.putTemplate(
+  const persistTemplateMutation = useMutation({
+    mutationFn: async (applyToAgents: boolean) => {
+      await Promise.all(
+        items
+          .filter((item) => item.metric)
+          .map((item) =>
+            objectivesApi.updateMetric(item.metric_id, {
+              proof_required: Boolean(item.metric?.proof_instructions?.trim()),
+              proof_type: item.metric?.proof_type || 'REFERENCE',
+              proof_instructions: item.metric?.proof_instructions?.trim() || null,
+            }),
+          ),
+      )
+      return objectivesApi.putTemplate(
         items.map((i) => ({
           metric_id: i.metric_id,
           target_value: Number(i.target_value) || 0,
           points: Number(i.points) || 0,
           minimum: Number(i.minimum) || 0,
         })),
-      ),
-    onSuccess: () => {
-      toast.success('Template appliqué à tous les agents')
-      setConfirmOpen(false)
+        { applyToAgents },
+      )
+    },
+    onSuccess: (_data, applyToAgents) => {
+      if (applyToAgents) {
+        toast.success('Template appliqué à tous les agents')
+        setConfirmOpen(false)
+        queryClient.invalidateQueries({ queryKey: ['objectives-agents'] })
+        queryClient.invalidateQueries({ queryKey: ['agent-wallets'] })
+      } else {
+        toast.success('Modifications enregistrées')
+      }
       queryClient.invalidateQueries({ queryKey: ['objectives-template'] })
-      queryClient.invalidateQueries({ queryKey: ['objectives-agents'] })
-      queryClient.invalidateQueries({ queryKey: ['agent-wallets'] })
     },
     onError: (e: any) => toast.error(e?.message || 'Erreur'),
   })
+
+  const templateBusy = persistTemplateMutation.isPending
 
   const createMetricMutation = useMutation({
     mutationFn: () =>
@@ -112,6 +172,9 @@ export default function ObjectivesPage() {
         default_points: Number(newMetric.default_points) || 1,
         default_minimum: Number(newMetric.default_minimum) || 0,
         default_target: Number(newMetric.default_target) || 0,
+        proof_required: Boolean(newMetric.proof_instructions.trim()),
+        proof_type: newMetric.proof_type,
+        proof_instructions: newMetric.proof_instructions.trim() || null,
       } as any),
     onSuccess: async () => {
       toast.success('Objectif ajouté')
@@ -124,6 +187,8 @@ export default function ObjectivesPage() {
         default_points: '1',
         default_minimum: '0',
         default_target: '0',
+        proof_type: 'REFERENCE',
+        proof_instructions: '',
       })
       await queryClient.invalidateQueries({ queryKey: ['objectives-template'] })
     },
@@ -164,6 +229,60 @@ export default function ObjectivesPage() {
       prev.map((it) => (it.metric_id === metricId ? { ...it, [field]: value } : it)),
     )
   }
+
+  const updateProofInstructions = (metricId: string, value: string) => {
+    setItems((prev) =>
+      prev.map((item) =>
+        item.metric_id === metricId && item.metric
+          ? {
+              ...item,
+              metric: {
+                ...item.metric,
+                proof_required: Boolean(value.trim()),
+                proof_instructions: value,
+              },
+            }
+          : item,
+      ),
+    )
+  }
+
+  const updateProofType = (metricId: string, proofType: ObjectiveMetric['proof_type']) => {
+    setItems((prev) =>
+      prev.map((item) =>
+        item.metric_id === metricId && item.metric
+          ? { ...item, metric: { ...item.metric, proof_type: proofType } }
+          : item,
+      ),
+    )
+  }
+
+  const approveProofMutation = useMutation({
+    mutationFn: (submission: ObjectiveProofSubmission) =>
+      objectivesApi.approveProofSubmission(submission.id, reviewNotes.trim() || undefined),
+    onSuccess: () => {
+      toast.success('Preuves validées et points crédités')
+      setSelectedSubmission(null)
+      setReviewNotes('')
+      queryClient.invalidateQueries({ queryKey: ['objective-proof-submissions'] })
+      queryClient.invalidateQueries({ queryKey: ['objectives-agents'] })
+      queryClient.invalidateQueries({ queryKey: ['objectives-performance'] })
+      queryClient.invalidateQueries({ queryKey: ['agent-rankings'] })
+    },
+    onError: (e: any) => toast.error(e?.message || 'Erreur lors de la validation'),
+  })
+
+  const rejectProofMutation = useMutation({
+    mutationFn: (submission: ObjectiveProofSubmission) =>
+      objectivesApi.rejectProofSubmission(submission.id, rejectionReason.trim()),
+    onSuccess: () => {
+      toast.success('Déclaration rejetée')
+      setSelectedSubmission(null)
+      setRejectionReason('')
+      queryClient.invalidateQueries({ queryKey: ['objective-proof-submissions'] })
+    },
+    onError: (e: any) => toast.error(e?.message || 'Erreur lors du rejet'),
+  })
 
   const openAgentEdit = async (agent: any) => {
     setEditAgent(agent)
@@ -207,8 +326,8 @@ export default function ObjectivesPage() {
   return (
     <div className="flex-1 flex flex-col bg-white">
       <Header
-        title="Objectifs agents"
-        subtitle="Définissez le template global ici — les cibles sont ensuite appliquées à tous les agents (modifiables individuellement)."
+        title={t('title')}
+        subtitle={t('subtitle')}
       />
 
       <div className="p-8 space-y-6 flex-1">
@@ -218,6 +337,7 @@ export default function ObjectivesPage() {
               ['template', 'Template global'],
               ['agents', 'Par agent'],
               ['performance', 'Performance'],
+              ['validations', `Validations${pendingProofCount ? ` (${pendingProofCount})` : ''}`],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -272,11 +392,25 @@ export default function ObjectivesPage() {
                 {canManage && (
                   <button
                     type="button"
+                    onClick={() => persistTemplateMutation.mutate(false)}
+                    disabled={templateBusy}
+                    className="flex items-center gap-2 px-5 py-3 text-sm font-semibold bg-white border border-gray-200 hover:bg-gray-50 text-gray-800 rounded-xl active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {templateBusy && !confirmOpen ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4" />
+                    )}
+                    Enregistrer
+                  </button>
+                )}
+                {canManage && (
+                  <button
+                    type="button"
                     onClick={() => setConfirmOpen(true)}
-                    disabled={saveMutation.isPending}
+                    disabled={templateBusy}
                     className="flex items-center gap-2 px-5 py-3 text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-xl active:scale-95 transition-all shadow-md shadow-blue-500/10 cursor-pointer border-0 disabled:opacity-50"
                   >
-                    <Save className="h-4 w-4" />
                     Appliquer à tous les agents
                   </button>
                 )}
@@ -284,6 +418,16 @@ export default function ObjectivesPage() {
             </div>
 
             <PeriodTabs />
+
+            {canManage && (
+              <p className="text-xs text-slate-500 rounded-xl border border-slate-100 bg-slate-50/80 px-4 py-3">
+                <span className="font-semibold text-slate-700">Enregistrer</span> sauvegarde le
+                template (cibles, points, minimums et preuves) sans toucher aux objectifs déjà
+                personnalisés par agent.{' '}
+                <span className="font-semibold text-slate-700">Appliquer à tous les agents</span>{' '}
+                propage ce template à l&apos;ensemble du terrain et écrase les overrides individuels.
+              </p>
+            )}
 
             {canManage && showAddForm && (
               <div className="w-full bg-white rounded-2xl border border-gray-100 p-6">
@@ -361,6 +505,18 @@ export default function ObjectivesPage() {
                       className="h-10 text-xs border-gray-200"
                     />
                   </div>
+                  <ProofConfigFields
+                    layout="form"
+                    proofType={newMetric.proof_type}
+                    proofInstructions={newMetric.proof_instructions}
+                    onProofTypeChange={(proof_type) =>
+                      setNewMetric({ ...newMetric, proof_type })
+                    }
+                    onProofInstructionsChange={(proof_instructions) =>
+                      setNewMetric({ ...newMetric, proof_instructions })
+                    }
+                    instructionsPlaceholder="Ex. rapport signé, n° de contrat, photo horodatée"
+                  />
                 </div>
                 <div className="flex flex-wrap gap-2 justify-end pt-5 border-t border-gray-50 mt-5">
                   <Button type="button" variant="ghost" onClick={() => setShowAddForm(false)}>
@@ -402,6 +558,7 @@ export default function ObjectivesPage() {
                         <th className={thClass}>Cible</th>
                         <th className={thClass}>Points</th>
                         <th className={thClass}>Minimum</th>
+                        <th className={thClass}>Preuves à l&apos;atteinte</th>
                         <th className={`${thClass} text-right`}>Actions</th>
                       </tr>
                     </thead>
@@ -448,6 +605,22 @@ export default function ObjectivesPage() {
                               }
                               disabled={!canManage}
                               className="h-10 w-24 text-xs border-gray-200"
+                            />
+                          </td>
+                          <td className="py-4 pr-4 align-top">
+                            <ProofConfigFields
+                              layout="compact"
+                              lockTypeUntilInstructions
+                              proofType={it.metric?.proof_type || 'REFERENCE'}
+                              proofInstructions={it.metric?.proof_instructions || ''}
+                              onProofTypeChange={(proofType) =>
+                                updateProofType(it.metric_id, proofType)
+                              }
+                              onProofInstructionsChange={(value) =>
+                                updateProofInstructions(it.metric_id, value)
+                              }
+                              disabled={!canManage}
+                              instructionsPlaceholder="Aucune preuve requise"
                             />
                           </td>
                           <td className="py-4 text-right">
@@ -584,6 +757,8 @@ export default function ObjectivesPage() {
                         <th className={thClass}>Points période</th>
                         <th className={thClass}>OK</th>
                         <th className={thClass}>Sous minimum</th>
+                        <th className={thClass}>En attente</th>
+                        <th className={thClass}>Rejetées</th>
                         <th className={thClass}>Total métriques</th>
                       </tr>
                     </thead>
@@ -613,7 +788,177 @@ export default function ObjectivesPage() {
                               {r.metrics_below ?? 0}
                             </span>
                           </td>
+                          <td className="py-4 text-sm font-bold text-amber-700">
+                            {r.pending_submissions_count ?? 0}
+                          </td>
+                          <td className="py-4 text-sm font-bold text-red-700">
+                            {r.rejected_submissions_count ?? 0}
+                          </td>
                           <td className="py-4 text-sm text-slate-700">{r.metrics_total ?? 0}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {tab === 'validations' && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-gray-950">Validation des preuves</h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Les points et objectifs atteints ne sont comptabilisés qu’après validation.
+                </p>
+              </div>
+              <div className="grid w-full sm:w-auto grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                <div>
+                  <label className={labelClass}>Portée</label>
+                  <SearchableSelect
+                    value={proofScopeFilter}
+                    onChange={(value) => {
+                      setProofScopeFilter(value as ObjectiveProofScope | '')
+                      if (value !== 'NICHE_OBJECTIVE') setProofNicheFilter('')
+                    }}
+                    options={[
+                      { value: '', label: 'Agence + niches' },
+                      { value: 'STANDARD_OBJECTIVE', label: 'Agence' },
+                      { value: 'NICHE_OBJECTIVE', label: 'Niche' },
+                    ]}
+                  />
+                </div>
+                {proofScopeFilter === 'NICHE_OBJECTIVE' && (
+                  <div>
+                    <label className={labelClass}>Niche</label>
+                    <SearchableSelect
+                      value={proofNicheFilter}
+                      onChange={setProofNicheFilter}
+                      options={[
+                        { value: '', label: 'Toutes les niches' },
+                        ...proofNiches.map((niche) => ({ value: niche.id, label: niche.name })),
+                      ]}
+                    />
+                  </div>
+                )}
+                <div>
+                  <label className={labelClass}>Période</label>
+                  <Input
+                    value={proofPeriodFilter}
+                    onChange={(event) => setProofPeriodFilter(event.target.value)}
+                    placeholder="2026-09 ou 2026-Q3"
+                    className="h-10 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>Statut</label>
+                <SearchableSelect
+                  value={proofStatusFilter}
+                  onChange={(value) =>
+                    setProofStatusFilter(value as ObjectiveProofSubmission['status'])
+                  }
+                  options={[
+                    { value: 'PENDING', label: 'En attente' },
+                    { value: 'APPROVED', label: 'Validées' },
+                    { value: 'REJECTED', label: 'Rejetées' },
+                  ]}
+                />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-gray-100 p-6">
+              {loadingProofSubmissions ? (
+                <div className="py-20 text-center text-gray-400">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-500 mb-3" />
+                  Chargement des déclarations…
+                </div>
+              ) : proofSubmissions.length === 0 ? (
+                <div className="py-20 text-center text-gray-400">
+                  <CheckCircle2 className="h-12 w-12 mx-auto text-gray-300 mb-3" />
+                  <p className="text-sm font-semibold">Aucune déclaration dans ce statut</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-100">
+                        <th className={thClass}>Agent</th>
+                        <th className={thClass}>Niche</th>
+                        <th className={thClass}>Objectif</th>
+                        <th className={thClass}>Période</th>
+                        <th className={thClass}>Valeur / preuves</th>
+                        <th className={thClass}>Statut</th>
+                        <th className={`${thClass} text-right`}>Détail</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {proofSubmissions.map((submission) => (
+                        <tr key={submission.id} className={trClass}>
+                          <td className="py-4">
+                            <span className="font-bold text-sm text-gray-900 block">
+                              {submission.agent_name || submission.agent_id}
+                            </span>
+                            <span className="text-[10px] text-gray-400">
+                              {new Date(submission.submitted_at).toLocaleString('fr-FR')}
+                            </span>
+                          </td>
+                          <td className="py-4 text-xs text-slate-700">
+                            {submission.scope === 'NICHE_OBJECTIVE'
+                              ? submission.niche_name || 'Niche'
+                              : 'Agence'}
+                          </td>
+                          <td className="py-4">
+                            <span className="text-sm font-semibold text-slate-800 block">
+                              {submission.objective_label || submission.metric_label || submission.metric_code}
+                            </span>
+                            <span className="text-[10px] text-slate-500">
+                              {proofTypeLabel(submission.proof_type)}
+                            </span>
+                          </td>
+                          <td className="py-4 text-xs text-slate-600">
+                            {submission.period_key}
+                          </td>
+                          <td className="py-4 text-xs font-bold text-slate-800">
+                            {submission.objective_kind === 'MONETARY'
+                              ? `${Number(submission.declared_amount || 0).toLocaleString('fr-FR')} FCFA`
+                              : submission.declared_value}{' '}
+                            / {submission.proofs.length}
+                          </td>
+                          <td className="py-4">
+                            <span
+                              className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                                submission.status === 'APPROVED'
+                                  ? 'bg-emerald-50 text-emerald-700'
+                                  : submission.status === 'REJECTED'
+                                    ? 'bg-red-50 text-red-700'
+                                    : 'bg-amber-50 text-amber-700'
+                              }`}
+                            >
+                              {submission.status === 'APPROVED'
+                                ? 'Validée'
+                                : submission.status === 'REJECTED'
+                                  ? 'Rejetée'
+                                  : 'En attente'}
+                            </span>
+                          </td>
+                          <td className="py-4 text-right">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-xs border-gray-200"
+                              onClick={() => {
+                                setSelectedSubmission(submission)
+                                setRejectionReason('')
+                                setReviewNotes('')
+                              }}
+                            >
+                              <Eye className="h-3.5 w-3.5 mr-1" />
+                              Contrôler
+                            </Button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -643,12 +988,168 @@ export default function ObjectivesPage() {
                     type="button"
                     variant="primary"
                     className="text-white"
-                    disabled={saveMutation.isPending}
-                    isLoading={saveMutation.isPending}
-                    onClick={() => saveMutation.mutate()}
+                    disabled={templateBusy}
+                    isLoading={templateBusy}
+                    onClick={() => persistTemplateMutation.mutate(true)}
                   >
                     Confirmer
                   </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {selectedSubmission && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <Card className="w-full max-w-2xl bg-white border border-gray-100 shadow-2xl rounded-2xl max-h-[90vh] overflow-y-auto">
+              <CardContent className="pt-6 space-y-5">
+                <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">
+                      {selectedSubmission.objective_label || selectedSubmission.metric_label}
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {selectedSubmission.agent_name}
+                      {selectedSubmission.niche_name ? ` · ${selectedSubmission.niche_name}` : ''}
+                      {' · '}{selectedSubmission.period_key} ·{' '}
+                      {selectedSubmission.objective_kind === 'MONETARY'
+                        ? `${Number(selectedSubmission.declared_amount || 0).toLocaleString('fr-FR')} FCFA déclarés`
+                        : `${selectedSubmission.declared_value} unité(s)`}
+                    </p>
+                  </div>
+                  <span
+                    className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                      selectedSubmission.status === 'APPROVED'
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : selectedSubmission.status === 'REJECTED'
+                          ? 'bg-red-50 text-red-700'
+                          : 'bg-amber-50 text-amber-700'
+                    }`}
+                  >
+                    {selectedSubmission.status === 'APPROVED'
+                      ? 'Validée'
+                      : selectedSubmission.status === 'REJECTED'
+                        ? 'Rejetée'
+                        : 'En attente'}
+                  </span>
+                </div>
+
+                {selectedSubmission.proof_instructions ? (
+                  <div className="rounded-xl bg-blue-50 border border-blue-100 p-3 text-xs text-blue-800">
+                    Consigne : {selectedSubmission.proof_instructions}
+                  </div>
+                ) : null}
+
+                <div className="space-y-2">
+                  <p className={labelClass}>
+                    Preuves fournies ({selectedSubmission.proofs.length})
+                  </p>
+                  {selectedSubmission.proofs.map((proof) => (
+                    <div
+                      key={proof.id}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 p-3"
+                    >
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 block">
+                          Unité {proof.unit_index}
+                        </span>
+                        {proof.proof_type === 'PHONE' ? (
+                          <a
+                            href={`tel:${proof.value}`}
+                            className="text-sm font-bold text-blue-700 hover:underline"
+                          >
+                            {proof.value}
+                          </a>
+                        ) : (
+                          <span className="text-sm font-semibold text-slate-800 break-all">
+                            {proof.value}
+                          </span>
+                        )}
+                        {proof.amount != null ? (
+                          <span className="block text-xs font-bold text-emerald-700 mt-1">
+                            {Number(proof.amount).toLocaleString('fr-FR')} FCFA
+                          </span>
+                        ) : null}
+                      </div>
+                      {proof.attachment_url ? (
+                        <a
+                          href={proxiedAssetUrl(proof.attachment_url)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs font-bold text-blue-700 hover:underline"
+                        >
+                          Ouvrir le fichier
+                        </a>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+
+                {selectedSubmission.status === 'REJECTED' && selectedSubmission.rejection_reason ? (
+                  <div className="rounded-xl bg-red-50 border border-red-100 p-3 text-xs text-red-700">
+                    Motif : {selectedSubmission.rejection_reason}
+                  </div>
+                ) : null}
+
+                {selectedSubmission.status === 'PENDING' && canManage ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className={labelClass}>Note de validation</label>
+                      <Input
+                        value={reviewNotes}
+                        onChange={(event) => setReviewNotes(event.target.value)}
+                        placeholder="Optionnel"
+                        className="h-10 text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className={labelClass}>Motif de rejet</label>
+                      <Input
+                        value={rejectionReason}
+                        onChange={(event) => setRejectionReason(event.target.value)}
+                        placeholder="Obligatoire pour rejeter"
+                        className="h-10 text-xs"
+                      />
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="flex flex-wrap justify-end gap-2 pt-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setSelectedSubmission(null)}
+                  >
+                    Fermer
+                  </Button>
+                  {selectedSubmission.status === 'PENDING' && canManage ? (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="border-red-200 text-red-700"
+                        disabled={
+                          rejectionReason.trim().length < 3 || rejectProofMutation.isPending
+                        }
+                        onClick={() => rejectProofMutation.mutate(selectedSubmission)}
+                      >
+                        <XCircle className="h-4 w-4 mr-1" />
+                        Rejeter
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="primary"
+                        className="text-white"
+                        disabled={approveProofMutation.isPending}
+                        isLoading={approveProofMutation.isPending}
+                        onClick={() => approveProofMutation.mutate(selectedSubmission)}
+                      >
+                        <CheckCircle2 className="h-4 w-4 mr-1" />
+                        Valider et créditer
+                      </Button>
+                    </>
+                  ) : null}
                 </div>
               </CardContent>
             </Card>

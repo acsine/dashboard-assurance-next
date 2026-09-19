@@ -2,21 +2,26 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { usersApi } from '@/lib/api/mobi-assur'
+import { asList, nichesApi, usersApi, type AgentRanking } from '@/lib/api/mobi-assur'
 import Header from '@/components/dashboard/Header'
 import { Button } from '@/components/ui/button'
 import SearchableSelect from '@/components/ui/searchable-select'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
+import { PhoneField } from '@/components/ui/phone-field'
 import { toast } from 'sonner'
-import { Users, Plus, Shield, Check, X, Loader2, Pencil, UserCheck, UserX, KeyRound, Trash2 } from 'lucide-react'
-import { parsePhoneNumberFromString, CountryCode } from 'libphonenumber-js'
+import { Users, Plus, Shield, Check, X, Loader2, Pencil, UserCheck, UserX, KeyRound, Trash2, BarChart3 } from 'lucide-react'
+import { Link } from '@/i18n/navigation'
+import { parseValidPhone, DEFAULT_PHONE_COUNTRY } from '@/lib/phone'
+import type { CountryCode } from 'libphonenumber-js'
 import { RoleGuard } from '@/components/auth/RoleGuard'
 import { ROLES, type Role } from '@/lib/auth/roles'
 import { can } from '@/lib/auth/roles'
 import { useAuthStore } from '@/lib/stores/auth-store'
+import { useTranslations } from 'next-intl'
 
 function UsersContent() {
+  const t = useTranslations('users')
   const queryClient = useQueryClient()
   const currentRole = useAuthStore((state) => state.user?.role)
   const canManage = can(currentRole, 'users:manage')
@@ -27,7 +32,7 @@ function UsersContent() {
   // Form states
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
-  const [countryCode, setCountryCode] = useState('CM')
+  const [countryCode, setCountryCode] = useState<CountryCode>(DEFAULT_PHONE_COUNTRY)
   const [phone, setPhone] = useState('')
   const [agentCode, setAgentCode] = useState('')
   const [password, setPassword] = useState('')
@@ -42,6 +47,14 @@ function UsersContent() {
     queryKey: ['users', roleFilter, search],
     queryFn: () => usersApi.list({ role: roleFilter || undefined, search: search || undefined }),
   })
+  const { data: rankingsData } = useQuery({
+    queryKey: ['agent-rankings'],
+    queryFn: () => nichesApi.listRankings(),
+    retry: false,
+  })
+  const rankingByAgent = Object.fromEntries(
+    asList<AgentRanking>(rankingsData).map((row) => [row.agent_id, row]),
+  )
 
   // Create user
   const createUserMutation = useMutation({
@@ -127,24 +140,17 @@ function UsersContent() {
       return
     }
 
-    if (phone) {
-      if (!countryCode) {
-        toast.error('Le code pays est requis avec le numéro de téléphone')
-        return
-      }
-      const parsedCountry = countryCode.toUpperCase() as CountryCode
-      const phoneNumber = parsePhoneNumberFromString(phone, parsedCountry)
-      if (!phoneNumber || !phoneNumber.isValid()) {
-        toast.error('Le numéro de téléphone est invalide pour ce code pays')
-        return
-      }
+    const parsedPhone = parseValidPhone(phone, countryCode)
+    if (!parsedPhone) {
+      toast.error('Le numéro de téléphone est invalide pour ce code pays')
+      return
     }
 
     createUserMutation.mutate({
       full_name: fullName,
       email,
-      phone,
-      country_code: countryCode.toUpperCase(),
+      phone: parsedPhone.e164,
+      country_code: parsedPhone.country,
       agent_code: role === ROLES.AGENT ? agentCode : undefined,
       password: password || undefined,
       role: role,
@@ -157,8 +163,8 @@ function UsersContent() {
     <div className="flex-1 flex flex-col bg-white">
 
       <Header
-        title="Gestion des Collaborateurs"
-        subtitle="Configurez les comptes des agents terrain, des gestionnaires back-office et admins."
+        title={t('title')}
+        subtitle={t('subtitle')}
       />
 
       <div className="p-8 space-y-6 flex-1">
@@ -210,15 +216,16 @@ function UsersContent() {
                     toast.error('Le code agent est obligatoire pour un agent terrain')
                     return
                   }
-                  const parsedPhone = parsePhoneNumberFromString(phone, countryCode as CountryCode)
-                  if (!parsedPhone || !parsedPhone.isValid()) {
+                  const parsedPhone = parseValidPhone(phone, countryCode)
+                  if (!parsedPhone) {
                     toast.error("Le numéro de téléphone n'est pas valide pour ce pays.")
                     return
                   }
                   createUserMutation.mutate({
                     full_name: fullName,
                     email: email || undefined,
-                    phone: parsedPhone.format('E.164'),
+                    phone: parsedPhone.e164,
+                    country_code: parsedPhone.country,
                     agent_code: role === ROLES.AGENT ? agentCode : undefined,
                     password: password || undefined,
                     role,
@@ -286,27 +293,14 @@ function UsersContent() {
                     <label className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wider block">
                       Téléphone *
                     </label>
-                    <div className="flex">
-                      <select
-                        value={countryCode}
-                        onChange={(e) => setCountryCode(e.target.value)}
-                        className="w-28 h-11 rounded-l-xl border border-slate-200 border-r-0 bg-white px-2 py-2 text-xs font-bold text-slate-900"
-                      >
-                        <option value="CM">🇨🇲 CM (+237)</option>
-                        <option value="CI">🇨🇮 CI (+225)</option>
-                        <option value="SN">🇸🇳 SN (+221)</option>
-                        <option value="GA">🇬🇦 GA (+241)</option>
-                        <option value="CG">🇨🇬 CG (+242)</option>
-                        <option value="TD">🇹🇩 TD (+235)</option>
-                        <option value="FR">🇫🇷 FR (+33)</option>
-                      </select>
-                      <Input
-                        placeholder="Ex: 677000000"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        className="flex-1 h-11 text-xs border-slate-200 rounded-l-none rounded-r-xl font-semibold"
-                      />
-                    </div>
+                    <PhoneField
+                      value={phone}
+                      onChange={setPhone}
+                      country={countryCode}
+                      onCountryChange={setCountryCode}
+                      required
+                      placeholder="Ex: 677000000"
+                    />
                   </div>
 
                   <div className="space-y-1 sm:col-span-2">
@@ -383,6 +377,9 @@ function UsersContent() {
                     <th className="pb-4 text-xs font-bold text-gray-400 uppercase tracking-wider">
                       Statut
                     </th>
+                    <th className="pb-4 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                      Performance
+                    </th>
                     <th className="pb-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">
                       Actions
                     </th>
@@ -421,8 +418,31 @@ function UsersContent() {
                           {u.is_active ? 'Actif' : 'Inactif'}
                         </span>
                       </td>
+                      <td className="py-4">
+                        {u.role === ROLES.AGENT && rankingByAgent[u.id] ? (
+                          <div className="text-xs text-slate-700 space-y-0.5">
+                            <span className="font-black text-slate-900">
+                              #{rankingByAgent[u.id].rank} · {rankingByAgent[u.id].score}/100
+                            </span>
+                            <span className="block text-slate-500">
+                              {rankingByAgent[u.id].contracts_month} contrats · {rankingByAgent[u.id].active_niches} niches
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-400">—</span>
+                        )}
+                      </td>
                       <td className="py-4 text-right">
                         {canManage ? <div className="flex gap-2 justify-end">
+                          {u.role === ROLES.AGENT && (
+                            <Link
+                              href={`/dashboard/users/${u.id}`}
+                              className="p-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-all inline-flex items-center justify-center"
+                              title="Fiche performance"
+                            >
+                              <BarChart3 className="h-4 w-4" />
+                            </Link>
+                          )}
                           <button
                             onClick={() => setEditingUser(u)}
                             className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all cursor-pointer border-0 flex items-center justify-center active:scale-95"
@@ -472,7 +492,20 @@ function UsersContent() {
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
-                        </div> : <span className="text-xs text-gray-400">Lecture seule</span>}
+                        </div> : (
+                          <div className="flex gap-2 justify-end">
+                            {u.role === ROLES.AGENT && (
+                              <Link
+                                href={`/dashboard/users/${u.id}`}
+                                className="p-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-all inline-flex items-center justify-center"
+                                title="Fiche performance"
+                              >
+                                <BarChart3 className="h-4 w-4" />
+                              </Link>
+                            )}
+                            <span className="text-xs text-gray-400 self-center">Lecture seule</span>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -515,27 +548,15 @@ function UsersContent() {
                     <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
                       Téléphone
                     </label>
-                    <div className="flex">
-                      <select
-                        value={editingUser.country_code || 'CM'}
-                        onChange={(e) => setEditingUser({ ...editingUser, country_code: e.target.value })}
-                        className="w-28 h-10 rounded-l-xl border border-gray-200 border-r-0 bg-white px-2 py-2 text-xs transition-colors focus-visible:outline-none focus:border-gray-200 text-gray-900"
-                      >
-                        <option value="CM">🇨🇲 CM (+237)</option>
-                        <option value="CI">🇨🇮 CI (+225)</option>
-                        <option value="SN">🇸🇳 SN (+221)</option>
-                        <option value="GA">🇬🇦 GA (+241)</option>
-                        <option value="CG">🇨🇬 CG (+242)</option>
-                        <option value="TD">🇹🇩 TD (+235)</option>
-                        <option value="FR">🇫🇷 FR (+33)</option>
-                      </select>
-                      <Input
-                        placeholder="Ex: 677000000"
-                        value={editingUser.phone || ''}
-                        onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })}
-                        className="flex-1 h-10 text-xs border-gray-200 rounded-l-none rounded-r-xl"
-                      />
-                    </div>
+                    <PhoneField
+                      value={editingUser.phone || ''}
+                      onChange={(phone) => setEditingUser({ ...editingUser, phone })}
+                      country={editingUser.country_code || DEFAULT_PHONE_COUNTRY}
+                      onCountryChange={(country) =>
+                        setEditingUser({ ...editingUser, country_code: country })
+                      }
+                      placeholder="Ex: 677000000"
+                    />
                   </div>
                 </div>
                 <div className="flex gap-2 justify-end pt-3">
@@ -549,12 +570,24 @@ function UsersContent() {
                     isLoading={updateUserMutation.isPending}
                     onClick={() => {
                       if (editingUser.phone) {
-                        const parsedCountry = (editingUser.country_code || 'CM').toUpperCase() as CountryCode
-                        const phoneNumber = parsePhoneNumberFromString(editingUser.phone, parsedCountry)
-                        if (!phoneNumber || !phoneNumber.isValid()) {
+                        const parsed = parseValidPhone(
+                          editingUser.phone,
+                          editingUser.country_code || DEFAULT_PHONE_COUNTRY,
+                        )
+                        if (!parsed) {
                           toast.error('Le numéro de téléphone est invalide pour ce code pays')
                           return
                         }
+                        updateUserMutation.mutate({
+                          id: editingUser.id,
+                          data: {
+                            full_name: editingUser.full_name,
+                            email: editingUser.email || undefined,
+                            phone: parsed.e164,
+                            country_code: parsed.country,
+                          },
+                        })
+                        return
                       }
                       updateUserMutation.mutate({
                         id: editingUser.id,
@@ -562,7 +595,7 @@ function UsersContent() {
                           full_name: editingUser.full_name,
                           email: editingUser.email || undefined,
                           phone: editingUser.phone || undefined,
-                          country_code: editingUser.country_code || 'CM',
+                          country_code: editingUser.country_code || DEFAULT_PHONE_COUNTRY,
                         },
                       })
                     }}

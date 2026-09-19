@@ -16,9 +16,15 @@ interface RefreshEntry {
 const refreshes = new Map<string, RefreshEntry>()
 
 export function backendUrl(path: string): string {
-  const base = process.env.API_URL
+  const base = process.env.API_URL?.replace(/\/+$/, '')
+  const legacyPublicBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, '')
   if (!base) throw new Error('API_URL n’est pas configurée')
-  return new URL(path, `${base.replace(/\/+$/, '')}/`).toString()
+  if (legacyPublicBase && legacyPublicBase !== base) {
+    throw new Error(
+      'API_URL et NEXT_PUBLIC_API_URL divergent : API_URL doit être l’unique source backend',
+    )
+  }
+  return new URL(path, `${base}/`).toString()
 }
 
 function refreshKey(token: string): string {

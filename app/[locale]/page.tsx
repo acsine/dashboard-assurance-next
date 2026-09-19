@@ -42,11 +42,17 @@ import {
 } from 'lucide-react'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 import QuoteDetailsAndGuarantees, { type InsurerComparisonItem } from '@/components/insurance/QuoteDetailsAndGuarantees'
-import type { QuoteBreakdown } from '@/lib/api/mobi-assur'
+import type { QuoteBreakdown, QuoteLineItem } from '@/lib/api/mobi-assur'
+import { useTranslations } from 'next-intl'
+import { PhoneField } from '@/components/ui/phone-field'
+import { parseValidPhone, DEFAULT_PHONE_COUNTRY } from '@/lib/phone'
+import type { CountryCode } from 'libphonenumber-js'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://gestion-d-assurance-v1-ten.vercel.app'
+const API_BASE = process.env.NEXT_PUBLIC_API_URL
 
 export default function Home() {
+  const t = useTranslations('landing')
+  const tCommon = useTranslations('common')
   const router = useRouter()
 
   // Track button click loading state
@@ -89,6 +95,8 @@ export default function Home() {
   const [computedTotal, setComputedTotal] = useState<number>(142500)
   const [breakdownLabel, setBreakdownLabel] = useState<string>('')
   const [computedBreakdown, setComputedBreakdown] = useState<QuoteBreakdown | Record<string, unknown> | null>(null)
+  const [computedLineItems, setComputedLineItems] = useState<QuoteLineItem[] | null>(null)
+  const [computedInsurerName, setComputedInsurerName] = useState<string | null>(null)
   const [computedComparison, setComputedComparison] = useState<InsurerComparisonItem[] | null>(null)
   const [selectedInsurerId, setSelectedInsurerId] = useState<string | undefined>(undefined)
   const [simulationId, setSimulationId] = useState<string | null>(null)
@@ -104,6 +112,7 @@ export default function Home() {
   const [loginType, setLoginType] = useState<'email' | 'phone'>('email')
   const [regFullName, setRegFullName] = useState('')
   const [regPhone, setRegPhone] = useState('')
+  const [regPhoneCountry, setRegPhoneCountry] = useState<CountryCode>(DEFAULT_PHONE_COUNTRY)
   const [regEmail, setRegEmail] = useState('')
   const [regPassword, setRegPassword] = useState('')
   const [authFeedback, setAuthFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
@@ -112,6 +121,7 @@ export default function Home() {
   // Footer Lead Contact Form State
   const [leadName, setLeadName] = useState('')
   const [leadPhone, setLeadPhone] = useState('')
+  const [leadPhoneCountry, setLeadPhoneCountry] = useState<CountryCode>(DEFAULT_PHONE_COUNTRY)
   const [leadEmail, setLeadEmail] = useState('')
   const [leadMessage, setLeadMessage] = useState('')
   const [leadFeedback, setLeadFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
@@ -197,6 +207,8 @@ export default function Home() {
         setComputedTotal(data.data.total || 0)
         setBreakdownLabel(data.data.breakdown?.label || '')
         setComputedBreakdown(data.data.breakdown || null)
+        setComputedLineItems(data.data.line_items || null)
+        setComputedInsurerName(data.data.insurer_name || data.data.best_insurer_name || null)
         setComputedComparison(data.data.comparison || data.data.insurers || null)
         setSimulationId(data.data.simulation_id || null)
       } else {
@@ -204,6 +216,8 @@ export default function Home() {
         setUnavailableMessage(data?.data?.message || data?.message || "Service d'assurance indisponible pour le moment.")
         setSimulationId(null)
         setComputedBreakdown(null)
+        setComputedLineItems(null)
+        setComputedInsurerName(null)
         setComputedComparison(null)
       }
     } catch (e) {
@@ -211,6 +225,8 @@ export default function Home() {
       setUnavailableMessage("Service indisponible pour le moment (Erreur de connexion au serveur backend).")
       setSimulationId(null)
       setComputedBreakdown(null)
+      setComputedLineItems(null)
+      setComputedInsurerName(null)
       setComputedComparison(null)
     } finally {
       setIsComputingQuote(false)
@@ -236,12 +252,19 @@ export default function Home() {
 
     try {
       if (authMode === 'REGISTER') {
+        const parsed = parseValidPhone(regPhone, regPhoneCountry)
+        if (!parsed) {
+          setAuthFeedback({ type: 'error', message: tCommon('phoneInvalid') })
+          setIsSubmittingAuth(false)
+          return
+        }
         const resp = await fetch(`${API_BASE}/auth/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             full_name: regFullName,
-            phone: regPhone,
+            phone: parsed.e164,
+            country_code: parsed.country,
             email: regEmail,
             password: regPassword,
             simulation_id: simulationId
@@ -249,20 +272,29 @@ export default function Home() {
         })
         const data = await resp.json()
         if (resp.ok) {
-          setAuthFeedback({ type: 'success', message: 'Compte créé avec succès ! Redirection vers la souscription...' })
+          setAuthFeedback({ type: 'success', message: t('accountCreated') })
           setTimeout(() => {
             setIsAuthModalOpen(false)
             router.push('/login')
           }, 1500)
         } else {
-          setAuthFeedback({ type: 'error', message: data?.detail || data?.message || 'Erreur lors de la création du compte.' })
+          setAuthFeedback({ type: 'error', message: data?.detail || data?.message || t('accountError') })
         }
       } else {
+        const loginValue =
+          loginType === 'email'
+            ? regEmail
+            : parseValidPhone(regPhone, regPhoneCountry)?.e164
+        if (loginType === 'phone' && !loginValue) {
+          setAuthFeedback({ type: 'error', message: tCommon('phoneInvalid') })
+          setIsSubmittingAuth(false)
+          return
+        }
         const resp = await fetch(`${API_BASE}/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            login: loginType === 'email' ? regEmail : regPhone,
+            login: loginValue,
             password: regPassword
           })
         })
@@ -291,12 +323,18 @@ export default function Home() {
     setIsSubmittingLead(true)
 
     try {
+      const parsedLead = parseValidPhone(leadPhone, leadPhoneCountry)
+      if (!parsedLead) {
+        setLeadFeedback({ type: 'error', message: tCommon('phoneInvalid') })
+        setIsSubmittingLead(false)
+        return
+      }
       const resp = await fetch(`${API_BASE}/public/leads`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           full_name: leadName,
-          phone: leadPhone,
+          phone: parsedLead.e164,
           email: leadEmail,
           message: leadMessage
         })
@@ -411,12 +449,12 @@ export default function Home() {
 
           {/* Navigation Links */}
           <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
-            <a href="#hero" className="hover:text-blue-700 transition-colors">Accueil</a>
-            <a href="#services" className="hover:text-blue-700 transition-colors">Nos Services</a>
-            <a href="#partenaire" className="hover:text-blue-700 transition-colors">Pourquoi Nous</a>
-            <a href="#performance" className="hover:text-blue-700 transition-colors">Performances</a>
-            <a href="#simulateur" className="hover:text-blue-700 transition-colors">Simulateur</a>
-            <a href="#contact" className="hover:text-blue-700 transition-colors">Contact</a>
+            <a href="#hero" className="hover:text-blue-700 transition-colors">{t('navHome')}</a>
+            <a href="#services" className="hover:text-blue-700 transition-colors">{t('navServices')}</a>
+            <a href="#partenaire" className="hover:text-blue-700 transition-colors">{t('navWhy')}</a>
+            <a href="#performance" className="hover:text-blue-700 transition-colors">{t('navPerf')}</a>
+            <a href="#simulateur" className="hover:text-blue-700 transition-colors">{t('navSim')}</a>
+            <a href="#contact" className="hover:text-blue-700 transition-colors">{t('navContact')}</a>
           </nav>
 
           {/* Right Actions */}
@@ -433,7 +471,7 @@ export default function Home() {
               ) : (
                 <LogIn className="h-4 w-4" />
               )}
-              <span>{isNavigatingToLogin ? 'Chargement...' : 'Espace Client'}</span>
+              <span>{isNavigatingToLogin ? tCommon('loading') : t('clientSpace')}</span>
             </button>
 
             <button
@@ -443,7 +481,7 @@ export default function Home() {
               }}
               className="px-4.5 py-2.5 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-xl transition-all pro-shadow-sm flex items-center gap-2 cursor-pointer active:scale-95"
             >
-              <span>Souscrire</span>
+              <span>{t('subscribe')}</span>
               <ArrowRight className="h-4 w-4" />
             </button>
           </div>
@@ -468,25 +506,25 @@ export default function Home() {
             >
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-100/80 border border-blue-200/80 text-blue-800 text-xs font-bold shadow-2xs">
                 <span className="w-2 h-2 rounded-full bg-blue-600 animate-ping" />
-                <span>L'Assurance Intelligente • Agrée CIMA Cameroun</span>
+                <span>{t('badge')}</span>
               </div>
 
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-slate-900 tracking-tight leading-[1.12]">
-                Innovons Aujourd'hui,<br />
+                {t('heroTitle1')}<br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-700 via-blue-800 to-amber-600">
-                  Inspirons Demain
+                  {t('heroTitle2')}
                 </span>
               </h1>
 
               <p className="text-slate-600 text-base sm:text-lg max-w-2xl font-medium leading-relaxed mx-auto lg:mx-0">
-                Nous délivrons des solutions d'assurance intelligentes qui accélèrent la croissance, protègent les entreprises et sécurisent les familles avec une transparence totale.
+                {t('heroBody')}
               </p>
 
               {/* Action Buttons */}
               <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4 pt-2">
                 <a href="#services">
                   <button className="px-6 py-3.5 text-sm font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-xl transition-all pro-shadow-md flex items-center gap-2.5 cursor-pointer active:scale-95">
-                    <span>Nos Services</span>
+                    <span>{t('ctaServices')}</span>
                     <ArrowRight className="h-4 w-4" />
                   </button>
                 </a>
@@ -494,7 +532,7 @@ export default function Home() {
                 <a href="#simulateur">
                   <button className="px-6 py-3.5 text-sm font-bold text-blue-900 bg-white hover:bg-slate-50 border border-slate-200/90 rounded-xl transition-all pro-shadow-sm flex items-center gap-2.5 cursor-pointer">
                     <Calculator className="h-4.5 w-4.5 text-blue-700" />
-                    <span>Simuler un Devis</span>
+                    <span>{t('ctaQuote')}</span>
                   </button>
                 </a>
 
@@ -1322,6 +1360,8 @@ export default function Home() {
               <div className="mt-8 pt-6 border-t border-slate-200/80">
                 <QuoteDetailsAndGuarantees
                   breakdown={computedBreakdown || { total: computedTotal, label: breakdownLabel, vignette: activeTab === 'AUTO' ? 15000 : 0 }}
+                  lineItems={computedLineItems}
+                  insurerName={computedInsurerName}
                   total={computedTotal}
                   comparison={computedComparison}
                   selectedInsurerId={selectedInsurerId}
@@ -1377,7 +1417,7 @@ export default function Home() {
               </div>
               
               <p className="text-xs text-slate-400 leading-relaxed font-medium max-w-sm">
-                Compagnie d'assurance agréée par la CIMA. Émission de polices d'assurance auto, santé, voyage et entreprise avec suivi en temps réel.
+                {t('footerAbout')}
               </p>
 
               <div className="flex items-center gap-4 text-xs font-semibold text-slate-300 pt-2">
@@ -1394,8 +1434,8 @@ export default function Home() {
 
             {/* Column 2: Lead Form */}
             <div className="lg:col-span-7 bg-slate-800/80 p-6 sm:p-8 rounded-3xl border border-slate-700/80">
-              <h4 className="text-sm font-extrabold text-white mb-2">Envoyez-nous un Message</h4>
-              <p className="text-xs text-slate-400 mb-6 font-medium">Un conseiller MobiAssur vous recontactera sous 2 heures.</p>
+              <h4 className="text-sm font-extrabold text-white mb-2">{t('contactTitle')}</h4>
+              <p className="text-xs text-slate-400 mb-6 font-medium">{t('contactHint')}</p>
 
               {leadFeedback && (
                 <div className={`p-3 rounded-xl text-xs font-bold mb-4 ${
@@ -1409,23 +1449,23 @@ export default function Home() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <input
                     type="text"
-                    placeholder="Nom complet"
+                    placeholder={t('fullName')}
                     value={leadName}
                     onChange={(e) => setLeadName(e.target.value)}
                     required
                     className="h-11 px-4 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
                   />
-                  <input
-                    type="text"
-                    placeholder="N° Téléphone (+237)"
+                  <PhoneField
                     value={leadPhone}
-                    onChange={(e) => setLeadPhone(e.target.value)}
+                    onChange={setLeadPhone}
+                    country={leadPhoneCountry}
+                    onCountryChange={setLeadPhoneCountry}
                     required
-                    className="h-11 px-4 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
+                    placeholder={t('phone')}
                   />
                 </div>
                 <textarea
-                  placeholder="Comment pouvons-nous vous aider ?"
+                  placeholder={t('helpPlaceholder')}
                   rows={3}
                   value={leadMessage}
                   onChange={(e) => setLeadMessage(e.target.value)}
@@ -1438,7 +1478,7 @@ export default function Home() {
                   className="w-full py-3 bg-blue-700 hover:bg-blue-800 disabled:opacity-50 text-white font-extrabold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
                 >
                   {isSubmittingLead ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  <span>Envoyer la Demande</span>
+                  <span>{t('send')}</span>
                 </button>
               </form>
             </div>
@@ -1446,11 +1486,11 @@ export default function Home() {
           </div>
 
           <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">
-            <p>© 2026 Bethel Comprehensive Insurance Ltd. Tous droits réservés.</p>
+            <p>{t('rights')}</p>
             <div className="flex gap-6">
-              <a href="#" className="hover:text-slate-300">Mentions Légales</a>
-              <a href="#" className="hover:text-slate-300">Politique CIMA</a>
-              <a href="#" className="hover:text-slate-300">Sécurité des Données</a>
+              <a href="#" className="hover:text-slate-300">{t('legal')}</a>
+              <a href="#" className="hover:text-slate-300">{t('cimaPolicy')}</a>
+              <a href="#" className="hover:text-slate-300">{t('dataSecurity')}</a>
             </div>
           </div>
 
@@ -1479,7 +1519,7 @@ export default function Home() {
                   {authMode === 'REGISTER' ? 'Souscription Rapide' : 'Espace Assuré'}
                 </h3>
                 <p className="text-xs text-slate-500 mt-1 font-medium">
-                  {authMode === 'REGISTER' ? 'Créez votre compte client pour valider votre devis' : 'Connectez-vous à votre compte'}
+                  {authMode === 'REGISTER' ? t('authRegisterHint') : t('authLoginHint')}
                 </p>
               </div>
 
@@ -1507,15 +1547,14 @@ export default function Home() {
                 )}
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Téléphone (+237)</label>
-                  <input
-                    type="text"
-                    placeholder="+237 699 00 00 00"
-                    value={regPhone}
-                    onChange={(e) => setRegPhone(e.target.value)}
-                    required
-                    className="w-full h-11 px-4 rounded-xl border border-slate-200 text-xs font-semibold"
-                  />
+                    <label className="text-xs font-bold text-slate-700">{t('phone')}</label>
+                    <PhoneField
+                      value={regPhone}
+                      onChange={setRegPhone}
+                      country={regPhoneCountry}
+                      onCountryChange={setRegPhoneCountry}
+                      required
+                    />
                 </div>
 
                 <div className="space-y-1.5">
