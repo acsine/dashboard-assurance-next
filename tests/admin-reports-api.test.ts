@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  asList,
   dailyReportsApi,
   filenameFromResponse,
   nichesApi,
@@ -10,6 +11,7 @@ import {
 import {
   countCalendarDaysInclusive,
   countExpectedMissingReports,
+  toLocalIsoDate,
 } from '@/lib/daily-reports'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -32,6 +34,18 @@ describe('API des rapports administrateur', () => {
       '/api/backend/admin/daily-reports?from_date=2026-09-01&to_date=2026-09-19&status=SUBMITTED&agent_id=agent-1',
       expect.objectContaining({ credentials: 'include', cache: 'no-store' }),
     )
+  })
+
+  it('extrait les rapports quel que soit l’enveloppe backend', async () => {
+    const report = {
+      id: 'r1',
+      agent_id: 'a1',
+      report_date: '2026-09-19',
+      status: 'SUBMITTED',
+    }
+    expect(asList({ items: [report] })).toEqual([report])
+    expect(asList({ reports: [report] })).toEqual([report])
+    expect(asList([report])).toEqual([report])
   })
 
   it('n’envoie jamais le statut artificiel MISSING', async () => {
@@ -119,6 +133,11 @@ describe('indicateur des rapports journaliers manquants', () => {
     contracts_count: 1,
     collections_amount: 5000,
     attachments: [],
+  })
+
+  it('formate la date calendaire en heure locale', () => {
+    expect(toLocalIsoDate(new Date(2026, 8, 1, 0, 30))).toBe('2026-09-01')
+    expect(toLocalIsoDate(new Date(2026, 8, 19, 23, 30))).toBe('2026-09-19')
   })
 
   it('compte les jours calendaires bornes incluses', () => {

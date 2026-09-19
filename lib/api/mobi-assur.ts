@@ -118,9 +118,11 @@ async function mobiRequest<T>(
 /** Normalise une réponse liste (tableau déjà unwrapped ou { items }). */
 export function asList<T>(data: unknown): T[] {
   if (Array.isArray(data)) return data as T[]
-  if (data && typeof data === 'object' && Array.isArray((data as { items?: unknown }).items)) {
-    return (data as { items: T[] }).items
-  }
+  if (!data || typeof data !== 'object') return []
+  const record = data as { items?: unknown; reports?: unknown; daily_reports?: unknown }
+  if (Array.isArray(record.items)) return record.items as T[]
+  if (Array.isArray(record.reports)) return record.reports as T[]
+  if (Array.isArray(record.daily_reports)) return record.daily_reports as T[]
   return []
 }
 
@@ -331,7 +333,7 @@ export interface DailyReport {
   next_day_plan?: string | null
   submitted_at?: string | null
   locked_at?: string | null
-  attachments: Array<{
+  attachments?: Array<{
     id: string
     file_url: string
     file_name: string

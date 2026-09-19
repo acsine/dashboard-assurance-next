@@ -16,18 +16,14 @@ import {
   usersApi,
   type DailyReport,
 } from '@/lib/api/mobi-assur'
-import { countExpectedMissingReports } from '@/lib/daily-reports'
+import { countExpectedMissingReports, toLocalIsoDate } from '@/lib/daily-reports'
 import { toast } from 'sonner'
-
-function isoDate(date: Date): string {
-  return date.toISOString().slice(0, 10)
-}
 
 function initialDates() {
   const today = new Date()
   return {
-    from_date: isoDate(new Date(today.getFullYear(), today.getMonth(), 1)),
-    to_date: isoDate(today),
+    from_date: toLocalIsoDate(new Date(today.getFullYear(), today.getMonth(), 1)),
+    to_date: toLocalIsoDate(today),
   }
 }
 
@@ -43,7 +39,7 @@ export default function DailyReportsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
 
-  const { data, isLoading, isFetching } = useQuery({
+  const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
     queryKey: ['admin-daily-reports', filters],
     queryFn: () =>
       dailyReportsApi.list({
@@ -52,6 +48,7 @@ export default function DailyReportsPage() {
         status: filters.status || undefined,
         agent_id: filters.agent_id || undefined,
       }),
+    retry: 1,
   })
   const { data: agents = [] } = useQuery({
     queryKey: ['users', 'AGENT_TERRAIN'],
@@ -173,8 +170,31 @@ export default function DailyReportsPage() {
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
           {isLoading ? (
             <div className="flex items-center justify-center gap-2 py-20 text-sm text-slate-500"><Loader2 className="h-5 w-5 animate-spin" />{t('loading')}</div>
+          ) : isError ? (
+            <div className="py-16 text-center">
+              <p className="text-sm font-semibold text-rose-700">{t('loadError')}</p>
+              <p className="mx-auto mt-2 max-w-md text-xs text-slate-500">
+                {error instanceof Error ? error.message : t('empty')}
+              </p>
+              <Button variant="outline" size="sm" className="mt-4" onClick={() => refetch()}>
+                {t('retry')}
+              </Button>
+            </div>
           ) : reports.length === 0 ? (
-            <div className="py-20 text-center text-slate-400"><CalendarDays className="mx-auto mb-3 h-10 w-10" /><p className="text-sm font-semibold">{t('empty')}</p></div>
+            <div className="py-20 text-center text-slate-400">
+              <CalendarDays className="mx-auto mb-3 h-10 w-10" />
+              <p className="text-sm font-semibold">{t('empty')}</p>
+              {(filters.from_date || filters.to_date || filters.status || filters.agent_id) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-4"
+                  onClick={() => setFilters({ from_date: '', to_date: '', status: '', agent_id: '' })}
+                >
+                  {t('clearFilters')}
+                </Button>
+              )}
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
@@ -259,9 +279,9 @@ export default function DailyReportsPage() {
                   </div>
                   <div>
                     <h3 className="mb-2 flex items-center gap-2 font-bold text-slate-900"><Paperclip className="h-4 w-4" />{t('attachments')}</h3>
-                    {selectedReport.attachments.length ? (
+                    {(selectedReport.attachments ?? []).length ? (
                       <div className="space-y-2">
-                        {selectedReport.attachments.map((attachment) => (
+                        {(selectedReport.attachments ?? []).map((attachment) => (
                           <a key={attachment.id} href={proxiedAssetUrl(attachment.file_url)} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-xl border border-slate-100 p-3 text-blue-700 hover:bg-blue-50">
                             <span className="truncate font-semibold">{attachment.file_name}</span>
                             <span className="ml-3 flex shrink-0 items-center gap-1 text-[10px] uppercase text-slate-500">{attachment.mime_type || t('file')}<ExternalLink className="h-3.5 w-3.5" /></span>
