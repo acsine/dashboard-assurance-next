@@ -20,7 +20,9 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
-import { Loader2, Plus, Save, Trash2, RefreshCw, KeyRound, Pencil, X } from 'lucide-react'
+import { Loader2, Plus, Save, Trash2, RefreshCw, KeyRound, Pencil, X, Download, FileSpreadsheet } from 'lucide-react'
+import ExcelImportModal from '@/components/excel/ExcelImportModal'
+import { generateExcelTemplate, generateInsurerTariffExcelTemplate } from '@/lib/excel/import-engine'
 
 const FUEL_OPTIONS = ['ESSENCE', 'DIESEL', 'ELECTRIQUE', 'HYBRIDE']
 
@@ -592,6 +594,7 @@ export function RcTariffPanel() {
   const [powerMax, setPowerMax] = useState('99')
   const [trailer, setTrailer] = useState(false)
   const [rcAmount, setRcAmount] = useState('')
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
 
   const { data: insurers = [] } = useQuery({
     queryKey: ['insurers'],
@@ -667,38 +670,62 @@ export function RcTariffPanel() {
   const list = Array.isArray(lines) ? lines : []
   const selectedCategory = categoryId ? resolveCategory(categoryId) : null
   const selectedZone = resolveZone(zoneId || null)
+  const selectedInsurer = autoInsurers.find((i) => i.id === insurerId)
 
   return (
-    <Card className="border-gray-100 shadow-sm">
-      <CardHeader className="pb-4 border-b border-gray-50">
-        <CardTitle className="text-sm font-bold uppercase tracking-wider text-gray-400">
-          Barème RC (lignes tarifaires)
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="pt-6 space-y-6">
-        <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4 space-y-2">
-          <FieldLabel>Assureur (obligatoire)</FieldLabel>
-          <div className="max-w-md">
-            <SearchableSelect
-              value={insurerId}
-              onChange={(val) => setInsurerId(val)}
-              placeholder="Choisir un assureur auto..."
-              options={autoInsurers.map((i) => ({
-                value: i.id,
-                label: `${i.code} — ${i.name}`,
-              }))}
-            />
+    <>
+      <Card className="border-gray-100 shadow-sm">
+        <CardHeader className="pb-4 border-b border-gray-50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <CardTitle className="text-sm font-bold uppercase tracking-wider text-gray-400">
+            Barème RC (lignes tarifaires)
+          </CardTitle>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => generateInsurerTariffExcelTemplate(selectedInsurer ? { code: selectedInsurer.code, name: selectedInsurer.name } : undefined)}
+              className="bg-emerald-50 border-emerald-300 hover:bg-emerald-100 text-emerald-900 font-extrabold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <Download className="h-3.5 w-3.5 text-emerald-700" />
+              {selectedInsurer ? `Modèle Excel Tarifs ${selectedInsurer.code} (.xlsx)` : 'Modèle Excel Tarifs Complet (.xlsx)'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsImportModalOpen(true)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+              Importer Tarifs Excel
+            </Button>
           </div>
-          <p className="text-[11px] text-slate-500">
-            Les tarifs RC sont stockés par assureur. Importez un Excel ou saisissez manuellement.
-          </p>
-        </div>
+        </CardHeader>
+        <CardContent className="pt-6 space-y-6">
+          <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4 space-y-2">
+            <FieldLabel>Assureur (obligatoire)</FieldLabel>
+            <div className="max-w-md">
+              <SearchableSelect
+                value={insurerId}
+                onChange={(val) => setInsurerId(val)}
+                placeholder="Choisir un assureur auto..."
+                options={autoInsurers.map((i) => ({
+                  value: i.id,
+                  label: `${i.code} — ${i.name}`,
+                }))}
+              />
+            </div>
+            <p className="text-[11px] text-slate-500">
+              Les tarifs RC sont stockés par assureur. Importez un Excel ou saisissez manuellement.
+            </p>
+          </div>
 
-        {!insurerId ? (
-          <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400">
-            Sélectionnez un assureur pour voir et modifier son barème RC.
-          </div>
-        ) : (
+          {!insurerId ? (
+            <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400">
+              Sélectionnez un assureur pour voir et modifier son barème RC.
+            </div>
+          ) : (
           <>
         <div className="rounded-xl border border-amber-100 bg-amber-50/70 p-4 text-xs text-amber-900 space-y-1.5">
           <p className="font-bold">Comment remplir les valeurs numériques ?</p>
@@ -954,6 +981,14 @@ export function RcTariffPanel() {
         )}
       </CardContent>
     </Card>
+
+    <ExcelImportModal
+      entityType="tariffs"
+      isOpen={isImportModalOpen}
+      onClose={() => setIsImportModalOpen(false)}
+      onSuccess={() => qc.invalidateQueries({ queryKey: ['tariff-lines', insurerId] })}
+    />
+    </>
   )
 }
 

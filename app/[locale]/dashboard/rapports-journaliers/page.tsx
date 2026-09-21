@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useLocale, useTranslations } from 'next-intl'
-import { CalendarDays, Download, ExternalLink, Eye, Loader2, Paperclip, X } from 'lucide-react'
+import { CalendarDays, Download, ExternalLink, Eye, Loader2, Paperclip, RefreshCw, X } from 'lucide-react'
 import Header from '@/components/dashboard/Header'
 import { RoleGuard } from '@/components/auth/RoleGuard'
 import { Button } from '@/components/ui/button'
@@ -48,13 +48,15 @@ export default function DailyReportsPage() {
         status: filters.status || undefined,
         agent_id: filters.agent_id || undefined,
       }),
+    refetchOnWindowFocus: true,
+    refetchInterval: 15000,
     retry: 1,
   })
   const { data: agents = [] } = useQuery({
     queryKey: ['users', 'AGENT_TERRAIN'],
     queryFn: () => usersApi.list({ role: 'AGENT_TERRAIN' }),
   })
-  const { data: submittedData } = useQuery({
+  const { data: submittedData, refetch: refetchSubmitted } = useQuery({
     queryKey: ['admin-daily-reports', 'submitted-kpis', filters.from_date, filters.to_date, filters.agent_id],
     queryFn: () =>
       dailyReportsApi.list({
@@ -63,12 +65,19 @@ export default function DailyReportsPage() {
         status: 'SUBMITTED',
         agent_id: filters.agent_id || undefined,
       }),
+    refetchOnWindowFocus: true,
+    refetchInterval: 15000,
   })
   const { data: selectedReport, isLoading: detailLoading } = useQuery({
     queryKey: ['admin-daily-report', selectedId],
     queryFn: () => dailyReportsApi.get(selectedId!),
     enabled: Boolean(selectedId),
   })
+
+  const handleRefresh = async () => {
+    await Promise.all([refetch(), refetchSubmitted()])
+    toast.success('Rapports actualisés')
+  }
 
   const reports = asList<DailyReport>(data)
   const submittedReports = asList<DailyReport>(submittedData)
@@ -117,7 +126,20 @@ export default function DailyReportsPage() {
   return (
     <RoleGuard permission="agency:read">
       <div className="flex min-h-screen flex-col gap-6 bg-slate-50/50 p-6 md:p-8">
-        <Header title={t('title')} subtitle={t('subtitle')} />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <Header title={t('title')} subtitle={t('subtitle')} />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isFetching}
+            className="self-start sm:self-auto bg-white hover:bg-slate-50 border-slate-200 text-slate-700 font-semibold text-xs flex items-center gap-2 shadow-xs cursor-pointer"
+          >
+            <RefreshCw className={`h-4 w-4 text-blue-600 ${isFetching ? 'animate-spin' : ''}`} />
+            Actualiser les données
+          </Button>
+        </div>
 
         <section className="grid gap-4 sm:grid-cols-2">
           <div className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-xs">
@@ -131,69 +153,119 @@ export default function DailyReportsPage() {
           </div>
         </section>
 
-        <section className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs md:grid-cols-4">
-          <label className="text-xs font-bold text-slate-600">
-            {t('fromDate')}
-            <Input type="date" value={filters.from_date} onChange={(event) => setFilters((value) => ({ ...value, from_date: event.target.value }))} className="mt-1" />
-          </label>
-          <label className="text-xs font-bold text-slate-600">
-            {t('toDate')}
-            <Input type="date" value={filters.to_date} onChange={(event) => setFilters((value) => ({ ...value, to_date: event.target.value }))} className="mt-1" />
-          </label>
-          <label className="text-xs font-bold text-slate-600">
-            {t('agent')}
-            <div className="mt-1">
-              <SearchableSelect value={filters.agent_id} onChange={(agent_id) => setFilters((value) => ({ ...value, agent_id }))} options={[{ value: '', label: t('allAgents') }, ...agents.map((agent) => ({ value: agent.id, label: agent.full_name || agent.email || agent.id }))]} />
+        <section className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+          <div className="grid gap-3 md:grid-cols-4">
+            <label className="text-xs font-bold text-slate-600">
+              {t('fromDate')}
+              <Input type="date" value={filters.from_date} onChange={(event) => setFilters((value) => ({ ...value, from_date: event.target.value }))} className="mt-1" />
+            </label>
+            <label className="text-xs font-bold text-slate-600">
+              {t('toDate')}
+              <Input type="date" value={filters.to_date} onChange={(event) => setFilters((value) => ({ ...value, to_date: event.target.value }))} className="mt-1" />
+            </label>
+            <label className="text-xs font-bold text-slate-600">
+              {t('agent')}
+              <div className="mt-1">
+                <SearchableSelect value={filters.agent_id} onChange={(agent_id) => setFilters((value) => ({ ...value, agent_id }))} options={[{ value: '', label: t('allAgents') }, ...agents.map((agent) => ({ value: agent.id, label: agent.full_name || agent.email || agent.id }))]} />
+              </div>
+            </label>
+            <label className="text-xs font-bold text-slate-600">
+              {t('status')}
+              <div className="mt-1">
+                <SearchableSelect
+                  value={filters.status}
+                  onChange={(status) =>
+                    setFilters((value) => ({
+                      ...value,
+                      status: status as '' | DailyReport['status'],
+                    }))
+                  }
+                  options={[
+                    { value: '', label: t('allStatuses') },
+                    { value: 'DRAFT', label: t('statusDraft') },
+                    { value: 'SUBMITTED', label: t('statusSubmitted') },
+                  ]}
+                />
+              </div>
+            </label>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold text-slate-500">Raccourcis période :</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 text-[11px] px-2.5"
+                onClick={() => setFilters((v) => ({ ...v, ...initialDates() }))}
+              >
+                Mois en cours
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 text-[11px] px-2.5"
+                onClick={() => {
+                  const today = toLocalIsoDate(new Date())
+                  setFilters((v) => ({ ...v, from_date: today, to_date: today }))
+                }}
+              >
+                Aujourd'hui
+              </Button>
             </div>
-          </label>
-          <label className="text-xs font-bold text-slate-600">
-            {t('status')}
-            <div className="mt-1">
-              <SearchableSelect
-                value={filters.status}
-                onChange={(status) =>
-                  setFilters((value) => ({
-                    ...value,
-                    status: status as '' | DailyReport['status'],
-                  }))
-                }
-                options={[
-                  { value: '', label: t('allStatuses') },
-                  { value: 'DRAFT', label: t('statusDraft') },
-                  { value: 'SUBMITTED', label: t('statusSubmitted') },
-                ]}
-              />
-            </div>
-          </label>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 text-[11px] text-slate-500 hover:text-slate-900"
+              onClick={() => setFilters({ ...initialDates(), status: '', agent_id: '' })}
+            >
+              Réinitialiser les filtres
+            </Button>
+          </div>
         </section>
 
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
           {isLoading ? (
-            <div className="flex items-center justify-center gap-2 py-20 text-sm text-slate-500"><Loader2 className="h-5 w-5 animate-spin" />{t('loading')}</div>
+            <div className="flex items-center justify-center gap-2 py-20 text-sm text-slate-500"><Loader2 className="h-5 w-5 animate-spin text-blue-600" />{t('loading')}</div>
           ) : isError ? (
             <div className="py-16 text-center">
               <p className="text-sm font-semibold text-rose-700">{t('loadError')}</p>
               <p className="mx-auto mt-2 max-w-md text-xs text-slate-500">
                 {error instanceof Error ? error.message : t('empty')}
               </p>
-              <Button variant="outline" size="sm" className="mt-4" onClick={() => refetch()}>
+              <Button variant="outline" size="sm" className="mt-4" onClick={() => handleRefresh()}>
                 {t('retry')}
               </Button>
             </div>
           ) : reports.length === 0 ? (
-            <div className="py-20 text-center text-slate-400">
-              <CalendarDays className="mx-auto mb-3 h-10 w-10" />
-              <p className="text-sm font-semibold">{t('empty')}</p>
-              {(filters.from_date || filters.to_date || filters.status || filters.agent_id) && (
+            <div className="py-16 text-center text-slate-400 space-y-3">
+              <CalendarDays className="mx-auto h-10 w-10 text-slate-300" />
+              <div>
+                <p className="text-sm font-semibold text-slate-700">{t('empty')}</p>
+                <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                  Aucun rapport trouvé pour cette plage de dates ou cet agent. Vérifiez la période ou cliquez sur Actualiser.
+                </p>
+              </div>
+              <div className="flex items-center justify-center gap-2 pt-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  className="mt-4"
-                  onClick={() => setFilters({ from_date: '', to_date: '', status: '', agent_id: '' })}
+                  onClick={handleRefresh}
+                  className="gap-1.5"
                 >
-                  {t('clearFilters')}
+                  <RefreshCw className="h-3.5 w-3.5" /> Actualiser la liste
                 </Button>
-              )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFilters({ ...initialDates(), status: '', agent_id: '' })}
+                >
+                  Réinitialiser la période du mois
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="overflow-x-auto">

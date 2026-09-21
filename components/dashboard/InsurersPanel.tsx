@@ -17,7 +17,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { useTranslations } from 'next-intl'
-import { Loader2, Pencil, Plus, RefreshCw, Trash2, Upload } from 'lucide-react'
+import { Loader2, Pencil, Plus, RefreshCw, Trash2, Upload, Download } from 'lucide-react'
+import { generateInsurerTariffExcelTemplate } from '@/lib/excel/import-engine'
 
 const ALL_PRODUCT_LINES: { code: ProductLineCode; label: string }[] = [
   { code: 'AUTO', label: 'Automobile' },
@@ -824,31 +825,42 @@ export function InsurersPanelContent() {
                     Branches
                   </Button>
                   {hasAuto ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      isLoading={
-                        pickingInsurerId === insurer.id || importingInsurerId === insurer.id
-                      }
-                      disabled={
-                        !!pickingInsurerId ||
-                        !!importingInsurerId ||
-                        importTariffMutation.isPending
-                      }
-                      onClick={() => openFilePicker(insurer.id)}
-                      className="text-xs"
-                    >
-                      {pickingInsurerId === insurer.id ? (
-                        <>Ouverture du sélecteur…</>
-                      ) : importingInsurerId === insurer.id ? (
-                        <>Import en cours…</>
-                      ) : (
-                        <>
-                          <Upload className="h-3.5 w-3.5 mr-1" /> Importer Tarif Excel (.xlsx)
-                        </>
-                      )}
-                    </Button>
+                    <>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => generateInsurerTariffExcelTemplate({ code: insurer.code, name: insurer.name })}
+                        className="text-xs bg-emerald-50 border-emerald-300 hover:bg-emerald-100 text-emerald-900 font-extrabold"
+                      >
+                        <Download className="h-3.5 w-3.5 mr-1 text-emerald-700" /> Modèle Excel ({insurer.code})
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        isLoading={
+                          pickingInsurerId === insurer.id || importingInsurerId === insurer.id
+                        }
+                        disabled={
+                          !!pickingInsurerId ||
+                          !!importingInsurerId ||
+                          importTariffMutation.isPending
+                        }
+                        onClick={() => openFilePicker(insurer.id)}
+                        className="text-xs"
+                      >
+                        {pickingInsurerId === insurer.id ? (
+                          <>Ouverture du sélecteur…</>
+                        ) : importingInsurerId === insurer.id ? (
+                          <>Import en cours…</>
+                        ) : (
+                          <>
+                            <Upload className="h-3.5 w-3.5 mr-1" /> Importer Tarif Excel (.xlsx)
+                          </>
+                        )}
+                      </Button>
+                    </>
                   ) : null}
                   {hasOtherBranches ? (
                     <p className="text-[11px] text-slate-500 self-center">

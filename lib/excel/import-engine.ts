@@ -8,7 +8,7 @@ import {
 } from '@/lib/api/mobi-assur'
 import { toE164OrThrow } from '@/lib/phone'
 
-export type EntityType = 'prospects' | 'clients' | 'contracts' | 'sinistres' | 'objectives'
+export type EntityType = 'prospects' | 'clients' | 'contracts' | 'sinistres' | 'objectives' | 'tariffs'
 
 export interface EntityFieldSpec {
   key: string
@@ -95,6 +95,20 @@ export const ENTITY_SCHEMAS: Record<EntityType, EntitySchema> = {
       { key: 'agent_identifier', label: 'Agent (Code Agent ou Email ou ID)', required: true, aliases: ['agent', 'agent_id', 'code agent', 'email agent', 'agent_email'], example: 'AGENT007' },
       { key: 'objective_prospects', label: 'Objectif Prospects (Nombre)', required: true, aliases: ['prospects', 'objective_prospects', 'cible prospects', 'nb prospects'], example: 20 },
       { key: 'objective_clients', label: 'Objectif Clients / Contrats (Nombre)', required: true, aliases: ['clients', 'objective_clients', 'cible clients', 'nb clients', 'contrats'], example: 10 },
+    ],
+  },
+  tariffs: {
+    entityType: 'tariffs',
+    label: 'Tarifs & Barèmes',
+    fields: [
+      { key: 'insurer_code', label: 'Code Assureur', required: true, aliases: ['assureur', 'code assureur', 'insurer', 'insurer_code', 'compagnie', 'code_assureur'], example: 'BETHEL' },
+      { key: 'category_code', label: 'Code Catégorie CIMA', required: true, aliases: ['categorie', 'catégorie', 'code categorie', 'category', 'category_code', 'code_categorie'], example: 'CAT1' },
+      { key: 'zone_code', label: 'Zone / Région', required: false, aliases: ['zone', 'code zone', 'region', 'zone_code', 'code_zone'], example: 'ZONE1' },
+      { key: 'power_min', label: 'Puissance Min (CV)', required: true, aliases: ['power_min', 'puissance min', 'puissance_min', 'cv min', 'min_cv'], example: 1 },
+      { key: 'power_max', label: 'Puissance Max (CV)', required: true, aliases: ['power_max', 'puissance max', 'puissance_max', 'cv max', 'max_cv'], example: 7 },
+      { key: 'fuel', label: 'Carburant (ESSENCE/DIESEL/TOUS)', required: false, aliases: ['carburant', 'fuel', 'energie', 'énergie'], example: 'ESSENCE' },
+      { key: 'rc_amount', label: 'Prime RC Annuelle (FCFA)', required: true, aliases: ['prime_rc', 'prime rc', 'rc_amount', 'montant_rc', 'rc', 'tarif_rc', 'prime_nette'], example: 58473 },
+      { key: 'has_trailer', label: 'Avec Remorque (OUI/NON)', required: false, aliases: ['remorque', 'avec_remorque', 'trailer', 'has_trailer'], example: 'NON' },
     ],
   },
 }
@@ -290,6 +304,48 @@ const TEMPLATE_EXAMPLES: Partial<Record<EntityType, Record<string, any>[]>> = {
       fuel: 'DIESEL',
     },
   ],
+  tariffs: [
+    {
+      insurer_code: 'BETHEL',
+      category_code: 'CAT1',
+      zone_code: 'ZONE1',
+      power_min: 1,
+      power_max: 7,
+      fuel: 'ESSENCE',
+      rc_amount: 58473,
+      has_trailer: 'NON',
+    },
+    {
+      insurer_code: 'BETHEL',
+      category_code: 'CAT1',
+      zone_code: 'ZONE1',
+      power_min: 8,
+      power_max: 11,
+      fuel: 'DIESEL',
+      rc_amount: 72150,
+      has_trailer: 'NON',
+    },
+    {
+      insurer_code: 'AXA',
+      category_code: 'CAT2',
+      zone_code: 'ZONE2',
+      power_min: 2,
+      power_max: 6,
+      fuel: 'DIESEL',
+      rc_amount: 112000,
+      has_trailer: 'OUI',
+    },
+    {
+      insurer_code: 'ACTIVA',
+      category_code: 'CAT3',
+      zone_code: 'ZONE1',
+      power_min: 1,
+      power_max: 15,
+      fuel: 'TOUS',
+      rc_amount: 145000,
+      has_trailer: 'NON',
+    },
+  ],
 }
 
 export function generateExcelTemplate(entityType: EntityType) {
@@ -442,4 +498,57 @@ export async function executeBatchImport(
   }
 
   return { successCount, failCount, errors }
+}
+
+export function generateInsurerTariffExcelTemplate(insurer?: { code?: string; name?: string }) {
+  const schema = ENTITY_SCHEMAS['tariffs']
+  const insurerCode = insurer?.code ? insurer.code.toUpperCase() : 'BETHEL'
+
+  const categories = [
+    { code: 'CAT1', name: 'Promenade et Affaires (Particulier)', pMin: 1, pMax: 7, fuel: 'ESSENCE', rc: 58473 },
+    { code: 'CAT1', name: 'Promenade et Affaires (Particulier)', pMin: 8, pMax: 11, fuel: 'DIESEL', rc: 72150 },
+    { code: 'CAT1', name: 'Promenade et Affaires (Particulier)', pMin: 12, pMax: 14, fuel: 'DIESEL', rc: 94800 },
+    { code: 'CAT2', name: 'Transport Public de Voyageurs (TPV)', pMin: 2, pMax: 9, fuel: 'DIESEL', rc: 112000 },
+    { code: 'CAT2', name: 'Transport Public de Voyageurs (TPV)', pMin: 10, pMax: 20, fuel: 'DIESEL', rc: 185000 },
+    { code: 'CAT3', name: 'Transport de Marchandises (TPM)', pMin: 1, pMax: 15, fuel: 'TOUS', rc: 145000 },
+    { code: 'CAT10', name: 'Véhicules Spéciaux & Engins', pMin: 1, pMax: 99, fuel: 'DIESEL', rc: 210000 },
+    { code: 'CAT11', name: 'Deux Roues & Motocycles', pMin: 1, pMax: 3, fuel: 'ESSENCE', rc: 35000 },
+  ]
+
+  const zones = ['ZONE_A', 'ZONE_B', 'ZONE_C']
+
+  const rows: Record<string, any>[] = []
+  for (const cat of categories) {
+    for (const zone of zones) {
+      const multiplier = zone === 'ZONE_A' ? 1 : zone === 'ZONE_B' ? 0.9 : 0.8
+      rows.push({
+        'Code Assureur': insurerCode,
+        'Code Catégorie CIMA': cat.code,
+        'Zone / Région': zone,
+        'Puissance Min (CV)': cat.pMin,
+        'Puissance Max (CV)': cat.pMax,
+        'Carburant (ESSENCE/DIESEL/TOUS)': cat.fuel,
+        'Prime RC Annuelle (FCFA)': Math.round(cat.rc * multiplier),
+        'Avec Remorque (OUI/NON)': 'NON',
+      })
+    }
+  }
+
+  const ws = XLSX.utils.json_to_sheet(rows, { header: schema.fields.map((f) => f.label) })
+
+  const colWidths = schema.fields.map((f) => {
+    let maxLen = f.label.length
+    for (const row of rows) {
+      const valStr = String(row[f.label] ?? '')
+      if (valStr.length > maxLen) maxLen = valStr.length
+    }
+    return { wch: Math.max(maxLen + 4, 16) }
+  })
+  ws['!cols'] = colWidths
+
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, `Tarifs ${insurerCode}`)
+
+  const filename = insurer?.code ? `modele_tarifs_${insurer.code.toLowerCase()}.xlsx` : `modele_tarifs_complet_assureurs.xlsx`
+  XLSX.writeFile(wb, filename)
 }

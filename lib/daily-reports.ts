@@ -35,8 +35,15 @@ export function countExpectedMissingReports({
   selectedAgentId?: string
   terrainAgentCount: number
 }): number {
+  const today = new Date()
+  const defaultFrom = toLocalIsoDate(new Date(today.getFullYear(), today.getMonth(), 1))
+  const defaultTo = toLocalIsoDate(today)
+
+  const effectiveFrom = fromDate || defaultFrom
+  const effectiveTo = toDate || defaultTo
+
   const agentCount = selectedAgentId ? 1 : Math.max(0, terrainAgentCount)
-  const expected = agentCount * countCalendarDaysInclusive(fromDate, toDate)
+  const expected = agentCount * countCalendarDaysInclusive(effectiveFrom, effectiveTo)
   const submittedPairs = new Set(
     reports
       .filter((report) => report.status === 'SUBMITTED')

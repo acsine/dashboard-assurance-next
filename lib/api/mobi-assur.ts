@@ -115,14 +115,21 @@ async function mobiRequest<T>(
   return json as T
 }
 
-/** Normalise une réponse liste (tableau déjà unwrapped ou { items }). */
 export function asList<T>(data: unknown): T[] {
   if (Array.isArray(data)) return data as T[]
   if (!data || typeof data !== 'object') return []
-  const record = data as { items?: unknown; reports?: unknown; daily_reports?: unknown }
+  const record = data as {
+    items?: unknown
+    reports?: unknown
+    daily_reports?: unknown
+    data?: unknown
+    results?: unknown
+  }
   if (Array.isArray(record.items)) return record.items as T[]
   if (Array.isArray(record.reports)) return record.reports as T[]
   if (Array.isArray(record.daily_reports)) return record.daily_reports as T[]
+  if (Array.isArray(record.data)) return record.data as T[]
+  if (Array.isArray(record.results)) return record.results as T[]
   return []
 }
 
@@ -361,9 +368,7 @@ function dailyReportQuery(filters?: DailyReportFilters): string {
   const search = new URLSearchParams()
   if (filters?.from_date) search.set('from_date', filters.from_date)
   if (filters?.to_date) search.set('to_date', filters.to_date)
-  if (filters?.status === 'DRAFT' || filters?.status === 'SUBMITTED') {
-    search.set('status', filters.status)
-  }
+  if (filters?.status) search.set('status', filters.status)
   if (filters?.agent_id) search.set('agent_id', filters.agent_id)
   const qs = search.toString()
   return qs ? `?${qs}` : ''
@@ -1216,6 +1221,7 @@ export interface PricingSettings {
   asac?: number
   dta?: number
   carte_rose_fee?: number
+  vignette_fee?: number
   tva_rate?: number
   commission_rate?: number
   bareme_config?: BaremeConfig
