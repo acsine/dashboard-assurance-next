@@ -12,6 +12,7 @@ import {
   FeeSchedulePanel,
   ProductLineTariffPanel,
   RcTariffPanel,
+  VignetteTariffPanel,
   ValidationCodePanel,
   ZonesPanel,
 } from '@/components/dashboard/cima-settings'
@@ -34,6 +35,7 @@ type SettingsTab =
   | 'zones'
   | 'durations'
   | 'rc'
+  | 'vignette'
   | 'fees'
   | 'branches'
   | 'validation'
@@ -47,6 +49,7 @@ const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'zones', label: 'Zones' },
   { id: 'durations', label: 'Durées' },
   { id: 'rc', label: 'Barème RC' },
+  { id: 'vignette', label: 'Barème vignette' },
   { id: 'fees', label: 'Frais légaux' },
   { id: 'branches', label: 'Santé / Voyage' },
   { id: 'validation', label: 'Code validation' },
@@ -307,8 +310,8 @@ function SettingsContent() {
                     />
                   </div>
                   <p className="text-[11px] text-slate-500 col-span-full">
-                    La vignette automobile se configure par assureur dans l’onglet{' '}
-                    <strong>Frais CIMA</strong> (grille des frais).
+                    La vignette automobile se configure dans l’onglet{' '}
+                    <strong>Barème vignette</strong> (paramètres du devis et montants par intervalle).
                   </p>
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
@@ -396,6 +399,7 @@ function SettingsContent() {
         {activeTab === 'zones' && <ZonesPanel />}
         {activeTab === 'durations' && <DurationsPanel />}
         {activeTab === 'rc' && <RcTariffPanel />}
+        {activeTab === 'vignette' && <VignetteTariffPanel />}
         {activeTab === 'fees' && <FeeSchedulePanel />}
         {activeTab === 'branches' && <ProductLineTariffPanel />}
         {activeTab === 'validation' && <ValidationCodePanel />}

@@ -12,6 +12,8 @@ import {
   type Insurer,
   type RcRate,
   type VehicleCategory,
+  type VignetteDimension,
+  type VignetteRate,
 } from '@/lib/api/mobi-assur'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { Button } from '@/components/ui/button'
@@ -25,6 +27,15 @@ import ExcelImportModal from '@/components/excel/ExcelImportModal'
 import { generateExcelTemplate, generateInsurerTariffExcelTemplate } from '@/lib/excel/import-engine'
 
 const FUEL_OPTIONS = ['ESSENCE', 'DIESEL', 'ELECTRIQUE', 'HYBRIDE']
+
+const VIGNETTE_DIMENSION_OPTIONS: { key: VignetteDimension; label: string }[] = [
+  { key: 'category', label: 'Catégorie véhicule' },
+  { key: 'zone', label: 'Zone de circulation' },
+  { key: 'fuel', label: 'Énergie / carburant' },
+  { key: 'power', label: 'Puissance (intervalle CV)' },
+  { key: 'trailer', label: 'Remorque' },
+  { key: 'duration', label: 'Durée du contrat' },
+]
 
 /** Zones CIMA standards — codes canoniques alignés backend (ZONE_A|B|C). */
 const CIMA_ZONES = [
@@ -992,6 +1003,335 @@ export function RcTariffPanel() {
   )
 }
 
+const VIGNETTE_DIMENSION_OPTIONS: Array<{ key: VignetteDimension; label: string }> = [
+  { key: 'category', label: 'Catégorie véhicule' },
+  { key: 'zone', label: 'Zone de circulation' },
+  { key: 'fuel', label: 'Énergie / carburant' },
+  { key: 'power', label: 'Puissance (intervalle CV)' },
+  { key: 'trailer', label: 'Remorque' },
+  { key: 'duration', label: 'Durée du contrat' },
+]
+
+export function VignetteTariffPanel() {
+  const qc = useQueryClient()
+  const [dimensions, setDimensions] = useState<VignetteDimension[]>(
+    VIGNETTE_DIMENSION_OPTIONS.map((d) => d.key),
+  )
+  const [categoryId, setCategoryId] = useState('')
+  const [zoneId, setZoneId] = useState('')
+  const [fuel, setFuel] = useState('ESSENCE')
+  const [powerMin, setPowerMin] = useState('1')
+  const [powerMax, setPowerMax] = useState('99')
+  const [trailer, setTrailer] = useState(false)
+  const [durationId, setDurationId] = useState('')
+  const [amount, setAmount] = useState('')
+
+  const { data: policy, isLoading: policyLoading } = useQuery({
+    queryKey: ['vignette-policy'],
+    queryFn: () => tariffApi.getVignettePolicy(),
+  })
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ['vehicle-categories'],
+    queryFn: () => tariffApi.listCategories(),
+  })
+
+  const { data: zones = [] } = useQuery({
+    queryKey: ['zones'],
+    queryFn: () => tariffApi.listZones(),
+  })
+
+  const { data: durations = [] } = useQuery({
+    queryKey: ['contract-durations'],
+    queryFn: () => tariffApi.listDurations(),
+  })
+
+  const { data: lines = [], isLoading: linesLoading } = useQuery({
+    queryKey: ['vignette-rates'],
+    queryFn: () => tariffApi.listVignetteRates(),
+  })
+
+  useEffect(() => {
+    if (policy?.dimensions?.length) {
+      setDimensions(policy.dimensions)
+    }
+  }, [policy])
+
+  const savePolicyMutation = useMutation({
+    mutationFn: () => tariffApi.setVignettePolicy({ dimensions }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['vignette-policy'] })
+      toast.success('Critères vignette enregistrés')
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+
+  const createMutation = useMutation({
+    mutationFn: () =>
+      tariffApi.createVignetteRate({
+        category_id: dimensions.includes('category') && categoryId ? categoryId : undefined,
+        zone_id: dimensions.includes('zone') && zoneId ? zoneId : undefined,
+        fuel: dimensions.includes('fuel') ? fuel : undefined,
+        power_min: dimensions.includes('power') ? Number(powerMin) : undefined,
+        power_max: dimensions.includes('power') ? Number(powerMax) : undefined,
+        trailer: dimensions.includes('trailer') ? trailer : undefined,
+        duration_id: dimensions.includes('duration') && durationId ? durationId : undefined,
+        vignette_amount: Number(amount),
+        is_active: true,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['vignette-rates'] })
+      setAmount('')
+      toast.success('Ligne vignette créée')
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => tariffApi.deleteVignetteRate(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['vignette-rates'] })
+      toast.success('Ligne vignette désactivée')
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+
+  const catList = Array.isArray(categories) ? categories : []
+  const zoneList = Array.isArray(zones) ? zones : []
+  const durList = Array.isArray(durations) ? durations : []
+  const list = Array.isArray(lines) ? lines : []
+
+  const toggleDimension = (key: VignetteDimension) => {
+    setDimensions((prev) =>
+      prev.includes(key) ? prev.filter((d) => d !== key) : [...prev, key],
+    )
+  }
+
+  const resolveCategory = (id?: string | null) =>
+    catList.find((c) => c.id === id)?.name ?? (id ? id.slice(0, 8) : 'Toutes')
+
+  const resolveZone = (id?: string | null) =>
+    zoneList.find((z) => z.id === id)?.name ?? (id ? id.slice(0, 8) : 'Toutes')
+
+  const resolveDuration = (id?: string | null) =>
+    durList.find((d) => d.id === id)?.label ?? (id ? id.slice(0, 8) : 'Toutes')
+
+  return (
+    <Card className="border-gray-100 shadow-sm">
+      <CardHeader className="pb-4 border-b border-gray-50">
+        <CardTitle className="text-sm font-bold uppercase tracking-wider text-gray-400">
+          Barème vignette (agence)
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-6 space-y-6">
+        <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-4 space-y-3">
+          <p className="text-xs font-bold text-amber-900">
+            Paramètres du devis utilisés pour calculer la vignette
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {VIGNETTE_DIMENSION_OPTIONS.map((opt) => (
+              <label
+                key={opt.key}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-amber-200 bg-white text-xs font-semibold cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={dimensions.includes(opt.key)}
+                  onChange={() => toggleDimension(opt.key)}
+                />
+                {opt.label}
+              </label>
+            ))}
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={savePolicyMutation.isPending || policyLoading}
+            onClick={() => savePolicyMutation.mutate()}
+          >
+            {savePolicyMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4 mr-1" />
+            )}
+            Enregistrer les critères
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {dimensions.includes('category') && (
+            <div className="space-y-1">
+              <FieldLabel>Catégorie (vide = toutes)</FieldLabel>
+              <SearchableSelect
+                value={categoryId}
+                onChange={setCategoryId}
+                placeholder="Toutes catégories"
+                options={[
+                  { value: '', label: '— Toutes —' },
+                  ...catList.map((c) => ({ value: c.id, label: `${c.code} — ${c.name}` })),
+                ]}
+              />
+            </div>
+          )}
+          {dimensions.includes('zone') && (
+            <div className="space-y-1">
+              <FieldLabel>Zone (vide = toutes)</FieldLabel>
+              <SearchableSelect
+                value={zoneId}
+                onChange={setZoneId}
+                placeholder="Toutes zones"
+                options={[
+                  { value: '', label: '— Toutes —' },
+                  ...zoneList.map((z) => ({ value: z.id, label: z.name })),
+                ]}
+              />
+            </div>
+          )}
+          {dimensions.includes('fuel') && (
+            <div className="space-y-1">
+              <FieldLabel>Énergie</FieldLabel>
+              <select
+                className="w-full h-10 text-xs border border-gray-200 rounded-md px-2"
+                value={fuel}
+                onChange={(e) => setFuel(e.target.value)}
+              >
+                {FUEL_OPTIONS.map((f) => (
+                  <option key={f} value={f}>
+                    {f}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {dimensions.includes('power') && (
+            <>
+              <div className="space-y-1">
+                <FieldLabel>Puissance min (CV)</FieldLabel>
+                <Input value={powerMin} onChange={(e) => setPowerMin(e.target.value)} type="number" />
+              </div>
+              <div className="space-y-1">
+                <FieldLabel>Puissance max (CV)</FieldLabel>
+                <Input value={powerMax} onChange={(e) => setPowerMax(e.target.value)} type="number" />
+              </div>
+            </>
+          )}
+          {dimensions.includes('trailer') && (
+            <div className="space-y-1 flex items-end">
+              <label className="inline-flex items-center gap-2 text-xs font-semibold">
+                <input type="checkbox" checked={trailer} onChange={(e) => setTrailer(e.target.checked)} />
+                Avec remorque
+              </label>
+            </div>
+          )}
+          {dimensions.includes('duration') && (
+            <div className="space-y-1">
+              <FieldLabel>Durée (vide = toutes)</FieldLabel>
+              <SearchableSelect
+                value={durationId}
+                onChange={setDurationId}
+                placeholder="Toutes durées"
+                options={[
+                  { value: '', label: '— Toutes —' },
+                  ...durList.map((d) => ({
+                    value: d.id,
+                    label: `${d.label} (${d.months} mois)`,
+                  })),
+                ]}
+              />
+            </div>
+          )}
+          <div className="space-y-1">
+            <FieldLabel>Montant vignette (FCFA)</FieldLabel>
+            <Input
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              type="number"
+              placeholder="Ex. 15000"
+            />
+          </div>
+        </div>
+
+        <Button
+          type="button"
+          variant="primary"
+          disabled={createMutation.isPending || !amount}
+          onClick={() => {
+            if (!amount || Number.isNaN(Number(amount))) {
+              toast.error('Saisissez le montant vignette en FCFA')
+              return
+            }
+            createMutation.mutate()
+          }}
+        >
+          {createMutation.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Plus className="h-4 w-4 mr-1" />
+          )}
+          Ajouter la ligne
+        </Button>
+
+        {linesLoading ? (
+          <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+        ) : list.length === 0 ? (
+          <p className="text-xs text-gray-400">Aucune ligne vignette — les devis utiliseront 0 FCFA.</p>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-slate-100">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider">
+                <tr>
+                  <th className="py-3 px-3">Catégorie</th>
+                  <th className="py-3 px-3">Zone</th>
+                  <th className="py-3 px-3">Énergie</th>
+                  <th className="py-3 px-3">CV</th>
+                  <th className="py-3 px-3">Remorque</th>
+                  <th className="py-3 px-3">Durée</th>
+                  <th className="py-3 px-3">Montant</th>
+                  <th className="py-3 px-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {list.map((r: VignetteRate) => (
+                  <tr key={r.id}>
+                    <td className="py-3 px-3">{resolveCategory(r.category_id)}</td>
+                    <td className="py-3 px-3">{resolveZone(r.zone_id)}</td>
+                    <td className="py-3 px-3">{r.fuel ?? '—'}</td>
+                    <td className="py-3 px-3">
+                      {r.power_min != null || r.power_max != null
+                        ? `${r.power_min ?? 1}–${r.power_max ?? 99}`
+                        : '—'}
+                    </td>
+                    <td className="py-3 px-3">
+                      {r.trailer == null ? '—' : r.trailer ? 'Oui' : 'Non'}
+                    </td>
+                    <td className="py-3 px-3">{resolveDuration(r.duration_id)}</td>
+                    <td className="py-3 px-3 font-mono text-amber-800">
+                      {Number(r.vignette_amount).toLocaleString('fr-FR')} F
+                    </td>
+                    <td className="py-3 px-3 text-right">
+                      {r.is_active && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteMutation.mutate(r.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 export function FeeSchedulePanel() {
   const qc = useQueryClient()
   const [selectedInsurerId, setSelectedInsurerId] = useState('')
@@ -1053,7 +1393,6 @@ export function FeeSchedulePanel() {
     { key: 'acc_amount', label: 'Accessoires (FCFA)' },
     { key: 'fc_amount', label: 'FC / ASAC (FCFA)' },
     { key: 'cr_amount', label: 'Carte rose (FCFA)' },
-    { key: 'vignette_amount', label: 'Vignette (FCFA)' },
     { key: 'tva_rate', label: 'TVA (%)', pct: true },
     { key: 'remise_max_pct', label: 'Remise max (%)' },
     { key: 'coeff_2m', label: 'Coeff. 2 mois (%)', pct: true },

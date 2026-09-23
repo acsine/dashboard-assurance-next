@@ -195,9 +195,9 @@ export default function QuoteDetailsAndGuarantees({
               <span className="text-sm font-extrabold text-amber-900">{formatFcfa(vignette)}</span>
             </div>
           ) : (
-            <div className="flex justify-between items-center py-1 text-slate-400 text-[11px] italic">
+            <div className="flex justify-between items-center py-1 border-b border-slate-100 text-slate-500 text-[11px]">
               <span>Vignette automobile</span>
-              <span>Incluse dans la tarification globale</span>
+              <span className="font-semibold">0 FCFA — configurez le barème vignette si besoin</span>
             </div>
           )}
 

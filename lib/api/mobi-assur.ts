@@ -1395,6 +1395,37 @@ export interface RcRate {
   updated_at?: string
 }
 
+export type VignetteDimension =
+  | 'category'
+  | 'zone'
+  | 'fuel'
+  | 'power'
+  | 'trailer'
+  | 'duration'
+
+export interface VignettePolicy {
+  agency_id: string
+  dimensions: VignetteDimension[]
+  updated_at?: string | null
+  updated_by?: string | null
+}
+
+export interface VignetteRate {
+  id: string
+  agency_id?: string
+  category_id?: string | null
+  zone_id?: string | null
+  fuel?: string | null
+  power_min?: number | null
+  power_max?: number | null
+  trailer?: boolean | null
+  duration_id?: string | null
+  vignette_amount: number
+  is_active: boolean
+  created_at?: string
+  updated_at?: string
+}
+
 export interface FeeSchedule {
   id: string
   agency_id?: string
@@ -1623,6 +1654,31 @@ export const tariffApi = {
     }),
   deleteTariffLine: (id: string) =>
     mobiRequest<unknown>(`/settings/tariff-lines/${id}`, { method: 'DELETE' }),
+
+  getVignettePolicy: () => mobiRequest<VignettePolicy>('/settings/vignette-policy'),
+  setVignettePolicy: (data: { dimensions: VignetteDimension[] }) =>
+    mobiRequest<VignettePolicy>('/settings/vignette-policy', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  listVignetteRates: () =>
+    mobiRequest<{ items: VignetteRate[] } | VignetteRate[]>('/settings/vignette-rates').then(
+      (res) => (Array.isArray(res) ? res : res.items ?? []),
+    ),
+  createVignetteRate: (
+    data: Omit<VignetteRate, 'id' | 'agency_id' | 'created_at' | 'updated_at'>,
+  ) =>
+    mobiRequest<VignetteRate>('/settings/vignette-rates', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateVignetteRate: (id: string, data: Partial<VignetteRate>) =>
+    mobiRequest<VignetteRate>(`/settings/vignette-rates/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  deleteVignetteRate: (id: string) =>
+    mobiRequest<unknown>(`/settings/vignette-rates/${id}`, { method: 'DELETE' }),
 
   getFeeSchedule: async (insurerId?: string) => {
     if (!insurerId) {
