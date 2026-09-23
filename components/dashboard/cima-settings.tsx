@@ -1003,15 +1003,6 @@ export function RcTariffPanel() {
   )
 }
 
-const VIGNETTE_DIMENSION_OPTIONS: Array<{ key: VignetteDimension; label: string }> = [
-  { key: 'category', label: 'Catégorie véhicule' },
-  { key: 'zone', label: 'Zone de circulation' },
-  { key: 'fuel', label: 'Énergie / carburant' },
-  { key: 'power', label: 'Puissance (intervalle CV)' },
-  { key: 'trailer', label: 'Remorque' },
-  { key: 'duration', label: 'Durée du contrat' },
-]
-
 export function VignetteTariffPanel() {
   const qc = useQueryClient()
   const [dimensions, setDimensions] = useState<VignetteDimension[]>(
