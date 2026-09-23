@@ -196,8 +196,12 @@ export default function Sidebar() {
           {/* Logo area */}
           <div className={`p-4 border-b border-slate-800/80 flex items-center ${isCollapsed && !isMobileOpen ? 'justify-center' : 'justify-between'}`}>
             <div className="flex items-center gap-3 overflow-hidden">
-              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-black text-xs shadow-md shrink-0 border border-blue-400/30">
-                BE
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-700/80 bg-white p-1 shadow-md">
+                <img
+                  src="/bethel-logo.png"
+                  alt="Bethel Comprehensive Insurance"
+                  className="h-full w-full object-contain object-center"
+                />
               </div>
               {(!isCollapsed || isMobileOpen) && (
                 <div className="whitespace-nowrap">

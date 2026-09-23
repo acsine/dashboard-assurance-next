@@ -47,6 +47,18 @@ export default function LoginPage() {
     if (msg) toast.info(msg)
   }, [])
 
+  useEffect(() => {
+    const { body, documentElement } = document
+    const prevBody = body.style.overflow
+    const prevHtml = documentElement.style.overflow
+    body.style.overflow = 'hidden'
+    documentElement.style.overflow = 'hidden'
+    return () => {
+      body.style.overflow = prevBody
+      documentElement.style.overflow = prevHtml
+    }
+  }, [])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!identifier || !password) {
@@ -87,33 +99,26 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-slate-900 via-[#1b365d] to-slate-950 text-slate-900 relative overflow-hidden">
+    <div className="fixed inset-0 z-50 flex h-dvh max-h-dvh w-full overflow-hidden bg-gradient-to-br from-slate-900 via-[#1b365d] to-slate-950 text-slate-900">
       {/* Soft Background Glowing Orbs */}
-      <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-blue-600/15 blur-[160px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-amber-500/10 blur-[150px] rounded-full pointer-events-none" />
+      <div className="absolute top-0 left-1/4 w-[min(600px,80vw)] h-[min(600px,50vh)] bg-blue-600/15 blur-[160px] rounded-full pointer-events-none" />
+      <div className="absolute bottom-0 right-1/4 w-[min(500px,70vw)] h-[min(500px,45vh)] bg-amber-500/10 blur-[150px] rounded-full pointer-events-none" />
 
       {/* Main Container */}
-      <div className="w-full flex min-h-screen relative z-10">
-        
+      <div className="relative z-10 flex h-full min-h-0 w-full">
         {/* Left Side: Premium Login Card Container */}
-        <div className="w-full lg:w-1/2 flex flex-col justify-between p-6 sm:p-12 lg:p-16 bg-white/95 backdrop-blur-2xl border-r border-white/20 shadow-2xl relative">
-          
+        <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden border-r border-white/20 bg-white/95 px-4 pb-4 pt-2 shadow-2xl backdrop-blur-2xl sm:px-6 sm:pb-5 sm:pt-2.5 lg:w-1/2 lg:px-10 lg:pb-6 lg:pt-3 xl:px-12">
           {/* Top Header Navigation */}
-          <div className="flex items-center justify-between">
+          <div className="-mt-0.5 flex shrink-0 items-center justify-between gap-2">
             <Breadcrumb
+              className="min-w-0 truncate max-sm:[&_ol]:text-[10px]"
               items={[
                 { label: tCommon('breadcrumb.home'), href: '/' },
                 { label: tCommon('breadcrumb.login') },
               ]}
             />
 
-            <div className="flex items-center gap-2">
-              <LanguageSwitcher />
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200/80">
-                <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-                {t('badge')}
-              </span>
-            </div>
+            <LanguageSwitcher variant="toolbar" />
           </div>
 
           {/* Center Form Section */}
@@ -121,21 +126,21 @@ export default function LoginPage() {
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="max-w-md w-full mx-auto space-y-6 my-auto py-6"
+            className="mx-auto flex w-full max-w-md min-h-0 flex-1 flex-col justify-start space-y-3 pt-3 sm:space-y-4 sm:pt-4 lg:pt-5 [@media(max-height:700px)]:space-y-2 [@media(max-height:700px)]:pt-2"
           >
             {/* Logo & Headline */}
             <div className="flex flex-col items-center text-center">
-              <div className="relative mb-2">
+              <div className="relative mb-1 sm:mb-2">
                 <img
                   src="/bethel-logo.png"
                   alt="Bethel Comprehensive Insurance"
-                  className="h-28 sm:h-36 w-auto object-contain drop-shadow-md transition-transform hover:scale-105"
+                  className="h-[clamp(3.5rem,14vh,9rem)] w-auto max-h-[22vh] object-contain drop-shadow-md"
                 />
               </div>
-              <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-[#1b365d]">
+              <h1 className="text-[clamp(1.35rem,4.5vw,2.25rem)] font-black leading-tight tracking-tight text-[#1b365d]">
                 {t('title')}
               </h1>
-              <p className="text-slate-500 text-xs sm:text-sm font-medium mt-1.5 max-w-sm">
+              <p className="mt-1 max-w-sm text-[11px] font-medium text-slate-500 sm:text-xs [@media(max-height:700px)]:hidden">
                 {t('subtitle')}
               </p>
             </div>
@@ -176,7 +181,7 @@ export default function LoginPage() {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="space-y-4 pt-1">
+            <form onSubmit={handleSubmit} className="space-y-3 pt-0 sm:space-y-4 sm:pt-1 [@media(max-height:700px)]:space-y-2">
               <div className="space-y-1.5">
                 <label className="text-xs font-extrabold text-slate-800 uppercase tracking-wider block">
                   {loginMethod === 'email' ? t('emailLabel') : t('phoneLabel')}
@@ -191,7 +196,7 @@ export default function LoginPage() {
                       placeholder={t('emailPlaceholder')}
                       value={identifier}
                       onChange={(e) => setIdentifier(e.target.value)}
-                      className="pl-11 h-12 bg-slate-50/60 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#1b365d] focus:ring-2 focus:ring-[#1b365d]/20 rounded-xl text-xs font-medium"
+                      className="h-11 pl-11 rounded-xl border-slate-200 bg-slate-50/60 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-[#1b365d] focus:bg-white focus:ring-2 focus:ring-[#1b365d]/20 sm:h-12"
                       required
                     />
                   </div>
@@ -232,7 +237,7 @@ export default function LoginPage() {
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pl-11 pr-11 h-12 bg-slate-50/60 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#1b365d] focus:ring-2 focus:ring-[#1b365d]/20 rounded-xl text-xs font-medium"
+                    className="h-11 rounded-xl border-slate-200 bg-slate-50/60 pl-11 pr-11 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-[#1b365d] focus:bg-white focus:ring-2 focus:ring-[#1b365d]/20 sm:h-12"
                     required
                   />
                   <button
@@ -249,7 +254,7 @@ export default function LoginPage() {
               <Button
                 type="submit"
                 disabled={loading}
-                className="w-full h-12 bg-gradient-to-r from-amber-600 via-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md hover:shadow-lg active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer border-0 mt-4"
+                className="mt-2 flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border-0 bg-gradient-to-r from-amber-600 via-amber-600 to-amber-700 text-xs font-black uppercase tracking-wider text-white shadow-md transition-all hover:from-amber-700 hover:to-amber-800 hover:shadow-lg active:scale-[0.98] sm:mt-4 sm:h-12"
               >
                 {loading ? (
                   <>
@@ -266,8 +271,8 @@ export default function LoginPage() {
             </form>
 
             {/* Registration Redirect */}
-            <div className="text-center pt-4 border-t border-slate-100 space-y-2">
-              <p className="text-xs text-slate-500 font-medium">
+            <div className="space-y-2 border-t border-slate-100 pt-3 text-center sm:pt-4">
+              <p className="text-[11px] font-medium text-slate-500 sm:text-xs">
                 {t('noAccount')}{' '}
                 <button
                   type="button"
@@ -281,8 +286,8 @@ export default function LoginPage() {
           </motion.div>
 
           {/* Footer Branding & Badges */}
-          <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-400">
-            <span>© 2026 Bethel Comprehensive Insurance Ltd.</span>
+          <div className="flex shrink-0 flex-col items-center justify-between gap-1 border-t border-slate-100 pt-2 text-[10px] text-slate-400 sm:flex-row sm:gap-2 sm:pt-3 sm:text-[11px] [@media(max-height:640px)]:hidden">
+            <span className="text-center sm:text-left">© 2026 Bethel Comprehensive Insurance Ltd.</span>
             <span className="flex items-center gap-1 font-semibold text-slate-500">
               <Lock className="h-3 w-3 text-emerald-600" /> {t('ssl')}
             </span>
@@ -290,7 +295,7 @@ export default function LoginPage() {
         </div>
 
         {/* Right Side: Hero Visual Panel */}
-        <div className="hidden lg:block lg:w-1/2 relative bg-[#1b365d] overflow-hidden">
+        <div className="relative hidden h-full min-h-0 overflow-hidden bg-[#1b365d] lg:block lg:w-1/2">
           <div
             className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-transform duration-1000 scale-105"
             style={{ backgroundImage: "url('/hero-agent.jpg')" }}
@@ -298,7 +303,7 @@ export default function LoginPage() {
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-[#1b365d]/60 to-[#1b365d]/20" />
 
           {/* Floating Glassmorphism Cards */}
-          <div className="absolute inset-0 p-12 flex flex-col justify-between relative z-10">
+          <div className="absolute inset-0 z-10 flex flex-col justify-between p-8 xl:p-12">
             {/* Top Badge */}
             <div className="flex justify-end">
               <div className="bg-white/10 backdrop-blur-xl border border-white/20 px-4 py-2 rounded-full text-white text-xs font-bold flex items-center gap-2 shadow-lg">
@@ -312,7 +317,7 @@ export default function LoginPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="bg-white/15 backdrop-blur-2xl p-8 rounded-3xl border border-white/25 shadow-2xl text-white space-y-4 max-w-lg"
+              className="max-w-lg space-y-3 rounded-3xl border border-white/25 bg-white/15 p-6 text-white shadow-2xl backdrop-blur-2xl xl:space-y-4 xl:p-8"
             >
               <div className="w-10 h-10 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center font-black shadow-md">
                 <ShieldCheck className="h-5 w-5" />

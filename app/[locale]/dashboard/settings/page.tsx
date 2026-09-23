@@ -67,7 +67,6 @@ function SettingsContent() {
   const [asac, setAsac] = useState('1000')
   const [fga, setFga] = useState('50000')
   const [cr, setCr] = useState('1000')
-  const [vignetteFee, setVignetteFee] = useState('15000')
   const [tva, setTva] = useState('19.25')
   const [commissionRate, setCommissionRate] = useState('10')
   const [guideContent, setGuideContent] = useState(DEFAULT_GUIDE)
@@ -83,7 +82,6 @@ function SettingsContent() {
     if (pricing.asac !== undefined) setAsac(String(pricing.asac))
     if (pricing.dta !== undefined) setFga(String(pricing.dta))
     if (pricing.carte_rose_fee !== undefined) setCr(String(pricing.carte_rose_fee))
-    if (pricing.vignette_fee !== undefined) setVignetteFee(String(pricing.vignette_fee))
     if (pricing.tva_rate !== undefined) setTva(String(Number(pricing.tva_rate) * 100))
     if (pricing.commission_rate !== undefined) {
       setCommissionRate(String(Number(pricing.commission_rate) * 100))
@@ -96,7 +94,6 @@ function SettingsContent() {
     asac: Number(asac),
     dta: Number(fga),
     carte_rose_fee: Number(cr),
-    vignette_fee: Number(vignetteFee),
     tva_rate: Number(tva) / 100,
     commission_rate: Number(commissionRate) / 100,
     guide_content: guideContent,
@@ -132,7 +129,6 @@ function SettingsContent() {
         asac: 1000,
         dta: 50000,
         carte_rose_fee: 1000,
-        vignette_fee: 15000,
         tva_rate: 0.1925,
         commission_rate: 0.1,
         guide_content: DEFAULT_GUIDE,
@@ -310,19 +306,10 @@ function SettingsContent() {
                       required
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                      Vignette (FCFA)
-                    </label>
-                    <Input
-                      type="number"
-                      value={vignetteFee}
-                      onChange={(e) => setVignetteFee(e.target.value)}
-                      className="h-11 text-xs border-gray-200"
-                      placeholder="15000"
-                      required
-                    />
-                  </div>
+                  <p className="text-[11px] text-slate-500 col-span-full">
+                    La vignette automobile se configure par assureur dans l’onglet{' '}
+                    <strong>Frais CIMA</strong> (grille des frais).
+                  </p>
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
                       TVA (%)

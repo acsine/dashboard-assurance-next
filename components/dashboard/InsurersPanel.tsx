@@ -104,6 +104,7 @@ const FEE_FIELDS: Array<{ key: keyof FeeSchedule; label: string; pct?: boolean }
   { key: 'acc_amount', label: 'Accessoires (FCFA)' },
   { key: 'fc_amount', label: 'FC / ASAC (FCFA)' },
   { key: 'cr_amount', label: 'Carte rose (FCFA)' },
+  { key: 'vignette_amount', label: 'Vignette (FCFA)' },
   { key: 'tva_rate', label: 'TVA (%)', pct: true },
   { key: 'remise_max_pct', label: 'Remise max (%)' },
   { key: 'coeff_2m', label: 'Coeff. 2 mois (%)', pct: true },

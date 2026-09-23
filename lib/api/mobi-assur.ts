@@ -817,6 +817,11 @@ export const contractsApi = {
     const qs = status ? `?status=${encodeURIComponent(status)}` : ''
     return mobiRequest<Contract[]>(`/contracts${qs}`)
   },
+  exportPaidXlsx: (status = 'PAYE') =>
+    downloadFileWithAuth(
+      `/admin/contracts/export.xlsx?status=${encodeURIComponent(status)}`,
+      `contrats-${status.toLowerCase()}.xlsx`,
+    ),
   get: (id: string) => mobiRequest<Contract>(`/contracts/${id}`),
   create: (data: CreateContractRequest) =>
     mobiRequest<Contract>('/contracts', { method: 'POST', body: JSON.stringify(data) }),

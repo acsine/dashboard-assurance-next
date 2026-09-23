@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { paymentSummary } from '@/lib/payments'
+import { paymentProofRequired, paymentReadyToValidate, paymentSummary } from '@/lib/payments'
 import type { Payment } from '@/lib/api/mobi-assur'
 
 const payment = (amount: number, status: string): Payment => ({
@@ -8,6 +8,35 @@ const payment = (amount: number, status: string): Payment => ({
   amount,
   method: 'ESPECES',
   status,
+})
+
+describe('preuve de paiement', () => {
+  it('n’exige pas de preuve pour les espèces en agence', () => {
+    expect(paymentProofRequired('ESPECES')).toBe(false)
+    expect(paymentProofRequired('ORANGE_MONEY')).toBe(true)
+    expect(paymentProofRequired('VIREMENT')).toBe(true)
+  })
+
+  it('autorise la validation espèces sans preuve', () => {
+    expect(
+      paymentReadyToValidate(
+        { method: 'ESPECES', has_reference: false, declared_by_client: false },
+        0,
+      ),
+    ).toBe(true)
+    expect(
+      paymentReadyToValidate(
+        { method: 'ORANGE_MONEY', has_reference: false, declared_by_client: false },
+        0,
+      ),
+    ).toBe(false)
+    expect(
+      paymentReadyToValidate(
+        { method: 'ORANGE_MONEY', has_reference: false, declared_by_client: false },
+        1,
+      ),
+    ).toBe(true)
+  })
 })
 
 describe('cumul des versements partiels', () => {

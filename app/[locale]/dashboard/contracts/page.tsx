@@ -17,6 +17,7 @@ export default function ContractsPage() {
   const t = useTranslations('contracts')
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [isExcelModalOpen, setIsExcelModalOpen] = useState(false)
+  const [exportingPaid, setExportingPaid] = useState(false)
   const queryClient = useQueryClient()
 
   // Query Contracts
@@ -64,7 +65,27 @@ export default function ContractsPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={exportingPaid}
+              onClick={async () => {
+                setExportingPaid(true)
+                try {
+                  await contractsApi.exportPaidXlsx('PAYE')
+                  toast.success('Export Excel téléchargé')
+                } catch (error) {
+                  toast.error(error instanceof Error ? error.message : 'Export impossible')
+                } finally {
+                  setExportingPaid(false)
+                }
+              }}
+              className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              {exportingPaid ? 'Export…' : 'Export contrats payés'}
+            </Button>
             <Button
               type="button"
               onClick={() => setIsExcelModalOpen(true)}

@@ -13,7 +13,7 @@ import {
   type PaymentMethod,
 } from '@/lib/api/mobi-assur'
 import { RoleGuard } from '@/components/auth/RoleGuard'
-import { paymentSummary } from '@/lib/payments'
+import { paymentProofRequired, paymentReadyToValidate, paymentSummary } from '@/lib/payments'
 import { validateUploadFile } from '@/lib/files/validation'
 import Header from '@/components/dashboard/Header'
 import { useTranslations } from 'next-intl'
@@ -191,7 +191,8 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
       toast.error('Le versement dépasse le solde restant')
       return
     }
-    if (collectProofUrls().length === 0) {
+    const proofs = collectProofUrls()
+    if (paymentProofRequired(paymentMethod) && proofs.length === 0) {
       toast.error('Ajoutez au moins une preuve de paiement (URL ou fichier)')
       return
     }
@@ -474,7 +475,9 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
                     />
                     <div className="space-y-1.5">
                       <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                        Preuves de paiement (obligatoire)
+                        {paymentProofRequired(paymentMethod)
+                          ? 'Preuves de paiement (obligatoire)'
+                          : 'Preuves de paiement (facultatif pour espèces)'}
                       </span>
                       <Input
                         placeholder="URL(s) séparées par virgule ou ligne"
@@ -560,7 +563,8 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
                       const proofs = paymentProofUrls(payment)
                       const needsReference =
                         Boolean(payment.has_reference) || Boolean(payment.declared_by_client)
-                      const canValidate = needsReference || proofs.length > 0
+                      const proofRequired = paymentProofRequired(payment.method)
+                      const canValidate = paymentReadyToValidate(payment, proofs.length)
                       const isValidatingThis = validatingPaymentId === payment.id
                       return (
                       <div key={payment.id} className="rounded-xl border border-gray-100 p-3 text-xs">
@@ -581,7 +585,7 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
                             {payment.status}
                           </span>
                         </div>
-                        {!needsReference && (
+                        {!needsReference && proofRequired && (
                         <div className="mt-2 space-y-1">
                           <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
                             Preuves
@@ -607,6 +611,33 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
                               ))}
                             </ul>
                           )}
+                        </div>
+                        )}
+                        {!needsReference && !proofRequired && proofs.length === 0 && (
+                          <p className="mt-2 text-[11px] font-medium text-slate-500">
+                            Espèces en agence — justificatif facultatif.
+                          </p>
+                        )}
+                        {!needsReference && !proofRequired && proofs.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                            Preuves (facultatif)
+                          </span>
+                          <ul className="space-y-1">
+                            {proofs.map((url, idx) => (
+                              <li key={`${payment.id}-proof-${idx}`}>
+                                <a
+                                  href={proxiedAssetUrl(url)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:underline"
+                                >
+                                  Preuve {idx + 1}
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              </li>
+                            ))}
+                          </ul>
                         </div>
                         )}
                         {payment.status === 'PENDING' && (
@@ -664,7 +695,7 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
                                 }}
                                 title={
                                   !canValidate
-                                    ? 'Preuves de paiement ou référence requises'
+                                    ? 'Preuve ou référence requise pour valider'
                                     : 'Valider ce versement'
                                 }
                                 className="mt-3 w-full rounded-lg bg-emerald-600 px-3 py-2 font-semibold text-white disabled:opacity-50"

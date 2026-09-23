@@ -21,6 +21,8 @@ describe('matrice des rôles', () => {
     expect(canProxy(ROLES.ADMIN, 'GET', '/admin/daily-reports')).toBe(true)
     expect(canProxy(ROLES.RESPONSABLE, 'GET', '/admin/daily-reports/report-1/pdf')).toBe(true)
     expect(canProxy(ROLES.RESPONSABLE, 'GET', '/admin/prospects/expiring/export.xlsx')).toBe(true)
+    expect(canProxy(ROLES.RESPONSABLE, 'GET', '/admin/contracts/export.xlsx')).toBe(true)
+    expect(canProxy(ROLES.AGENT, 'GET', '/admin/contracts/export.xlsx')).toBe(false)
     expect(canProxy(ROLES.AGENT, 'GET', '/admin/daily-reports')).toBe(false)
   })
 })
