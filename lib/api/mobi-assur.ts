@@ -282,6 +282,7 @@ export interface User {
   role: string
   is_active: boolean
   agency_id?: string
+  agent_code?: string
   created_at?: string
 }
 
@@ -1054,28 +1055,69 @@ export interface ApproveConversionBody {
   received_payment_reference?: string
 }
 
+export interface ProspectListParams {
+  needs_recontact?: boolean
+  agent_id?: string
+  days?: number
+  expiry_date?: string
+  date_from?: string
+  date_to?: string
+  status?: string
+}
+
+export interface ProspectExportParams {
+  days?: number
+  agent_id?: string
+  status?: string
+  date_from?: string
+  date_to?: string
+  expiry_date?: string
+  has_external_insurance?: boolean
+}
+
 export const prospectsApi = {
-  list: (params?: { needs_recontact?: boolean; agent_id?: string }) => {
+  list: (params?: ProspectListParams) => {
     const search = new URLSearchParams()
     if (params?.needs_recontact) search.set('needs_recontact', 'true')
     if (params?.agent_id) search.set('agent_id', params.agent_id)
+    if (params?.days != null) search.set('days', String(params.days))
+    if (params?.expiry_date) search.set('expiry_date', params.expiry_date)
+    if (params?.date_from) search.set('date_from', params.date_from)
+    if (params?.date_to) search.set('date_to', params.date_to)
+    if (params?.status) search.set('status', params.status)
     const qs = search.toString()
     return mobiRequest<Prospect[]>(`/prospects${qs ? `?${qs}` : ''}`)
   },
-  exportExpiringPdf: (params?: { days?: number; agent_id?: string }) => {
-    const search = new URLSearchParams({ days: String(params?.days ?? 30) })
+  exportExpiringPdf: (params?: ProspectExportParams) => {
+    const search = new URLSearchParams()
+    if (params?.days != null) search.set('days', String(params.days))
     if (params?.agent_id) search.set('agent_id', params.agent_id)
+    if (params?.status) search.set('status', params.status)
+    if (params?.date_from) search.set('date_from', params.date_from)
+    if (params?.date_to) search.set('date_to', params.date_to)
+    if (params?.expiry_date) search.set('expiry_date', params.expiry_date)
+    if (params?.has_external_insurance != null)
+      search.set('has_external_insurance', String(params.has_external_insurance))
+    const filename = `prospects-${params?.agent_id ? 'agent' : 'agence'}-${params?.days ? `j${params.days}` : 'export'}.pdf`
     return downloadFileWithAuth(
-      `/admin/prospects/expiring/export.pdf?${search}`,
-      'prospects-a-relancer-j30.pdf',
+      `/admin/prospects/expiring/export.pdf?${search.toString()}`,
+      filename,
     )
   },
-  exportExpiringExcel: (params?: { days?: number; agent_id?: string }) => {
-    const search = new URLSearchParams({ days: String(params?.days ?? 30) })
+  exportExpiringExcel: (params?: ProspectExportParams) => {
+    const search = new URLSearchParams()
+    if (params?.days != null) search.set('days', String(params.days))
     if (params?.agent_id) search.set('agent_id', params.agent_id)
+    if (params?.status) search.set('status', params.status)
+    if (params?.date_from) search.set('date_from', params.date_from)
+    if (params?.date_to) search.set('date_to', params.date_to)
+    if (params?.expiry_date) search.set('expiry_date', params.expiry_date)
+    if (params?.has_external_insurance != null)
+      search.set('has_external_insurance', String(params.has_external_insurance))
+    const filename = `prospects-${params?.agent_id ? 'agent' : 'agence'}-${params?.days ? `j${params.days}` : 'export'}.xlsx`
     return downloadFileWithAuth(
-      `/admin/prospects/expiring/export.xlsx?${search}`,
-      'prospects-a-relancer-j30.xlsx',
+      `/admin/prospects/expiring/export.xlsx?${search.toString()}`,
+      filename,
     )
   },
   get: (id: string) => mobiRequest<Prospect>(`/prospects/${id}`),

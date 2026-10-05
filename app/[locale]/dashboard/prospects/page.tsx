@@ -37,7 +37,10 @@ import {
   BellRing,
   FileSpreadsheet,
   FileDown,
+  Calendar,
+  Filter,
 } from 'lucide-react'
+import ExportProspectsModal from '@/components/dashboard/ExportProspectsModal'
 import { RoleGuard } from '@/components/auth/RoleGuard'
 import { PhoneField } from '@/components/ui/phone-field'
 import { parseValidPhone, DEFAULT_PHONE_COUNTRY } from '@/lib/phone'
@@ -107,16 +110,26 @@ function statusBadgeClass(status: string): string {
   }
 }
 
-function needsRecontact(p: Prospect): boolean {
+function needsRecontact(
+  p: Prospect,
+  daysLimit: number | null = 30,
+  exactDate?: string,
+): boolean {
   if (!p.has_external_insurance || !p.external_policy_expires_on) return false
   if (['CONVERTI', 'APPROUVEE', 'PERDU'].includes(p.status)) return false
+  if (exactDate) {
+    return p.external_policy_expires_on.startsWith(exactDate)
+  }
   const expiry = new Date(p.external_policy_expires_on)
   if (Number.isNaN(expiry.getTime())) return false
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   expiry.setHours(0, 0, 0, 0)
   const days = Math.round((expiry.getTime() - today.getTime()) / 86400000)
-  return days >= 0 && days <= 30
+  if (daysLimit != null) {
+    return days >= 0 && days <= daysLimit
+  }
+  return days >= 0
 }
 
 function formatExpiry(value?: string): string {
@@ -551,6 +564,9 @@ export default function ProspectsPage() {
   const [rejectMotif, setRejectMotif] = useState('')
   const [search, setSearch] = useState('')
   const [agentFilter, setAgentFilter] = useState('')
+  const [periodFilter, setPeriodFilter] = useState<number | null>(30)
+  const [expiryDateFilter, setExpiryDateFilter] = useState<string>('')
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false)
   const [exporting, setExporting] = useState<'pdf' | 'xlsx' | null>(null)
   const [isExcelModalOpen, setIsExcelModalOpen] = useState(false)
   const [convertingProspect, setConvertingProspect] = useState<Prospect | null>(null)
@@ -570,12 +586,14 @@ export default function ProspectsPage() {
   })
 
   const { data: backendRecontactProspects = [], isLoading: loadingRecontacts } = useQuery({
-    queryKey: ['prospects', 'needs-recontact', agentFilter],
+    queryKey: ['prospects', 'needs-recontact', agentFilter, periodFilter, expiryDateFilter],
     queryFn: async () => {
       try {
         return await prospectsApi.list({
           needs_recontact: true,
           agent_id: agentFilter || undefined,
+          days: expiryDateFilter ? undefined : (periodFilter ?? undefined),
+          expiry_date: expiryDateFilter || undefined,
         })
       } catch (error) {
         if (
@@ -585,7 +603,7 @@ export default function ProspectsPage() {
           const legacyProspects = await prospectsApi.list()
           return legacyProspects.filter(
             (prospect) =>
-              needsRecontact(prospect) &&
+              needsRecontact(prospect, periodFilter, expiryDateFilter) &&
               (!agentFilter || prospect.agent_id === agentFilter),
           )
         }
@@ -961,10 +979,10 @@ export default function ProspectsPage() {
     [prospects],
   )
   const safePendingRequests = Array.isArray(pendingRequests) ? pendingRequests : []
-  const recontactProspects = useMemo(
-    () => (Array.isArray(backendRecontactProspects) ? backendRecontactProspects : []),
-    [backendRecontactProspects],
-  )
+  const recontactProspects = useMemo(() => {
+    const list = Array.isArray(backendRecontactProspects) ? backendRecontactProspects : []
+    return list.filter((p) => needsRecontact(p, periodFilter, expiryDateFilter))
+  }, [backendRecontactProspects, periodFilter, expiryDateFilter])
 
   const filteredProspects = useMemo(() => {
     const source = tab === 'recontact'
@@ -979,19 +997,8 @@ export default function ProspectsPage() {
     })
   }, [safeProspects, recontactProspects, search, resolveAgentLabel, agentFilter, tab])
 
-  const handleExpiringExport = async (format: 'pdf' | 'xlsx') => {
-    if (exporting) return
-    setExporting(format)
-    try {
-      const params = { days: 30, agent_id: agentFilter || undefined }
-      if (format === 'pdf') await prospectsApi.exportExpiringPdf(params)
-      else await prospectsApi.exportExpiringExcel(params)
-      toast.success(`Export ${format.toUpperCase()} téléchargé`)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Impossible de télécharger l'export")
-    } finally {
-      setExporting(null)
-    }
+  const handleExpiringExport = (format?: 'pdf' | 'xlsx') => {
+    setIsExportModalOpen(true)
   }
 
   return (
@@ -1038,11 +1045,11 @@ export default function ProspectsPage() {
               }`}
             >
               <BellRing className="h-3.5 w-3.5" />
-              Relance J-30 — fin contrat ({recontactProspects.length})
+              Relance fin contrat ({recontactProspects.length})
             </button>
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
             <div className="w-full sm:w-56">
               <SearchableSelect
                 value={agentFilter}
@@ -1062,7 +1069,7 @@ export default function ProspectsPage() {
                 placeholder="Rechercher nom, téléphone, CNI, statut…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="h-9 text-xs border-slate-200 w-full sm:w-72 bg-white"
+                className="h-9 text-xs border-slate-200 w-full sm:w-64 bg-white"
               />
             )}
             <Button
@@ -1073,28 +1080,33 @@ export default function ProspectsPage() {
               <FileSpreadsheet className="h-4 w-4" />
               Importer Excel
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsExportModalOpen(true)}
+              className="h-9 text-xs flex items-center gap-1.5 border-slate-200 hover:bg-slate-50 shrink-0 font-bold text-slate-700 cursor-pointer"
+            >
+              <FileDown className="h-4 w-4 text-blue-600" />
+              Exporter (PDF / Excel)
+            </Button>
             {tab === 'recontact' && (
               <>
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => handleExpiringExport('pdf')}
-                  disabled={exporting !== null}
-                  isLoading={exporting === 'pdf'}
-                  className="h-9 text-xs"
+                  onClick={() => setIsExportModalOpen(true)}
+                  className="h-9 text-xs text-red-700 border-red-200 hover:bg-red-50 shrink-0 font-bold cursor-pointer"
                 >
-                  <FileDown className="h-4 w-4 mr-1.5" />
+                  <FileDown className="h-4 w-4 mr-1 text-red-600" />
                   PDF
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => handleExpiringExport('xlsx')}
-                  disabled={exporting !== null}
-                  isLoading={exporting === 'xlsx'}
-                  className="h-9 text-xs"
+                  onClick={() => setIsExportModalOpen(true)}
+                  className="h-9 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50 shrink-0 font-bold cursor-pointer"
                 >
-                  <FileSpreadsheet className="h-4 w-4 mr-1.5" />
+                  <FileSpreadsheet className="h-4 w-4 mr-1 text-emerald-600" />
                   Excel
                 </Button>
               </>
@@ -1102,12 +1114,102 @@ export default function ProspectsPage() {
           </div>
         </div>
 
+        {/* Sous-barre de sélection de période & date pour les échéances concurrentes */}
+        {tab === 'recontact' && (
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-amber-50/70 border border-amber-200/80 rounded-2xl backdrop-blur-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-bold text-amber-950 flex items-center gap-1.5 mr-1">
+                <Calendar className="h-4 w-4 text-amber-700" />
+                Échéance dans l&apos;autre assurance :
+              </span>
+
+              {/* Sélecteur de période : 1 semaine, 2 semaines, 3 semaines, 1 mois, Toutes */}
+              <div className="inline-flex rounded-xl p-1 bg-white border border-amber-200/80 shadow-2xs gap-1">
+                {[
+                  { label: '1 semaine', days: 7, desc: '≤ 7 jours' },
+                  { label: '2 semaines', days: 14, desc: '≤ 14 jours' },
+                  { label: '3 semaines', days: 21, desc: '≤ 21 jours' },
+                  { label: '1 mois', days: 30, desc: '≤ 30 jours' },
+                  { label: 'Toutes dates', days: null, desc: 'Illimité' },
+                ].map((item) => {
+                  const isActive = periodFilter === item.days && !expiryDateFilter
+                  return (
+                    <button
+                      key={String(item.days)}
+                      type="button"
+                      onClick={() => {
+                        setPeriodFilter(item.days)
+                        setExpiryDateFilter('')
+                      }}
+                      title={item.desc}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-amber-600 text-white shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Filtre sur une date précise */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-bold text-amber-950 shrink-0">
+                Filtre sur une date :
+              </span>
+              <div className="relative flex items-center">
+                <Input
+                  type="date"
+                  value={expiryDateFilter}
+                  onChange={(e) => {
+                    setExpiryDateFilter(e.target.value)
+                  }}
+                  className="h-8 text-xs bg-white border-amber-200 pr-7 w-38"
+                />
+                {expiryDateFilter && (
+                  <button
+                    type="button"
+                    onClick={() => setExpiryDateFilter('')}
+                    className="absolute right-2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                    title="Effacer le filtre date"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+              {(expiryDateFilter || periodFilter !== 30) && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setPeriodFilter(30)
+                    setExpiryDateFilter('')
+                  }}
+                  className="h-8 px-2 text-xs text-amber-900 hover:bg-amber-100 font-bold"
+                >
+                  Réinitialiser
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
         {tab === 'all' || tab === 'recontact' ? (
           <div className="bg-white/95 backdrop-blur-xl rounded-2xl border border-slate-200/80 shadow-xs p-6 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <h3 className="text-sm font-bold text-slate-900">
                 {tab === 'recontact'
-                  ? 'À relancer : fin de contrat chez un autre prestataire (≤ 30 jours) — pour en faire un client'
+                  ? `À relancer : fin de contrat chez un autre prestataire (${
+                      expiryDateFilter
+                        ? `échéance le ${new Date(expiryDateFilter).toLocaleDateString('fr-FR')}`
+                        : periodFilter
+                          ? `≤ ${periodFilter} jours`
+                          : 'toutes dates'
+                    }) — pour en faire un client`
                   : "Prospects de l'agence"}
               </h3>
             </div>
@@ -1709,6 +1811,16 @@ export default function ProspectsPage() {
         isOpen={isExcelModalOpen}
         onClose={() => setIsExcelModalOpen(false)}
         onSuccess={() => queryClient.invalidateQueries({ queryKey: ['prospects'] })}
+      />
+      {/* Export Prospects Modal */}
+      <ExportProspectsModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        agents={Array.isArray(agents) ? agents : []}
+        allProspects={safeProspects}
+        defaultAgentId={agentFilter}
+        defaultDays={periodFilter}
+        defaultExpiryDate={expiryDateFilter}
       />
     </div>
   )
