@@ -22,7 +22,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
-import { Loader2, Plus, Save, Trash2, RefreshCw, KeyRound, Pencil, X, Download, FileSpreadsheet } from 'lucide-react'
+import { Loader2, Plus, Save, Trash2, RefreshCw, KeyRound, Pencil, X, Download, FileSpreadsheet, PowerOff, RotateCcw } from 'lucide-react'
 import ExcelImportModal from '@/components/excel/ExcelImportModal'
 import { generateExcelTemplate, generateInsurerTariffExcelTemplate } from '@/lib/excel/import-engine'
 
@@ -1078,11 +1078,21 @@ export function VignetteTariffPanel() {
     onError: (e: Error) => toast.error(e.message),
   })
 
+  const toggleMutation = useMutation({
+    mutationFn: ({ id, is_active }: { id: string; is_active: boolean }) =>
+      tariffApi.updateVignetteRate(id, { is_active }),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['vignette-rates'] })
+      toast.success(vars.is_active ? 'Ligne vignette réactivée' : 'Ligne vignette désactivée')
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => tariffApi.deleteVignetteRate(id),
+    mutationFn: (id: string) => tariffApi.deleteVignetteRate(id, true),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['vignette-rates'] })
-      toast.success('Ligne vignette désactivée')
+      toast.success('Ligne vignette supprimée définitivement')
     },
     onError: (e: Error) => toast.error(e.message),
   })
@@ -1279,12 +1289,16 @@ export function VignetteTariffPanel() {
                   <th className="py-3 px-3">Remorque</th>
                   <th className="py-3 px-3">Durée</th>
                   <th className="py-3 px-3">Montant</th>
+                  <th className="py-3 px-3 text-center">Statut</th>
                   <th className="py-3 px-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {list.map((r: VignetteRate) => (
-                  <tr key={r.id}>
+                  <tr
+                    key={r.id}
+                    className={r.is_active ? 'hover:bg-slate-50/50' : 'bg-slate-50/70 opacity-80'}
+                  >
                     <td className="py-3 px-3">{resolveCategory(r.category_id)}</td>
                     <td className="py-3 px-3">{resolveZone(r.zone_id)}</td>
                     <td className="py-3 px-3">{r.fuel ?? '—'}</td>
@@ -1297,20 +1311,79 @@ export function VignetteTariffPanel() {
                       {r.trailer == null ? '—' : r.trailer ? 'Oui' : 'Non'}
                     </td>
                     <td className="py-3 px-3">{resolveDuration(r.duration_id)}</td>
-                    <td className="py-3 px-3 font-mono text-amber-800">
+                    <td className="py-3 px-3 font-mono text-amber-800 font-semibold">
                       {Number(r.vignette_amount).toLocaleString('fr-FR')} F
                     </td>
+                    <td className="py-3 px-3 text-center">
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          r.is_active
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-slate-200/80 text-slate-600 border border-slate-300'
+                        }`}
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            r.is_active ? 'bg-emerald-500' : 'bg-slate-400'
+                          }`}
+                        />
+                        {r.is_active ? 'Actif' : 'Désactivé'}
+                      </span>
+                    </td>
                     <td className="py-3 px-3 text-right">
-                      {r.is_active && (
+                      <div className="flex items-center justify-end gap-1">
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
-                          onClick={() => deleteMutation.mutate(r.id)}
+                          onClick={() =>
+                            toggleMutation.mutate({
+                              id: r.id,
+                              is_active: !r.is_active,
+                            })
+                          }
+                          disabled={toggleMutation.isPending}
+                          title={
+                            r.is_active
+                              ? 'Désactiver cette ligne'
+                              : 'Réactiver cette ligne'
+                          }
+                          className={
+                            r.is_active
+                              ? 'text-amber-600 hover:text-amber-700 hover:bg-amber-50 h-8 px-2'
+                              : 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 h-8 px-2 font-semibold'
+                          }
                         >
-                          <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                          {r.is_active ? (
+                            <PowerOff className="h-3.5 w-3.5" />
+                          ) : (
+                            <>
+                              <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                              <span className="text-[11px]">Réactiver</span>
+                            </>
+                          )}
                         </Button>
-                      )}
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                'Voulez-vous supprimer définitivement cette ligne du barème vignette ?',
+                              )
+                            ) {
+                              deleteMutation.mutate(r.id)
+                            }
+                          }}
+                          disabled={deleteMutation.isPending}
+                          title="Supprimer définitivement"
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 px-2"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}

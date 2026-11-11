@@ -1721,8 +1721,8 @@ export const tariffApi = {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
-  deleteVignetteRate: (id: string) =>
-    mobiRequest<unknown>(`/settings/vignette-rates/${id}`, { method: 'DELETE' }),
+  deleteVignetteRate: (id: string, hard = false) =>
+    mobiRequest<unknown>(`/settings/vignette-rates/${id}${hard ? '?hard=true' : ''}`, { method: 'DELETE' }),
 
   getFeeSchedule: async (insurerId?: string) => {
     if (!insurerId) {
