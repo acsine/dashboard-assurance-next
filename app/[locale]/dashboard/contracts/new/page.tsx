@@ -62,6 +62,7 @@ function NewContractFormContent() {
     has_trailer: false,
   })
   const [subscriptionType, setSubscriptionType] = useState('AFFAIRE_NOUVELLE')
+  const [hasValidVignette, setHasValidVignette] = useState(false)
   const [durationId, setDurationId] = useState('')
   const [dateEffet, setDateEffet] = useState(new Date().toISOString().slice(0, 10))
   const [driverType, setDriverType] = useState<DriverType>('ASSURE')
@@ -142,6 +143,8 @@ function NewContractFormContent() {
         trailer: vehicleDraft.has_trailer,
         include_dr: !!guarantees.DR,
         include_ipt: !!guarantees.INDIV_ACC,
+        has_valid_vignette: hasValidVignette,
+        include_vignette: !hasValidVignette,
         insurer_id: insurerId,
       }),
     onSuccess: setQuote,
@@ -348,6 +351,18 @@ function NewContractFormContent() {
                   onChange={setDriverField}
                 />
                 <GuaranteeChoices options={withSelectFallback(options?.garanties, GUARANTEE_OPTIONS)} value={guarantees} onChange={setGuarantees} />
+                <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-xs font-bold text-slate-800 cursor-pointer hover:bg-slate-100 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={hasValidVignette}
+                    onChange={(e) => setHasValidVignette(e.target.checked)}
+                    className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500"
+                  />
+                  <div>
+                    <span className="block">Le client dispose déjà d&apos;une vignette automobile valide</span>
+                    <span className="text-[11px] font-normal text-slate-500">Si coché, le montant de la vignette ne sera pas facturé sur le contrat.</span>
+                  </div>
+                </label>
               </section>
             )}
 

@@ -12,12 +12,14 @@ export function Providers({ children }: { children: React.ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 60 * 1000,
+            staleTime: 3 * 60 * 1000,
+            gcTime: 10 * 60 * 1000,
+            refetchOnWindowFocus: false,
             retry: (failureCount, error: any) => {
-              if (error?.status === 404 || error?.status === 401) {
+              if (error?.status === 404 || error?.status === 401 || error?.status === 403) {
                 return false
               }
-              return failureCount < 3
+              return failureCount < 1
             },
           },
         },

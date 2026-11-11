@@ -72,6 +72,7 @@ export default function Home() {
   const [usage, setUsage] = useState('PROMENADE')
   const [vehicleValue, setVehicleValue] = useState('5000000')
   const [coverageType, setCoverageType] = useState<'TIERS' | 'TOUS_RISQUES'>('TIERS')
+  const [hasValidVignette, setHasValidVignette] = useState(false)
 
   // Santé inputs
   const [santeLevel, setSanteLevel] = useState<'BRONZE' | 'SILVER' | 'GOLD'>('SILVER')
@@ -165,7 +166,8 @@ export default function Home() {
           fiscal_power: fiscalPower,
           usage: usage,
           vehicle_value: parseFloat(vehicleValue) || 5000000,
-          coverage_type: coverageType
+          coverage_type: coverageType,
+          has_valid_vignette: hasValidVignette,
         }
       } else if (activeTab === 'SANTE') {
         inputsPayload = {
@@ -237,7 +239,7 @@ export default function Home() {
     computeQuoteFromBackend()
   }, [
     activeTab, 
-    fiscalPower, usage, vehicleValue, coverageType,
+    fiscalPower, usage, vehicleValue, coverageType, hasValidVignette,
     santeLevel, santeBeneficiaries, santeAgeGroup,
     voyageZone, voyageDays, voyageTravelers,
     habPropertyType, habRooms, habFurniture,
@@ -1149,6 +1151,33 @@ export default function Home() {
                         </button>
                       </div>
                     </div>
+
+                    <div className="sm:col-span-2 p-3.5 rounded-xl bg-slate-50 border border-slate-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-bold text-slate-800">Avez-vous une vignette automobile valide ?</p>
+                        <p className="text-[11px] text-slate-500">Si oui, le coût de la vignette ne sera pas inclus dans votre devis.</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setHasValidVignette(false)}
+                          className={`px-3.5 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                            !hasValidVignette ? 'bg-blue-600 text-white border-blue-600 shadow-xs' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          Non
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setHasValidVignette(true)}
+                          className={`px-3.5 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                            hasValidVignette ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          Oui
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -1359,7 +1388,7 @@ export default function Home() {
             {isServiceAvailable && (
               <div className="mt-8 pt-6 border-t border-slate-200/80">
                 <QuoteDetailsAndGuarantees
-                  breakdown={computedBreakdown || { total: computedTotal, label: breakdownLabel, vignette: activeTab === 'AUTO' ? 15000 : 0 }}
+                  breakdown={computedBreakdown || { total: computedTotal, label: breakdownLabel, vignette: (activeTab === 'AUTO' && !hasValidVignette) ? 15000 : 0 }}
                   lineItems={computedLineItems}
                   insurerName={computedInsurerName}
                   total={computedTotal}

@@ -78,6 +78,7 @@ interface FormState {
   driver_type: DriverType
   driver: DriverValues
   guarantees: Record<string, boolean>
+  has_valid_vignette: boolean
 }
 
 const initialForm: FormState = {
@@ -110,6 +111,7 @@ const initialForm: FormState = {
   driver_type: 'ASSURE',
   driver: {},
   guarantees: { RC: true, DR: true },
+  has_valid_vignette: false,
 }
 
 function NewClientContent() {
@@ -170,6 +172,8 @@ function NewClientContent() {
         trailer: form.has_trailer,
         include_dr: !!form.guarantees.DR,
         include_ipt: !!form.guarantees.INDIV_ACC,
+        has_valid_vignette: form.has_valid_vignette,
+        include_vignette: !form.has_valid_vignette,
         insurer_id: insurerId,
       }),
     onSuccess: setQuote,
@@ -392,6 +396,18 @@ function NewClientContent() {
                 </div>
                 <DriverFields driverType={form.driver_type} values={form.driver} errors={errors} onTypeChange={chooseDriverType} onChange={setDriver} />
                 <GuaranteeChoices options={withSelectFallback(options?.garanties, GUARANTEE_OPTIONS)} value={form.guarantees} onChange={(value) => set('guarantees', value)} />
+                <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-xs font-bold text-slate-800 cursor-pointer hover:bg-slate-100 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={form.has_valid_vignette}
+                    onChange={(e) => set('has_valid_vignette', e.target.checked)}
+                    className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500"
+                  />
+                  <div>
+                    <span className="block">Le client dispose déjà d&apos;une vignette automobile valide</span>
+                    <span className="text-[11px] font-normal text-slate-500">Si coché, le montant de la vignette ne sera pas facturé sur le devis.</span>
+                  </div>
+                </label>
               </section>
             )}
 

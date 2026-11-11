@@ -1605,6 +1605,8 @@ export interface QuoteComputeRequest {
   trailer?: boolean
   include_dr?: boolean
   include_ipt?: boolean
+  include_vignette?: boolean
+  has_valid_vignette?: boolean
   remise_pct?: number
   prospect_id?: string
   cni_number?: string
