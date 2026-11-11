@@ -1170,7 +1170,7 @@ export function VignetteTariffPanel() {
                 placeholder="Toutes catégories"
                 options={[
                   { value: '', label: '— Toutes —' },
-                  ...catList.map((c) => ({ value: c.id, label: `${c.code} — ${c.name}` })),
+                  ...catList.filter((c) => c.is_active).map((c) => ({ value: c.id, label: `${c.code} — ${c.name}` })),
                 ]}
               />
             </div>
@@ -1184,7 +1184,7 @@ export function VignetteTariffPanel() {
                 placeholder="Toutes zones"
                 options={[
                   { value: '', label: '— Toutes —' },
-                  ...zoneList.map((z) => ({ value: z.id, label: z.name })),
+                  ...zoneList.filter((z) => z.is_active).map((z) => ({ value: z.id, label: z.name })),
                 ]}
               />
             </div>
@@ -1234,7 +1234,7 @@ export function VignetteTariffPanel() {
                 placeholder="Toutes durées"
                 options={[
                   { value: '', label: '— Toutes —' },
-                  ...durList.map((d) => ({
+                  ...durList.filter((d) => d.is_active).map((d) => ({
                     value: d.id,
                     label: `${d.label} (${d.months} mois)`,
                   })),
