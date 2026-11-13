@@ -130,7 +130,7 @@ export default function ObjectivesPage() {
           .filter((item) => item.metric)
           .map((item) =>
             objectivesApi.updateMetric(item.metric_id, {
-              proof_required: Boolean(item.metric?.proof_instructions?.trim()),
+              proof_required: true,
               proof_type: item.metric?.proof_type || 'REFERENCE',
               proof_instructions: item.metric?.proof_instructions?.trim() || null,
             }),
@@ -172,7 +172,7 @@ export default function ObjectivesPage() {
         default_points: Number(newMetric.default_points) || 1,
         default_minimum: Number(newMetric.default_minimum) || 0,
         default_target: Number(newMetric.default_target) || 0,
-        proof_required: Boolean(newMetric.proof_instructions.trim()),
+        proof_required: true,
         proof_type: newMetric.proof_type,
         proof_instructions: newMetric.proof_instructions.trim() || null,
       } as any),
@@ -238,7 +238,7 @@ export default function ObjectivesPage() {
               ...item,
               metric: {
                 ...item.metric,
-                proof_required: Boolean(value.trim()),
+                proof_required: true,
                 proof_instructions: value,
               },
             }
