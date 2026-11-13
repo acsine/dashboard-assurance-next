@@ -210,8 +210,8 @@ function NewClientContent() {
           vehicle: {
             marque: form.marque.trim(),
             modele: form.modele.trim() || undefined,
-            chassis_num: form.chassis_num.replace(/\s/g, '').toUpperCase(),
-            immatriculation: form.immatriculation.replace(/\s/g, '').toUpperCase() || undefined,
+            chassis_num: form.chassis_num ? form.chassis_num.replace(/\s/g, '').toUpperCase() : undefined,
+            immatriculation: form.immatriculation.replace(/\s/g, '').toUpperCase(),
             energie: form.energie,
             puissance_cv: Number(form.puissance_cv),
             nb_places: Number(form.nb_places) || undefined,
@@ -368,8 +368,8 @@ function NewClientContent() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className={labelClass}>Marque *<Input value={form.marque} onChange={(e) => set('marque', e.target.value)} className={inputClass} />{fieldError('marque')}</label>
                   <label className={labelClass}>Modèle<Input value={form.modele} onChange={(e) => set('modele', e.target.value)} className={inputClass} /></label>
-                  <label className={labelClass}>N° châssis (VIN) *<Input maxLength={17} value={form.chassis_num} onChange={(e) => set('chassis_num', e.target.value.toUpperCase().replace(/\s/g, '').slice(0, 17))} className={inputClass} />{fieldError('chassis_num')}</label>
-                  <label className={labelClass}>Immatriculation<Input value={form.immatriculation} onChange={(e) => set('immatriculation', e.target.value)} className={inputClass} /></label>
+                  <label className={labelClass}>Immatriculation *<Input value={form.immatriculation} onChange={(e) => set('immatriculation', e.target.value)} className={inputClass} />{fieldError('immatriculation')}</label>
+                  <label className={labelClass}>N° châssis (VIN) (optionnel)<Input maxLength={17} value={form.chassis_num} onChange={(e) => set('chassis_num', e.target.value.toUpperCase().replace(/\s/g, '').slice(0, 17))} className={inputClass} />{fieldError('chassis_num')}</label>
                   <label className={labelClass}>Catégorie tarifaire *<SearchableSelect value={form.category_id} onChange={(value) => set('category_id', value)} options={(bootstrap?.categories ?? []).filter((item) => item.is_active).map((item) => ({ value: item.id, label: `${item.code} — ${item.name}` }))} />{fieldError('category_id')}</label>
                   <label className={labelClass}>Énergie *<SearchableSelect value={form.energie} onChange={(value) => set('energie', value)} options={withSelectFallback(options?.energies, ENERGY_OPTIONS)} placeholder="Sélectionner une énergie..." />{fieldError('energie')}</label>
                   <label className={labelClass}>Puissance (CV) *<Input type="number" min={1} max={99} value={form.puissance_cv} onChange={(e) => set('puissance_cv', e.target.value)} className={inputClass} />{fieldError('puissance_cv')}</label>

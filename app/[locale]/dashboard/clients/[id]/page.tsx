@@ -172,16 +172,16 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
 
   const handleAddVehicle = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!vehicleBrand || !vehicleChassis) {
-      toast.error('Marque et Numéro de Châssis requis')
+    if (!vehicleBrand || !vehicleImmat) {
+      toast.error('Marque et Immatriculation requises')
       return
     }
 
     addVehicleMutation.mutate({
       marque: vehicleBrand,
       modele: vehicleModel || undefined,
-      immatriculation: vehicleImmat || undefined,
-      chassis_num: vehicleChassis,
+      immatriculation: vehicleImmat.trim().toUpperCase(),
+      chassis_num: vehicleChassis ? vehicleChassis.trim().toUpperCase() : undefined,
       puissance_cv: vehiclePower ? parseInt(vehiclePower) : undefined,
     })
   }
@@ -516,24 +516,24 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                          Numéro de Châssis *
+                          Immatriculation *
                         </label>
                         <Input
-                          placeholder="VIN123456789..."
-                          value={vehicleChassis}
-                          onChange={(e) => setVehicleChassis(e.target.value)}
+                          placeholder="LT-123-AA..."
+                          value={vehicleImmat}
+                          onChange={(e) => setVehicleImmat(e.target.value)}
                           className="h-10 text-xs border-gray-200"
                           required
                         />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                          Immatriculation
+                          Numéro de Châssis (optionnel)
                         </label>
                         <Input
-                          placeholder="LT-123-AA..."
-                          value={vehicleImmat}
-                          onChange={(e) => setVehicleImmat(e.target.value)}
+                          placeholder="VIN123456789..."
+                          value={vehicleChassis}
+                          onChange={(e) => setVehicleChassis(e.target.value)}
                           className="h-10 text-xs border-gray-200"
                         />
                       </div>

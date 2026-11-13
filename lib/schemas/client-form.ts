@@ -31,14 +31,18 @@ export const insuredStepSchema = z.object({
 
 export const vehicleStepSchema = z.object({
   marque: requiredText('La marque est requise'),
+  immatriculation: requiredText('L’immatriculation est requise'),
   chassis_num: z
     .string()
     .trim()
-    .transform((value) => value.replace(/\s/g, '').toUpperCase())
-    .refine((value) => /^[A-Z0-9]{17}$/.test(value), 'Le VIN doit contenir exactement 17 caractères'),
+    .optional()
+    .transform((value) => (value ? value.replace(/\s/g, '').toUpperCase() : ''))
+    .refine((value) => !value || value.length >= 3, 'Numéro de châssis trop court'),
   category_id: requiredText('La catégorie tarifaire est requise'),
   energie: requiredText('L’énergie est requise'),
   puissance_cv: z.coerce.number().int().min(1).max(99),
+  nb_places: z.coerce.number().int().min(1).max(99).optional(),
+  date_mise_circulation: z.string().trim().optional(),
   usage: requiredText('L’usage est requis'),
   genre: requiredText('Le genre est requis'),
 })
