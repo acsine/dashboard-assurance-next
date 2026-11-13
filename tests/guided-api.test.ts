@@ -40,6 +40,7 @@ describe('API des formulaires guidés', () => {
         phone: '+237690000000',
         vehicle: {
           marque: 'Toyota',
+          immatriculation: 'LT-1234-A',
           chassis_num: '12345678901234567',
           category_id: 'category-id',
           has_trailer: false,

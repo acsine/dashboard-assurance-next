@@ -441,10 +441,10 @@ export async function executeBatchImport(
                 modele: row.vehicle_modele ? String(row.vehicle_modele) : undefined,
                 chassis_num: row.vehicle_chassis_num
                   ? String(row.vehicle_chassis_num)
-                  : `CHAS-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                  : undefined,
                 immatriculation: row.vehicle_immatriculation
                   ? String(row.vehicle_immatriculation)
-                  : undefined,
+                  : `IMM-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
                 energie: row.vehicle_energie
                   ? String(row.vehicle_energie).toUpperCase()
                   : undefined,

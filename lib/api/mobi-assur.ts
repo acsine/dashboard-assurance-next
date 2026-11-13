@@ -542,7 +542,7 @@ export interface Vehicle {
   marque: string
   modele?: string
   immatriculation?: string
-  chassis_num: string
+  chassis_num?: string
   puissance_fiscale?: number
   puissance_cv?: number
   energie?: string
@@ -558,8 +558,8 @@ export interface Vehicle {
 export interface VehicleInput {
   marque: string
   modele?: string
-  chassis_num: string
-  immatriculation?: string
+  chassis_num?: string
+  immatriculation: string
   energie?: string
   puissance_cv?: number
   nb_places?: number
