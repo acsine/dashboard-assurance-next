@@ -2053,6 +2053,8 @@ export interface Challenge {
   id: string
   title: string
   description?: string | null
+  rules?: string | null
+  reward_description?: string | null
   scope: 'METRIC' | 'PERIOD_TYPE'
   metric_id?: string | null
   period?: string | null
@@ -2063,6 +2065,10 @@ export interface Challenge {
   starts_at: string
   ends_at: string
   status: 'DRAFT' | 'ACTIVE' | 'CLOSED'
+  total_winners?: number
+  places_left?: number
+  is_full?: boolean
+  is_expired?: boolean
 }
 
 export interface BonusRule {

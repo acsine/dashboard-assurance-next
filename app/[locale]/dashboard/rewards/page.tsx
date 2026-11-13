@@ -43,6 +43,8 @@ const emptyConv = {
 const emptyChal = {
   title: '',
   description: '',
+  rules: '',
+  reward_description: '',
   scope: 'METRIC',
   metric_id: '',
   period: 'DAILY',
@@ -145,6 +147,8 @@ export default function RewardsPage() {
     setChalForm({
       title: c.title,
       description: c.description || '',
+      rules: c.rules || '',
+      reward_description: c.reward_description || '',
       scope: c.scope,
       metric_id: c.metric_id || '',
       period: c.period || 'DAILY',
@@ -205,6 +209,8 @@ export default function RewardsPage() {
       const payload = {
         title: chalForm.title,
         description: chalForm.description || null,
+        rules: chalForm.rules || null,
+        reward_description: chalForm.reward_description || null,
         scope: chalForm.scope as Challenge['scope'],
         metric_id: chalForm.scope === 'METRIC' ? chalForm.metric_id || null : null,
         period: chalForm.scope === 'PERIOD_TYPE' ? chalForm.period : null,
@@ -564,6 +570,34 @@ export default function RewardsPage() {
                     <Input
                       value={chalForm.title}
                       onChange={(e) => setChalForm({ ...chalForm, title: e.target.value })}
+                      placeholder="ex: Challenge Printemps 2026"
+                      className="h-10 text-xs border-gray-200"
+                    />
+                  </div>
+                  <div className="space-y-1 sm:col-span-2">
+                    <label className={labelClass}>Description / Objectif</label>
+                    <Input
+                      value={chalForm.description}
+                      onChange={(e) => setChalForm({ ...chalForm, description: e.target.value })}
+                      placeholder="Détails de la mission pour les agents..."
+                      className="h-10 text-xs border-gray-200"
+                    />
+                  </div>
+                  <div className="space-y-1 sm:col-span-2">
+                    <label className={labelClass}>Règles & Conditions d'éligibilité</label>
+                    <Input
+                      value={chalForm.rules}
+                      onChange={(e) => setChalForm({ ...chalForm, rules: e.target.value })}
+                      placeholder="Conditions particulières (ex: contrats payés au comptant, min 3 mois)..."
+                      className="h-10 text-xs border-gray-200"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelClass}>Détail Récompense (Lot / Prime)</label>
+                    <Input
+                      value={chalForm.reward_description}
+                      onChange={(e) => setChalForm({ ...chalForm, reward_description: e.target.value })}
+                      placeholder="ex: Trophée + Prime d'excellence"
                       className="h-10 text-xs border-gray-200"
                     />
                   </div>
@@ -715,7 +749,7 @@ export default function RewardsPage() {
                         <th className={thClass}>Titre</th>
                         <th className={thClass}>Statut</th>
                         <th className={thClass}>Cible</th>
-                        <th className={thClass}>Top</th>
+                        <th className={thClass}>Places restantes</th>
                         <th className={thClass}>Récompense</th>
                         <th className={`${thClass} text-right`}>Actions</th>
                       </tr>
@@ -738,7 +772,17 @@ export default function RewardsPage() {
                             </span>
                           </td>
                           <td className="py-4 text-sm font-semibold">{c.target_value}</td>
-                          <td className="py-4 text-sm">{c.max_winners}</td>
+                          <td className="py-4 text-sm">
+                            <span className="font-bold text-blue-700">
+                              {c.places_left !== undefined ? c.places_left : c.max_winners}
+                            </span>
+                            <span className="text-gray-400 text-xs"> / {c.max_winners} places</span>
+                            {c.is_full && (
+                              <span className="ml-2 inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
+                                Complet
+                              </span>
+                            )}
+                          </td>
                           <td className="py-4 text-xs text-slate-700">
                             {Number(c.reward_amount).toLocaleString('fr-FR')} FCFA
                             {c.reward_points ? ` / ${c.reward_points} pts` : ''}
