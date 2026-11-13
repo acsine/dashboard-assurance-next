@@ -369,7 +369,7 @@ function dailyReportQuery(filters?: DailyReportFilters): string {
   const search = new URLSearchParams()
   if (filters?.from_date) search.set('from_date', filters.from_date)
   if (filters?.to_date) search.set('to_date', filters.to_date)
-  if (filters?.status) search.set('status', filters.status)
+  if (filters?.status && (filters.status as string) !== 'MISSING') search.set('status', filters.status)
   if (filters?.agent_id) search.set('agent_id', filters.agent_id)
   const qs = search.toString()
   return qs ? `?${qs}` : ''
@@ -1844,7 +1844,7 @@ export interface ObjectiveMetric {
   default_minimum: number
   default_target: number
   proof_required: boolean
-  proof_type: 'PHONE' | 'REFERENCE' | 'FILE'
+  proof_type: 'PHONE' | 'REFERENCE' | 'FILE' | 'TEXT'
   proof_instructions?: string | null
   is_system: boolean
   is_active: boolean
@@ -1870,7 +1870,7 @@ export interface ObjectivesTemplate {
 export interface ObjectiveProofItem {
   id: string
   unit_index: number
-  proof_type: 'PHONE' | 'REFERENCE' | 'FILE'
+  proof_type: 'PHONE' | 'REFERENCE' | 'FILE' | 'TEXT'
   value: string
   attachment_url?: string | null
   amount?: number | null
@@ -1907,7 +1907,7 @@ export interface NicheObjective {
   recurrence: NicheObjectiveRecurrence
   custom_interval_days?: number | null
   anchor_date?: string | null
-  proof_type: 'PHONE' | 'REFERENCE' | 'FILE'
+  proof_type: 'PHONE' | 'REFERENCE' | 'FILE' | 'TEXT'
   proof_instructions?: string | null
   points: number
   is_active: boolean
@@ -1931,7 +1931,7 @@ export interface ObjectiveProofSubmission {
   niche_name?: string | null
   objective_label?: string | null
   objective_kind?: NicheObjectiveKind | ObjectiveMetric['kind'] | null
-  proof_type: 'PHONE' | 'REFERENCE' | 'FILE'
+  proof_type: 'PHONE' | 'REFERENCE' | 'FILE' | 'TEXT'
   proof_instructions?: string | null
   period_key: string
   declared_value: number

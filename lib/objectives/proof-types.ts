@@ -7,6 +7,7 @@ export const PROOF_TYPE_OPTIONS: {
   { value: 'PHONE', label: 'Téléphone' },
   { value: 'REFERENCE', label: 'Référence' },
   { value: 'FILE', label: 'Fichier / photo' },
+  { value: 'TEXT', label: 'Texte / Compte-rendu' },
 ]
 
 export function proofTypeLabel(type: string | undefined | null): string {

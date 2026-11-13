@@ -860,6 +860,7 @@ export default function ObjectivesPage() {
                     setProofStatusFilter(value as ObjectiveProofSubmission['status'])
                   }
                   options={[
+                    { value: '', label: 'Tous les statuts' },
                     { value: 'PENDING', label: 'En attente' },
                     { value: 'APPROVED', label: 'Validées' },
                     { value: 'REJECTED', label: 'Rejetées' },
@@ -925,7 +926,7 @@ export default function ObjectivesPage() {
                             {submission.objective_kind === 'MONETARY'
                               ? `${Number(submission.declared_amount || 0).toLocaleString('fr-FR')} FCFA`
                               : submission.declared_value}{' '}
-                            / {submission.proofs.length}
+                            / {submission.proofs?.length ?? 0}
                           </td>
                           <td className="py-4">
                             <span
@@ -1041,49 +1042,86 @@ export default function ObjectivesPage() {
                   </div>
                 ) : null}
 
-                <div className="space-y-2">
-                  <p className={labelClass}>
-                    Preuves fournies ({selectedSubmission.proofs.length})
-                  </p>
-                  {selectedSubmission.proofs.map((proof) => (
-                    <div
-                      key={proof.id}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 p-3"
-                    >
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 block">
-                          Unité {proof.unit_index}
-                        </span>
-                        {proof.proof_type === 'PHONE' ? (
-                          <a
-                            href={`tel:${proof.value}`}
-                            className="text-sm font-bold text-blue-700 hover:underline"
-                          >
-                            {proof.value}
-                          </a>
-                        ) : (
-                          <span className="text-sm font-semibold text-slate-800 break-all">
-                            {proof.value}
-                          </span>
-                        )}
-                        {proof.amount != null ? (
-                          <span className="block text-xs font-bold text-emerald-700 mt-1">
-                            {Number(proof.amount).toLocaleString('fr-FR')} FCFA
-                          </span>
-                        ) : null}
-                      </div>
-                      {proof.attachment_url ? (
-                        <a
-                          href={proxiedAssetUrl(proof.attachment_url)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-xs font-bold text-blue-700 hover:underline"
-                        >
-                          Ouvrir le fichier
-                        </a>
-                      ) : null}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className={labelClass}>
+                      Preuves fournies ({selectedSubmission.proofs?.length ?? 0})
+                    </p>
+                    <span className="text-xs text-slate-500 font-medium">
+                      Déclaré : {selectedSubmission.declared_value} unité(s)
+                    </span>
+                  </div>
+
+                  {(!selectedSubmission.proofs || selectedSubmission.proofs.length === 0) ? (
+                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 text-xs text-slate-500 text-center">
+                      Aucune preuve détaillée enregistrée pour cette déclaration.
                     </div>
-                  ))}
+                  ) : (
+                    <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+                      {selectedSubmission.proofs.map((proof) => (
+                        <div
+                          key={proof.id}
+                          className="rounded-xl border border-slate-200 bg-slate-50/60 p-3.5 space-y-2 hover:bg-slate-50 transition-colors"
+                        >
+                          <div className="flex items-center justify-between gap-2 border-b border-slate-200/60 pb-2">
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 text-[11px] font-bold">
+                              Preuve #{proof.unit_index}
+                            </span>
+                            <span className="text-[11px] font-semibold text-slate-500">
+                              {proofTypeLabel(proof.proof_type)}
+                            </span>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            {proof.proof_type === 'PHONE' ? (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-semibold text-slate-600">Contact / Tél :</span>
+                                <a
+                                  href={`tel:${proof.value}`}
+                                  className="text-sm font-bold text-blue-700 hover:underline"
+                                >
+                                  {proof.value}
+                                </a>
+                              </div>
+                            ) : proof.proof_type === 'TEXT' ? (
+                              <div className="space-y-1">
+                                <span className="text-xs font-semibold text-slate-600">Compte-rendu / Détails :</span>
+                                <div className="text-xs font-normal text-slate-800 whitespace-pre-wrap bg-white p-2.5 rounded-lg border border-slate-200/80 leading-relaxed shadow-xs">
+                                  {proof.value}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="space-y-1">
+                                <span className="text-xs font-semibold text-slate-600">Référence / Détails :</span>
+                                <div className="text-xs font-medium text-slate-800 break-words bg-white p-2.5 rounded-lg border border-slate-200/80 shadow-xs">
+                                  {proof.value}
+                                </div>
+                              </div>
+                            )}
+
+                            {proof.amount != null ? (
+                              <div className="text-xs font-bold text-emerald-700 mt-1">
+                                Montant déclaré : {Number(proof.amount).toLocaleString('fr-FR')} FCFA
+                              </div>
+                            ) : null}
+                          </div>
+
+                          {proof.attachment_url ? (
+                            <div className="pt-2 border-t border-slate-200/60">
+                              <a
+                                href={proxiedAssetUrl(proof.attachment_url)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-700 hover:underline"
+                              >
+                                📎 Voir le fichier joint
+                              </a>
+                            </div>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {selectedSubmission.status === 'REJECTED' && selectedSubmission.rejection_reason ? (
