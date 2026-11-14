@@ -950,6 +950,7 @@ export interface Prospect {
   has_external_insurance?: boolean
   external_insurer_name?: string
   external_policy_expires_on?: string
+  rejection_reason?: string
   created_at?: string
   updated_at?: string
 }
@@ -1053,6 +1054,9 @@ export interface ConversionRequest {
 export interface ApproveConversionBody {
   validation_code: string
   received_payment_reference?: string
+  payment_mode?: string
+  payment_reference?: string
+  payment_amount?: number
 }
 
 export interface ProspectListParams {

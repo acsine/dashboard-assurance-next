@@ -286,6 +286,12 @@ function ConversionReviewPanel({
           value={(payload.cni_number as string) || prospect?.cni_number}
         />
         <InfoRow label="Statut" value={prospect?.status || 'EN_ATTENTE_VALIDATION'} />
+        {prospect?.client_id && (
+          <div className="p-2.5 bg-blue-50 border border-blue-200/80 rounded-lg text-[11px] text-blue-900 flex items-start gap-2">
+            <span className="font-bold">ℹ️ Note :</span>
+            <span>Ce prospect est déjà identifié comme client dans le système. La validation lui rattachera son nouveau véhicule et son contrat sans doublon.</span>
+          </div>
+        )}
         {(cniPhoto || permisPhoto) && (
           <div className="flex flex-wrap gap-2 pt-1">
             {cniPhoto && (
@@ -581,6 +587,9 @@ export default function ProspectsPage() {
   const [approvingRequest, setApprovingRequest] = useState<ConversionRequest | null>(null)
   const [approvalCode, setApprovalCode] = useState('')
   const [approvalPaymentRef, setApprovalPaymentRef] = useState('')
+  const [approvalPaymentAction, setApprovalPaymentAction] = useState<'pay_now' | 'leave_unpaid'>('pay_now')
+  const [approvalPaymentMode, setApprovalPaymentMode] = useState<string>('ESPECES')
+  const [approvalPaymentAmount, setApprovalPaymentAmount] = useState<string>('')
 
   const { data: prospects = [], isLoading: loadingProspects } = useQuery({
     queryKey: ['prospects'],
@@ -764,22 +773,33 @@ export default function ProspectsPage() {
       id,
       validation_code,
       received_payment_reference,
+      payment_mode,
+      payment_reference,
+      payment_amount,
     }: {
       id: string
       validation_code: string
       received_payment_reference?: string
+      payment_mode?: string
+      payment_reference?: string
+      payment_amount?: number
     }) =>
       prospectsApi.approveConversion(id, {
         validation_code,
         received_payment_reference,
+        payment_mode,
+        payment_reference,
+        payment_amount,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pending-conversions'] })
       queryClient.invalidateQueries({ queryKey: ['prospects'] })
-      toast.success('Demande approuvée. Client créé et prospect converti.')
+      toast.success('Demande approuvée. Client créé / rattaché et prospect converti.')
       setApprovingRequest(null)
       setApprovalCode('')
       setApprovalPaymentRef('')
+      setApprovalPaymentAmount('')
+      setApprovalPaymentAction('pay_now')
     },
     onError: (err: Error) => {
       toast.error(err.message || "Erreur lors de l'approbation")
@@ -962,16 +982,45 @@ export default function ProspectsPage() {
       toast.error('Code de validation à 6 chiffres requis')
       return
     }
-    const needsPaymentRef = approvingRequest.payment_mode === 'MANUAL_PAYMENT'
-    if (needsPaymentRef && !approvalPaymentRef.trim()) {
-      toast.error('Référence de paiement requise')
+    const isManual = approvingRequest.payment_mode === 'MANUAL_PAYMENT'
+    const isUnpaid = approvingRequest.payment_mode === 'UNPAID'
+
+    if (isManual && !approvalPaymentRef.trim()) {
+      toast.error('Référence de paiement requise pour valider le règlement agent')
       return
     }
+
+    if (isUnpaid && approvalPaymentAction === 'pay_now') {
+      if (!approvalPaymentRef.trim()) {
+        toast.error('Référence ou N° de reçu de caisse requis')
+        return
+      }
+      if (!approvalPaymentAmount || Number(approvalPaymentAmount) <= 0) {
+        toast.error('Montant de paiement valide requis')
+        return
+      }
+    }
+
     approveMutation.mutate({
       id: approvingRequest.id,
       validation_code: approvalCode,
-      received_payment_reference: needsPaymentRef
+      received_payment_reference: isManual
         ? approvalPaymentRef.trim()
+        : approvalPaymentAction === 'pay_now'
+        ? approvalPaymentRef.trim()
+        : undefined,
+      payment_mode: isUnpaid
+        ? (approvalPaymentAction === 'pay_now' ? approvalPaymentMode : 'UNPAID')
+        : approvingRequest.payment_mode,
+      payment_reference: isManual
+        ? approvalPaymentRef.trim()
+        : approvalPaymentAction === 'pay_now'
+        ? approvalPaymentRef.trim()
+        : undefined,
+      payment_amount: isUnpaid && approvalPaymentAction === 'pay_now'
+        ? Number(approvalPaymentAmount)
+        : approvingRequest.payment_amount != null
+        ? Number(approvingRequest.payment_amount)
         : undefined,
     })
   }
@@ -1440,7 +1489,21 @@ export default function ProspectsPage() {
                               onClick={() => {
                                 setApprovingRequest(req)
                                 setApprovalCode('')
-                                setApprovalPaymentRef('')
+                                setApprovalPaymentRef(req.payment_reference || '')
+                                const defAmt =
+                                  req.payment_amount ??
+                                  req.desired_contract?.quote_total ??
+                                  req.prospect?.quote_total ??
+                                  ''
+                                setApprovalPaymentAmount(defAmt ? String(defAmt) : '')
+                                setApprovalPaymentMode(
+                                  req.payment_mode === 'MANUAL_PAYMENT'
+                                    ? 'MANUAL_PAYMENT'
+                                    : 'ESPECES',
+                                )
+                                setApprovalPaymentAction(
+                                  req.payment_mode === 'UNPAID' ? 'pay_now' : 'leave_unpaid',
+                                )
                               }}
                               disabled={approveMutation.isPending}
                               variant="outline"
@@ -1769,21 +1832,142 @@ export default function ProspectsPage() {
                     required
                   />
                 </div>
-                {approvingRequest.payment_mode === 'MANUAL_PAYMENT' && (
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                      Référence paiement reçue *
-                    </label>
-                    <Input
-                      value={approvalPaymentRef}
-                      onChange={(e) => setApprovalPaymentRef(e.target.value)}
-                      placeholder={approvingRequest.payment_reference || ''}
-                      className="h-10 text-xs"
-                      required
-                    />
-                    <p className="text-[10px] text-amber-600">
-                      Doit correspondre à la référence déclarée par l&apos;agent.
+                {/* Gestion et vérification des paiements */}
+                {approvingRequest.payment_mode === 'MANUAL_PAYMENT' ? (
+                  <div className="space-y-2 p-3 bg-blue-50/60 border border-blue-200/80 rounded-xl">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-blue-900 uppercase tracking-wider">
+                        Vérification paiement agent
+                      </span>
+                      <span className="text-[10px] font-medium bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                        Paiement manuel déclaré
+                      </span>
+                    </div>
+                    <div className="text-xs text-blue-950/80 space-y-0.5">
+                      <p>
+                        Montant déclaré :{' '}
+                        <strong className="font-semibold">
+                          {approvingRequest.payment_amount != null
+                            ? formatFcfa(approvingRequest.payment_amount)
+                            : approvingRequest.desired_contract?.quote_total != null
+                            ? formatFcfa(approvingRequest.desired_contract.quote_total)
+                            : 'Non précisé'}
+                        </strong>
+                      </p>
+                      {approvingRequest.payment_date && (
+                        <p>
+                          Date déclarée : <strong>{approvingRequest.payment_date}</strong>
+                        </p>
+                      )}
+                      {approvingRequest.payment_reference && (
+                        <p>
+                          Réf. déclarée :{' '}
+                          <strong className="font-mono">{approvingRequest.payment_reference}</strong>
+                        </p>
+                      )}
+                    </div>
+                    <div className="space-y-1 pt-1">
+                      <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider block">
+                        Confirmer la référence paiement reçue *
+                      </label>
+                      <Input
+                        value={approvalPaymentRef}
+                        onChange={(e) => setApprovalPaymentRef(e.target.value)}
+                        placeholder={approvingRequest.payment_reference || 'Ex: RECU-2026-001'}
+                        className="h-9 text-xs font-mono"
+                        required
+                      />
+                      <p className="text-[10px] text-slate-500">
+                        Vérifiez que la référence reçue en caisse ou relevé correspond à la déclaration.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3 p-3 bg-amber-50/60 border border-amber-200/80 rounded-xl">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-amber-900 uppercase tracking-wider">
+                        Statut paiement : Non payé (par l&apos;agent)
+                      </span>
+                      <span className="text-[10px] font-medium bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
+                        À régler
+                      </span>
+                    </div>
+                    <p className="text-xs text-amber-900/80">
+                      L&apos;agent a coché « Non payé ». Souhaitez-vous encaisser le règlement maintenant avant de valider la conversion ?
                     </p>
+
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setApprovalPaymentAction('pay_now')}
+                        className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold border transition ${
+                          approvalPaymentAction === 'pay_now'
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                            : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        Encaisser le paiement maintenant
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setApprovalPaymentAction('leave_unpaid')}
+                        className={`py-1.5 px-3 rounded-lg text-xs font-semibold border transition ${
+                          approvalPaymentAction === 'leave_unpaid'
+                            ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
+                            : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        Laisser en attente (non soldé)
+                      </button>
+                    </div>
+
+                    {approvalPaymentAction === 'pay_now' && (
+                      <div className="space-y-2 pt-2 border-t border-amber-200/60">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-gray-600 uppercase tracking-wider block">
+                              Mode de règlement *
+                            </label>
+                            <select
+                              value={approvalPaymentMode}
+                              onChange={(e) => setApprovalPaymentMode(e.target.value)}
+                              className="w-full h-9 rounded-md border border-gray-200 bg-white px-2 text-xs focus:ring-1 focus:ring-emerald-500"
+                            >
+                              <option value="ESPECES">Espèces (Caisse)</option>
+                              <option value="ORANGE_MONEY">Orange Money</option>
+                              <option value="MTN_MOMO">MTN Mobile Money</option>
+                              <option value="VIREMENT">Virement bancaire</option>
+                              <option value="CHEQUE">Chèque</option>
+                            </select>
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-gray-600 uppercase tracking-wider block">
+                              Montant réglé (FCFA) *
+                            </label>
+                            <Input
+                              type="number"
+                              value={approvalPaymentAmount}
+                              onChange={(e) => setApprovalPaymentAmount(e.target.value)}
+                              placeholder="Montant"
+                              className="h-9 text-xs"
+                              required
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-gray-600 uppercase tracking-wider block">
+                            Référence / N° Reçu de caisse *
+                          </label>
+                          <Input
+                            value={approvalPaymentRef}
+                            onChange={(e) => setApprovalPaymentRef(e.target.value)}
+                            placeholder="Ex: RECU-CAISSE-2026-0042 ou Réf transaction MM"
+                            className="h-9 text-xs font-mono"
+                            required
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
                 <div className="flex gap-2 justify-end pt-2">

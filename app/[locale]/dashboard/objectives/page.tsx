@@ -65,7 +65,7 @@ export default function ObjectivesPage() {
     proof_instructions: '',
   })
   const [proofStatusFilter, setProofStatusFilter] =
-    useState<ObjectiveProofSubmission['status']>('PENDING')
+    useState<ObjectiveProofSubmission['status'] | ''>('PENDING')
   const [proofScopeFilter, setProofScopeFilter] = useState<ObjectiveProofScope | ''>('')
   const [proofNicheFilter, setProofNicheFilter] = useState('')
   const [proofPeriodFilter, setProofPeriodFilter] = useState('')
@@ -99,7 +99,7 @@ export default function ObjectivesPage() {
   } = useQuery({
     queryKey: ['objective-proof-submissions', proofStatusFilter, proofScopeFilter, proofNicheFilter, proofPeriodFilter],
     queryFn: () => objectivesApi.listProofSubmissions({
-      status: proofStatusFilter,
+      status: proofStatusFilter || undefined,
       scope: proofScopeFilter || undefined,
       niche_id: proofNicheFilter || undefined,
       period_key: proofPeriodFilter.trim() || undefined,
