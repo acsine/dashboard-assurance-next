@@ -296,6 +296,59 @@ export default function QuoteDetailsAndGuarantees({
               <strong className="text-blue-900 font-bold block mb-0.5">Un « tiers », c'est qui ?</strong>
               Toute personne autre que vous : le piéton, le motard, l'autre conducteur et ses passagers — et aussi les passagers de votre propre véhicule.
             </div>
+
+            {/* Autres éléments essentiels du devis pour orienter le client */}
+            <div className="pt-2 border-t border-amber-200/50 space-y-2.5">
+              <h6 className="text-[11px] font-extrabold text-amber-950 uppercase tracking-wider">
+                💡 Autres garanties & postes du devis :
+              </h6>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-[11px]">
+                {/* DR */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-2.5 space-y-1">
+                  <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                    <span className="px-1.5 py-0.5 rounded text-[9.5px] font-black bg-blue-100 text-blue-800">DR</span>
+                    Défense & Recours
+                  </div>
+                  <p className="text-slate-600 leading-normal">
+                    La compagnie mandate des experts et prend en charge les démarches amiables et judiciaires pour récupérer vos indemnités auprès de l&apos;assureur adverse quand vous n&apos;êtes pas responsable.
+                  </p>
+                </div>
+
+                {/* IPT */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-2.5 space-y-1">
+                  <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                    <span className="px-1.5 py-0.5 rounded text-[9.5px] font-black bg-indigo-100 text-indigo-800">IPT</span>
+                    Individuelle Personnes Transportées
+                  </div>
+                  <p className="text-slate-600 leading-normal">
+                    Couvre les frais médicaux d&apos;urgence, les capitaux invalidité et décès pour les passagers et le conducteur en cas d&apos;accident corporel.
+                  </p>
+                </div>
+
+                {/* Vignette */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-2.5 space-y-1">
+                  <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                    <span className="px-1.5 py-0.5 rounded text-[9.5px] font-black bg-amber-100 text-amber-900">Vignette</span>
+                    Taxe Automobile DGI
+                  </div>
+                  <p className="text-slate-600 leading-normal">
+                    Taxe légale reversée intégralement au Trésor Public (DGI), obligatoire pour circuler en toute règle lors des contrôles de police.
+                  </p>
+                </div>
+
+                {/* Carte Rose & FGA */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-2.5 space-y-1">
+                  <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                    <span className="px-1.5 py-0.5 rounded text-[9.5px] font-black bg-emerald-100 text-emerald-800">CIMA</span>
+                    Carte Rose & Fonds de Garantie (FGA)
+                  </div>
+                  <p className="text-slate-600 leading-normal">
+                    Certificat officiel international pour circuler dans la zone CIMA (14 pays), avec contribution au fonds de secours pour les victimes d&apos;accidents causés par des conducteurs non assurés ou en fuite.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
