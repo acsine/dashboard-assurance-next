@@ -49,7 +49,7 @@ import { useTranslations } from 'next-intl'
 
 type Tab = 'all' | 'pending' | 'recontact'
 
-const BLOCKED_CONVERT_STATUSES = new Set(['CONVERTI', 'EN_ATTENTE_VALIDATION'])
+const BLOCKED_CONVERT_STATUSES = new Set(['CONVERTI', 'EN_ATTENTE_VALIDATION', 'REJETEE'])
 const FUEL_OPTIONS = ['ESSENCE', 'DIESEL', 'ELECTRIQUE', 'HYBRIDE']
 const CHASSIS_VIN_RE = /^[A-Z0-9]{17}$/
 
@@ -102,6 +102,8 @@ function statusBadgeClass(status: string): string {
       return 'bg-amber-50 text-amber-700'
     case 'PERDU':
       return 'bg-red-50 text-red-700'
+    case 'REJETEE':
+      return 'bg-rose-50 text-rose-700 border border-rose-200'
     case 'CONVERTI':
     case 'APPROUVEE':
       return 'bg-green-50 text-green-700'
@@ -1281,9 +1283,15 @@ export default function ProspectsPage() {
                               className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${statusBadgeClass(
                                 p.status,
                               )}`}
+                              title={p.rejection_reason ? `Motif de rejet : ${p.rejection_reason}` : undefined}
                             >
                               {p.status}
                             </span>
+                            {p.status === 'REJETEE' && p.rejection_reason && (
+                              <span className="block text-[10px] text-rose-600 font-medium truncate max-w-[150px]" title={p.rejection_reason}>
+                                {p.rejection_reason}
+                              </span>
+                            )}
                           </td>
                           <td className="py-3 pr-4 text-slate-600">
                             {resolveAgentLabel(p.agent_id)}
