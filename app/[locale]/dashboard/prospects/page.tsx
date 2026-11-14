@@ -39,6 +39,7 @@ import {
   FileDown,
   Calendar,
   Filter,
+  AlertTriangle,
 } from 'lucide-react'
 import ExportProspectsModal from '@/components/dashboard/ExportProspectsModal'
 import { RoleGuard } from '@/components/auth/RoleGuard'
@@ -978,6 +979,10 @@ export default function ProspectsPage() {
   const handleApproveSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!approvingRequest) return
+    if (approvingRequest.prospect?.client_id) {
+      toast.error("Ce contact est déjà client de l'agence. Une conversion en client n'est pas autorisée.")
+      return
+    }
     if (approvalCode.length !== 6) {
       toast.error('Code de validation à 6 chiffres requis')
       return
@@ -1814,6 +1819,18 @@ export default function ProspectsPage() {
                 )}
               />
 
+              {approvingRequest.prospect?.client_id && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-start gap-2.5">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-red-600 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-red-800">Ce contact est déjà client de l&apos;agence</p>
+                    <p className="text-[11px] text-red-600 mt-0.5">
+                      On ne peut pas convertir un prospect qui est déjà client. Ce prospect est déjà lié à un dossier client existant ({approvingRequest.prospect.client_id}).
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <form
                 onSubmit={handleApproveSubmit}
                 className="space-y-3 border-t border-gray-100 pt-4 shrink-0"
@@ -1985,7 +2002,7 @@ export default function ProspectsPage() {
                   <Button
                     type="submit"
                     variant="success"
-                    disabled={approveMutation.isPending}
+                    disabled={approveMutation.isPending || Boolean(approvingRequest.prospect?.client_id)}
                     isLoading={approveMutation.isPending}
                   >
                     <Check className="h-4 w-4 mr-1.5" />
