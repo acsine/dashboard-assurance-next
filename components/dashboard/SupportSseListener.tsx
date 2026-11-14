@@ -132,9 +132,18 @@ export function SupportSseListener() {
       }
     }
 
+    const onObjectiveProofEvent = () => {
+      queryClient.invalidateQueries({ queryKey: ['objective-proof-submissions'] })
+      queryClient.invalidateQueries({ queryKey: ['objectives-agents'] })
+      queryClient.invalidateQueries({ queryKey: ['objectives-performance'] })
+      queryClient.invalidateQueries({ queryKey: ['agent-rankings'] })
+    }
+
     eventSource.addEventListener('new_message', onNewMessage)
     eventSource.addEventListener('support_ticket_created', onTicketCreated)
     eventSource.addEventListener('message_read', onMessageRead)
+    eventSource.addEventListener('objective_proof_submitted', onObjectiveProofEvent)
+    eventSource.addEventListener('objective_proof_reviewed', onObjectiveProofEvent)
 
     eventSource.onerror = () => {
       if (eventSource.readyState !== EventSource.CLOSED) return
@@ -156,6 +165,8 @@ export function SupportSseListener() {
       eventSource.removeEventListener('new_message', onNewMessage)
       eventSource.removeEventListener('support_ticket_created', onTicketCreated)
       eventSource.removeEventListener('message_read', onMessageRead)
+      eventSource.removeEventListener('objective_proof_submitted', onObjectiveProofEvent)
+      eventSource.removeEventListener('objective_proof_reviewed', onObjectiveProofEvent)
       eventSource.close()
     }
   }, [queryClient, push, pushInboundFromMessage])

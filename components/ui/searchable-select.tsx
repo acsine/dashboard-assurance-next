@@ -59,8 +59,11 @@ export default function SearchableSelect({
 
   // Find currently selected option
   const selectedOption = useMemo(() => {
-    if (value === undefined || value === null || value === '') return null
-    return normalizedOptions.find((opt) => String(opt.value) === String(value)) || null
+    if (value === undefined || value === null) return null
+    const matched = normalizedOptions.find((opt) => String(opt.value) === String(value))
+    if (matched) return matched
+    if (value === '') return null
+    return null
   }, [normalizedOptions, value])
 
   // Filter options based on search input

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
-import { CheckCircle2, Eye, FileSpreadsheet, Loader2, Plus, Save, Target, Trash2, XCircle } from 'lucide-react'
+import { CheckCircle2, Eye, FileSpreadsheet, Loader2, Plus, RefreshCw, Save, Target, Trash2, XCircle } from 'lucide-react'
 import ExcelImportModal from '@/components/excel/ExcelImportModal'
 import { useTranslations } from 'next-intl'
 import {
@@ -91,7 +91,12 @@ export default function ObjectivesPage() {
     enabled: tab === 'performance',
   })
 
-  const { data: proofSubmissionsData, isLoading: loadingProofSubmissions } = useQuery({
+  const {
+    data: proofSubmissionsData,
+    isLoading: loadingProofSubmissions,
+    isFetching: fetchingProofSubmissions,
+    refetch: refetchProofSubmissions,
+  } = useQuery({
     queryKey: ['objective-proof-submissions', proofStatusFilter, proofScopeFilter, proofNicheFilter, proofPeriodFilter],
     queryFn: () => objectivesApi.listProofSubmissions({
       status: proofStatusFilter,
@@ -100,6 +105,7 @@ export default function ObjectivesPage() {
       period_key: proofPeriodFilter.trim() || undefined,
     }),
     enabled: tab === 'validations',
+    refetchInterval: tab === 'validations' ? 10_000 : false,
   })
   const { data: proofNichesData } = useQuery({
     queryKey: ['niches', 'proof-filters'],
@@ -108,9 +114,10 @@ export default function ObjectivesPage() {
   })
   const proofNiches = asList<Niche>(proofNichesData)
   const proofSubmissions = asList<ObjectiveProofSubmission>(proofSubmissionsData)
-  const { data: pendingProofsData } = useQuery({
+  const { data: pendingProofsData, refetch: refetchPendingCount } = useQuery({
     queryKey: ['objective-proof-submissions', 'PENDING', 'count'],
     queryFn: () => objectivesApi.listProofSubmissions('PENDING'),
+    refetchInterval: 15_000,
   })
   const pendingProofCount = asList<ObjectiveProofSubmission>(pendingProofsData).length
 
@@ -814,8 +821,8 @@ export default function ObjectivesPage() {
                   Les points et objectifs atteints ne sont comptabilisés qu’après validation.
                 </p>
               </div>
-              <div className="grid w-full sm:w-auto grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                <div>
+              <div className="flex flex-wrap sm:flex-nowrap items-end gap-2 w-full sm:w-auto">
+                <div className="w-full sm:w-36">
                   <label className={labelClass}>Portée</label>
                   <SearchableSelect
                     value={proofScopeFilter}
@@ -831,7 +838,7 @@ export default function ObjectivesPage() {
                   />
                 </div>
                 {proofScopeFilter === 'NICHE_OBJECTIVE' && (
-                  <div>
+                  <div className="w-full sm:w-44">
                     <label className={labelClass}>Niche</label>
                     <SearchableSelect
                       value={proofNicheFilter}
@@ -843,30 +850,45 @@ export default function ObjectivesPage() {
                     />
                   </div>
                 )}
-                <div>
+                <div className="w-full sm:w-36">
                   <label className={labelClass}>Période</label>
                   <Input
                     value={proofPeriodFilter}
                     onChange={(event) => setProofPeriodFilter(event.target.value)}
-                    placeholder="2026-09 ou 2026-Q3"
+                    placeholder="2026-11 ou 2026-Q4"
                     className="h-10 text-xs"
                   />
                 </div>
-                <div>
+                <div className="w-full sm:w-36">
                   <label className={labelClass}>Statut</label>
-                <SearchableSelect
-                  value={proofStatusFilter}
-                  onChange={(value) =>
-                    setProofStatusFilter(value as ObjectiveProofSubmission['status'])
-                  }
-                  options={[
-                    { value: '', label: 'Tous les statuts' },
-                    { value: 'PENDING', label: 'En attente' },
-                    { value: 'APPROVED', label: 'Validées' },
-                    { value: 'REJECTED', label: 'Rejetées' },
-                  ]}
-                />
+                  <SearchableSelect
+                    value={proofStatusFilter}
+                    onChange={(value) =>
+                      setProofStatusFilter(value as ObjectiveProofSubmission['status'])
+                    }
+                    options={[
+                      { value: '', label: 'Tous les statuts' },
+                      { value: 'PENDING', label: 'En attente' },
+                      { value: 'APPROVED', label: 'Validées' },
+                      { value: 'REJECTED', label: 'Rejetées' },
+                    ]}
+                  />
                 </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    refetchProofSubmissions()
+                    refetchPendingCount()
+                  }}
+                  disabled={fetchingProofSubmissions}
+                  className="h-10 px-3 border-gray-200 text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 shrink-0"
+                  title="Actualiser la liste des preuves"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${fetchingProofSubmissions ? 'animate-spin text-blue-600' : ''}`} />
+                  <span className="hidden md:inline text-xs font-semibold">Actualiser</span>
+                </Button>
               </div>
             </div>
 
@@ -877,9 +899,40 @@ export default function ObjectivesPage() {
                   Chargement des déclarations…
                 </div>
               ) : proofSubmissions.length === 0 ? (
-                <div className="py-20 text-center text-gray-400">
-                  <CheckCircle2 className="h-12 w-12 mx-auto text-gray-300 mb-3" />
-                  <p className="text-sm font-semibold">Aucune déclaration dans ce statut</p>
+                <div className="py-20 text-center text-gray-400 space-y-3">
+                  <CheckCircle2 className="h-12 w-12 mx-auto text-gray-300" />
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700">
+                      {proofStatusFilter === 'PENDING'
+                        ? 'Aucune preuve en attente de validation'
+                        : proofStatusFilter === 'APPROVED'
+                          ? 'Aucune déclaration validée pour ces critères'
+                          : proofStatusFilter === 'REJECTED'
+                            ? 'Aucune déclaration rejetée pour ces critères'
+                            : 'Aucune déclaration trouvée'}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {proofStatusFilter || proofScopeFilter || proofNicheFilter || proofPeriodFilter
+                        ? 'Des filtres sont actuellement appliqués.'
+                        : 'Les soumissions des agents apparaîtront ici automatiquement dès qu’elles seront renseignées.'}
+                    </p>
+                  </div>
+                  {(proofStatusFilter !== '' || proofScopeFilter !== '' || proofNicheFilter !== '' || proofPeriodFilter !== '') && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setProofStatusFilter('')
+                        setProofScopeFilter('')
+                        setProofNicheFilter('')
+                        setProofPeriodFilter('')
+                      }}
+                      className="text-xs text-blue-600 border-blue-200 hover:bg-blue-50"
+                    >
+                      Afficher toutes les déclarations (tous statuts)
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <div className="overflow-x-auto">
