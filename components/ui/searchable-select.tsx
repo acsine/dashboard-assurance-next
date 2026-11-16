@@ -117,7 +117,7 @@ export default function SearchableSelect({
   }
 
   return (
-    <div ref={containerRef} className={`relative inline-block w-full text-left ${className}`}>
+    <div ref={containerRef} className={`relative inline-block w-full text-left ${isOpen ? 'z-50' : 'z-10'} ${className}`}>
       {/* Hidden native input for form compatibility */}
       {name && (
         <input

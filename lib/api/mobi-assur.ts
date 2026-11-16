@@ -715,6 +715,7 @@ export type PaymentMethod = 'ESPECES' | 'ORANGE_MONEY' | 'MTN_MOMO' | 'CHEQUE' |
 
 export interface Contract {
   id: string
+  contract_number?: string
   quote_id?: string
   client_id: string
   agent_id?: string
@@ -747,6 +748,7 @@ export interface Payment {
   /** Alias legacy / entrée unique normalisée côté API */
   proof_url?: string
   status: string
+  rejection_reason?: string | null
   created_at?: string
   validated_at?: string
 }
@@ -761,6 +763,10 @@ export interface AddPaymentRequest {
 
 export interface ValidatePaymentRequest {
   received_reference?: string
+}
+
+export interface RejectPaymentRequest {
+  rejection_reason?: string
 }
 
 export function suggestCarteRoseSerial(contractId: string): string {
@@ -837,6 +843,11 @@ export const contractsApi = {
     mobiRequest<Payment[]>(`/contracts/${contractId}/payments`),
   validatePayment: (contractId: string, paymentId: string, data?: ValidatePaymentRequest) =>
     mobiRequest<Payment>(`/contracts/${contractId}/payments/${paymentId}/validate`, {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    }),
+  rejectPayment: (contractId: string, paymentId: string, data?: RejectPaymentRequest) =>
+    mobiRequest<Payment>(`/contracts/${contractId}/payments/${paymentId}/reject`, {
       method: 'POST',
       body: JSON.stringify(data || {}),
     }),
