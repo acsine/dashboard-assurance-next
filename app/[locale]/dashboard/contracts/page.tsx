@@ -238,8 +238,8 @@ export default function ContractsPage() {
                                 toast.loading("Génération du pack en cours...", { id: `gen-${contract.id}` })
                                 contractsApi.generatePack(contract.id).then(() => {
                                   toast.success("Classeur Excel téléchargé.", { id: `gen-${contract.id}` })
-                                }).catch(() => {
-                                  toast.error("Erreur lors de la génération", { id: `gen-${contract.id}` })
+                                }).catch((err: any) => {
+                                  toast.error(err?.message || "Erreur lors de la génération", { id: `gen-${contract.id}` })
                                 })
                               }}
                               title="Télécharger tous les documents en Excel"
