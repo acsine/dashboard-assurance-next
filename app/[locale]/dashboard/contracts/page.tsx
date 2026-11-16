@@ -146,7 +146,7 @@ export default function ContractsPage() {
         </div>
 
         {/* Contracts Table */}
-        <div className="bg-white/95 backdrop-blur-xl rounded-2xl border border-slate-200/80 pro-shadow-sm p-6">
+        <div className="relative z-0 bg-white/95 backdrop-blur-xl rounded-2xl border border-slate-200/80 pro-shadow-sm p-6">
           {isLoading ? (
             <div className="py-20 text-center text-slate-400 font-medium text-xs">
               Chargement des contrats en cours...
