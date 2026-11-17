@@ -117,7 +117,7 @@ export default function SearchableSelect({
   }
 
   return (
-    <div ref={containerRef} className={`relative inline-block w-full text-left ${isOpen ? 'z-50' : 'z-10'} ${className}`}>
+    <div ref={containerRef} className={`relative inline-block w-full text-left ${isOpen ? 'z-[60]' : 'z-10'} ${className}`}>
       {/* Hidden native input for form compatibility */}
       {name && (
         <input
@@ -154,7 +154,7 @@ export default function SearchableSelect({
 
       {/* Dropdown Popover */}
       {isOpen && (
-        <div className="absolute z-50 mt-1.5 w-full min-w-[200px] bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden animate-in fade-in-50 zoom-in-95 duration-100">
+        <div className="absolute z-[100] mt-1.5 w-full min-w-[200px] bg-white rounded-xl border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in-50 zoom-in-95 duration-100">
           {/* Search Header */}
           <div className="p-2 border-b border-slate-100 bg-slate-50/70">
             <div className="relative flex items-center">

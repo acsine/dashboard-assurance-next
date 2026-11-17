@@ -63,7 +63,7 @@ export default function ContractsPage() {
 
       <div className="p-6 sm:p-8 space-y-6 flex-1">
         {/* Status filtering, client search and action buttons */}
-        <div className="relative z-30 bg-white/95 backdrop-blur-xl p-4 sm:p-5 rounded-2xl border border-slate-200/80 pro-shadow-sm flex flex-col xl:flex-row gap-4 items-center justify-between">
+        <div className="relative z-40 bg-white/95 backdrop-blur-xl p-4 sm:p-5 rounded-2xl border border-slate-200/80 pro-shadow-sm flex flex-col xl:flex-row gap-4 items-center justify-between">
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto flex-1 max-w-2xl">
             {/* Search Input for Client Name / Contract Code */}
             <div className="relative w-full sm:flex-1">
@@ -146,7 +146,7 @@ export default function ContractsPage() {
         </div>
 
         {/* Contracts Table */}
-        <div className="relative z-0 bg-white/95 backdrop-blur-xl rounded-2xl border border-slate-200/80 pro-shadow-sm p-6">
+        <div className="relative z-0 isolate bg-white/95 backdrop-blur-xl rounded-2xl border border-slate-200/80 pro-shadow-sm p-6">
           {isLoading ? (
             <div className="py-20 text-center text-slate-400 font-medium text-xs">
               Chargement des contrats en cours...
