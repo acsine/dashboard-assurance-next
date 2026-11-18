@@ -18,6 +18,7 @@ import {
 } from '@/components/dashboard/cima-settings'
 import { InsurersPanelContent } from '@/components/dashboard/InsurersPanel'
 import { CommissionRatesPanel } from '@/components/dashboard/CommissionRatesPanel'
+import { PaymentModePanel } from '@/components/dashboard/PaymentModePanel'
 import Header from '@/components/dashboard/Header'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
@@ -29,6 +30,7 @@ import { generateExcelTemplate } from '@/lib/excel/import-engine'
 import { RoleGuard } from '@/components/auth/RoleGuard'
 
 type SettingsTab =
+  | 'payment-mode'
   | 'pricing'
   | 'commissions'
   | 'categories'
@@ -42,6 +44,7 @@ type SettingsTab =
   | 'insurers'
 
 const TABS: { id: SettingsTab; label: string }[] = [
+  { id: 'payment-mode', label: 'Modes de paiement' },
   { id: 'pricing', label: 'Tarification agent' },
   { id: 'commissions', label: 'Commissions' },
   { id: 'insurers', label: 'Assureurs' },
@@ -379,6 +382,8 @@ function SettingsContent() {
             </div>
           </form>
         )}
+
+        {activeTab === 'payment-mode' && <PaymentModePanel />}
 
         {activeTab === 'commissions' && <CommissionRatesPanel />}
 

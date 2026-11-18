@@ -1357,6 +1357,14 @@ export const insurersApi = {
   },
 }
 
+export interface PaymentConfig {
+  payment_gateway_mode: 'MANUAL' | 'API_DIRECT'
+  manual_payment_om_merchant?: string | null
+  manual_payment_momo_merchant?: string | null
+  manual_payment_bank_rib?: string | null
+  manual_payment_instructions?: string | null
+}
+
 export const settingsApi = {
   getPricing: () => mobiRequest<PricingSettings>('/settings/pricing'),
   createPricing: (data: Partial<PricingSettings>) =>
@@ -1371,6 +1379,12 @@ export const settingsApi = {
     }),
   deletePricing: () =>
     mobiRequest<unknown>('/settings/pricing', { method: 'DELETE' }),
+  getPaymentConfig: () => mobiRequest<PaymentConfig>('/settings/payment-config'),
+  updatePaymentConfig: (data: Partial<PaymentConfig>) =>
+    mobiRequest<PaymentConfig>('/settings/payment-config', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
   // Le backend ne gère pas les marques individuellement : on réécrit brand_factors via PATCH /settings/pricing.
   addBrand: async (data: { marque: string; mode: 'fixed' | 'percent'; value: number }) => {
     const current = await settingsApi.getPricing()
@@ -2397,7 +2411,13 @@ export const commissionRatesApi = {
 
 export type SinistreStatus =
   | 'DECLARE'
+  | 'DECLARATION_RECUE'
   | 'EN_COURS'
+  | 'EN_INSTRUCTION'
+  | 'EXPERTISE_MANDATEE'
+  | 'RAPPORT_DEPOSE'
+  | 'OFFRE_ET_QUITTANCE'
+  | 'REGLE_ET_CLOTURE'
   | 'COMPLEMENT'
   | 'VALIDE'
   | 'REJETE'
@@ -2412,6 +2432,22 @@ export interface SinistreItem {
   title: string
   description?: string | null
   status: string
+  location?: string | null
+  incident_at?: string | null
+  gps_lat?: number | null
+  gps_lng?: number | null
+  expert_name?: string | null
+  expert_phone?: string | null
+  expert_email?: string | null
+  magic_token?: string | null
+  magic_token_expires_at?: string | null
+  magic_link?: string | null
+  chiffrage_expert?: number | null
+  valeur_venale?: number | null
+  offre_indemnisation?: number | null
+  quittance_signee_at?: string | null
+  mode_reglement?: string | null
+  compte_reglement?: string | null
   created_at?: string
   updated_at?: string
   documents?: Array<{ id: string; doc_type: string; file_url: string; file_name?: string }>
@@ -2443,13 +2479,29 @@ export const sinistresApi = {
     return mobiRequest<{ items: SinistreItem[] }>(`/admin/sinistres${qs}`)
   },
   get: (id: string) => mobiRequest<SinistreItem>(`/admin/sinistres/${id}`),
-  // La déclaration passe par le canal agent : /admin/sinistres est en lecture seule.
   create: (data: any) =>
     mobiRequest<SinistreItem>('/agent/sinistres', { method: 'POST', body: JSON.stringify(data) }),
   updateStatus: (id: string, data: { status: string; note?: string }) =>
     mobiRequest<SinistreItem>(`/admin/sinistres/${id}/status`, {
       method: 'POST',
       body: JSON.stringify(data),
+    }),
+  mandateExpert: (
+    id: string,
+    data: { expert_name: string; expert_phone?: string; expert_email?: string; note?: string }
+  ) =>
+    mobiRequest<SinistreItem>(`/admin/sinistres/${id}/mandate-expert`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  makeOffer: (id: string, data: { offre_indemnisation: number; note?: string }) =>
+    mobiRequest<SinistreItem>(`/admin/sinistres/${id}/offer`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  settle: (id: string) =>
+    mobiRequest<SinistreItem>(`/admin/sinistres/${id}/settle`, {
+      method: 'POST',
     }),
 }
 
