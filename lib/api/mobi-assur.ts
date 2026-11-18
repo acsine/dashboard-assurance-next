@@ -1357,12 +1357,23 @@ export const insurersApi = {
   },
 }
 
+export interface PaymentMethodItem {
+  id: string
+  type: 'ORANGE_MONEY' | 'MTN_MOMO' | 'VIREMENT' | 'ESPECES' | 'CHEQUE' | 'AUTRE'
+  label: string
+  account_number: string
+  account_name?: string | null
+  instructions?: string | null
+  is_active: boolean
+}
+
 export interface PaymentConfig {
   payment_gateway_mode: 'MANUAL' | 'API_DIRECT'
   manual_payment_om_merchant?: string | null
   manual_payment_momo_merchant?: string | null
   manual_payment_bank_rib?: string | null
   manual_payment_instructions?: string | null
+  manual_payment_methods?: PaymentMethodItem[]
 }
 
 export const settingsApi = {
@@ -1385,6 +1396,36 @@ export const settingsApi = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
+  addPaymentMethod: (data: {
+    type: string
+    label: string
+    account_number: string
+    account_name?: string
+    instructions?: string
+    is_active?: boolean
+  }) =>
+    mobiRequest<{ message: string; payment_method: PaymentMethodItem; config: PaymentConfig }>(
+      '/settings/payment-methods',
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      },
+    ),
+  updatePaymentMethod: (id: string, data: Partial<PaymentMethodItem>) =>
+    mobiRequest<{ message: string; payment_method: PaymentMethodItem; config: PaymentConfig }>(
+      `/settings/payment-methods/${id}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      },
+    ),
+  deletePaymentMethod: (id: string) =>
+    mobiRequest<{ message: string; deleted_id: string; config: PaymentConfig }>(
+      `/settings/payment-methods/${id}`,
+      {
+        method: 'DELETE',
+      },
+    ),
   // Le backend ne gère pas les marques individuellement : on réécrit brand_factors via PATCH /settings/pricing.
   addBrand: async (data: { marque: string; mode: 'fixed' | 'percent'; value: number }) => {
     const current = await settingsApi.getPricing()
