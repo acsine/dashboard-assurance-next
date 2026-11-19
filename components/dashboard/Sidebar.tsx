@@ -26,9 +26,10 @@ import {
   ClipboardList,
 } from 'lucide-react'
 import Link from 'next/link'
-import { authApi } from '@/lib/api/mobi-assur'
-import { ROLES } from '@/lib/auth/roles'
+import { authApi, portalClientApi } from '@/lib/api/mobi-assur'
+import { ROLES, type Role } from '@/lib/auth/roles'
 import { useLocale, useTranslations } from 'next-intl'
+import { useQuery } from '@tanstack/react-query'
 
 export default function Sidebar() {
   const pathname = usePathname()
@@ -40,6 +41,13 @@ export default function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+
+  // Requête légère pour badges temps réel
+  const { data: portalKpis } = useQuery({
+    queryKey: ['portal-kpis-sidebar'],
+    queryFn: () => portalClientApi.kpis(),
+    staleTime: 60_000,
+  })
 
   // Clear loading state and close mobile drawer on navigation
   useEffect(() => {
@@ -67,104 +75,127 @@ export default function Sidebar() {
     setNavigatingTo(path)
   }
 
-  const menuItems = [
-    {
-      name: t('overview'),
-      path: '/dashboard',
-      icon: LayoutDashboard,
-      roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
-    },
-    {
-      name: t('clients'),
-      path: '/dashboard/clients',
-      icon: Users,
-      roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
-    },
-    {
-      name: t('claims'),
-      path: '/dashboard/sinistres',
-      icon: AlertTriangle,
-      roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
-    },
-    {
-      name: t('declaredPayments'),
-      path: '/dashboard/paiements-declares',
-      icon: CreditCard,
-      roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
-    },
-    {
-      name: t('clientRequests'),
-      path: '/dashboard/demandes-clients',
-      icon: Inbox,
-      roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
-    },
-    {
-      name: t('contracts'),
-      path: '/dashboard/contracts',
-      icon: FileText,
-      roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
-    },
-    {
-      name: t('prospects'),
-      path: '/dashboard/prospects',
-      icon: UserCheck,
-      roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
-    },
-    {
-      name: t('dailyReports'),
-      path: '/dashboard/rapports-journaliers',
-      icon: ClipboardList,
-      roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
-    },
-    {
-      name: t('wallet'),
-      path: '/dashboard/wallet',
-      icon: Wallet,
-      roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
-    },
-    {
-      name: t('objectives'),
-      path: '/dashboard/objectives',
-      icon: Target,
-      roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
-    },
-    {
-      name: t('niches'),
-      path: '/dashboard/niches',
-      icon: Building2,
-      roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
-    },
-    {
-      name: t('rewards'),
-      path: '/dashboard/rewards',
-      icon: Gift,
-      roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
-    },
-    {
-      name: t('support'),
-      path: '/dashboard/support',
-      icon: MessageSquare,
-      roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
-    },
-    {
-      name: t('users'),
-      path: '/dashboard/users',
-      icon: ShieldAlert,
-      roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
-    },
-    {
-      name: t('settings'),
-      path: '/dashboard/settings',
-      icon: Settings,
-      roles: [ROLES.ADMIN],
-    },
-  ]
-
   const userRole = user?.role
 
-  const filteredMenuItems = menuItems.filter(
-    (item) => userRole !== undefined && item.roles.some((role) => role === userRole)
-  )
+  // 4 Pôles Métiers Structurés ProMax
+  const sections = [
+    {
+      title: t('sectionOperations'),
+      items: [
+        {
+          name: t('overview'),
+          path: '/dashboard',
+          icon: LayoutDashboard,
+          roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
+        },
+        {
+          name: t('clients'),
+          path: '/dashboard/clients',
+          icon: Users,
+          roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
+        },
+        {
+          name: t('contracts'),
+          path: '/dashboard/contracts',
+          icon: FileText,
+          roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
+        },
+        {
+          name: t('claims'),
+          path: '/dashboard/sinistres',
+          icon: AlertTriangle,
+          roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
+          badge: portalKpis?.open_claims ? Number(portalKpis.open_claims) : undefined,
+          badgeColor: 'bg-rose-500/20 text-rose-300 border border-rose-500/30',
+        },
+        {
+          name: t('declaredPayments'),
+          path: '/dashboard/paiements-declares',
+          icon: CreditCard,
+          roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
+          badge: portalKpis?.pending_client_payments ? Number(portalKpis.pending_client_payments) : undefined,
+          badgeColor: 'bg-amber-500/20 text-amber-300 border border-amber-500/30',
+        },
+        {
+          name: t('clientRequests'),
+          path: '/dashboard/demandes-clients',
+          icon: Inbox,
+          roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
+          badge: portalKpis?.open_requests ? Number(portalKpis.open_requests) : undefined,
+          badgeColor: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30',
+        },
+      ],
+    },
+    {
+      title: t('sectionCommercial'),
+      items: [
+        {
+          name: t('prospects'),
+          path: '/dashboard/prospects',
+          icon: UserCheck,
+          roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
+        },
+        {
+          name: t('objectives'),
+          path: '/dashboard/objectives',
+          icon: Target,
+          roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
+        },
+        {
+          name: t('niches'),
+          path: '/dashboard/niches',
+          icon: Building2,
+          roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
+        },
+        {
+          name: t('dailyReports'),
+          path: '/dashboard/rapports-journaliers',
+          icon: ClipboardList,
+          roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
+        },
+      ],
+    },
+    {
+      title: t('sectionFinance'),
+      items: [
+        {
+          name: t('wallet'),
+          path: '/dashboard/wallet',
+          icon: Wallet,
+          roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
+        },
+        {
+          name: t('rewards'),
+          path: '/dashboard/rewards',
+          icon: Gift,
+          roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
+        },
+      ],
+    },
+    {
+      title: t('sectionSystem'),
+      items: [
+        {
+          name: t('users'),
+          path: '/dashboard/users',
+          icon: ShieldAlert,
+          roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
+        },
+        {
+          name: t('support'),
+          path: '/dashboard/support',
+          icon: MessageSquare,
+          roles: [ROLES.ADMIN, ROLES.RESPONSABLE],
+        },
+        {
+          name: t('settings'),
+          path: '/dashboard/settings',
+          icon: Settings,
+          roles: [ROLES.ADMIN],
+        },
+      ],
+    },
+  ]
 
   return (
     <>
@@ -227,41 +258,68 @@ export default function Sidebar() {
             </button>
           </div>
 
-          {/* Navigation Items */}
-          <nav className="p-3.5 space-y-1.5 overflow-y-auto max-h-[calc(100vh-160px)] custom-scrollbar">
-            {filteredMenuItems.map((item) => {
-              const isActive =
-                pathname === item.path ||
-                (item.path !== '/dashboard' && pathname.startsWith(item.path))
-              
-              const isNavigatingThis = navigatingTo === item.path
+          {/* Navigation Items Grouped by Domain */}
+          <nav className="p-3 space-y-3.5 overflow-y-auto max-h-[calc(100vh-160px)] custom-scrollbar">
+            {sections.map((section, sIdx) => {
+              const visibleItems = section.items.filter(
+                (item) => userRole !== undefined && item.roles.some((role) => role === userRole)
+              )
+              if (visibleItems.length === 0) return null
 
               return (
-                <Link
-                  key={item.path}
-                  href={item.path}
-                  onClick={(e) => handleNavigation(item.path, e)}
-                  title={isCollapsed && !isMobileOpen ? item.name : undefined}
-                  className={`group relative flex min-h-11 items-center ${isCollapsed && !isMobileOpen ? 'justify-center' : 'justify-between'} px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 whitespace-nowrap cursor-pointer ${
-                    isActive
-                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30 font-black'
-                      : 'text-slate-400 hover:bg-slate-800/80 hover:text-white font-semibold'
-                  }`}
-                >
-                  <div className={`flex items-center ${isCollapsed && !isMobileOpen ? 'justify-center' : 'gap-3'}`}>
-                    {isNavigatingThis ? (
-                      <Loader2 className={`h-4.5 w-4.5 shrink-0 animate-spin ${isActive ? 'text-white' : 'text-blue-400'}`} strokeWidth={2.2} />
-                    ) : (
-                      <item.icon className={`h-4.5 w-4.5 shrink-0 transition-transform duration-200 group-hover:scale-110 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-blue-400'}`} strokeWidth={2.2} />
-                    )}
-                    {(!isCollapsed || isMobileOpen) && (
-                      <span className="truncate tracking-wide">{item.name}</span>
-                    )}
-                  </div>
-                  {isActive && (!isCollapsed || isMobileOpen) && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0 shadow-xs" />
+                <div key={sIdx} className="space-y-1">
+                  {(!isCollapsed || isMobileOpen) && (
+                    <div className="px-3 pt-1.5 pb-0.5 text-[10px] font-black uppercase tracking-wider text-slate-500 select-none">
+                      {section.title}
+                    </div>
                   )}
-                </Link>
+                  {isCollapsed && !isMobileOpen && sIdx > 0 && (
+                    <div className="mx-auto w-6 my-2 border-t border-slate-800" />
+                  )}
+                  <div className="space-y-0.5">
+                    {visibleItems.map((item) => {
+                      const isActive =
+                        pathname === item.path ||
+                        (item.path !== '/dashboard' && pathname.startsWith(item.path))
+                      const isNavigatingThis = navigatingTo === item.path
+
+                      return (
+                        <Link
+                          key={item.path}
+                          href={item.path}
+                          onClick={(e) => handleNavigation(item.path, e)}
+                          title={isCollapsed && !isMobileOpen ? item.name : undefined}
+                          className={`group relative flex min-h-9 items-center ${isCollapsed && !isMobileOpen ? 'justify-center' : 'justify-between'} px-3 py-2 rounded-xl text-xs font-bold transition-all duration-150 whitespace-nowrap cursor-pointer ${
+                            isActive
+                              ? 'bg-blue-600 text-white shadow-md shadow-blue-900/40 font-black'
+                              : 'text-slate-400 hover:bg-slate-800/70 hover:text-white font-medium'
+                          }`}
+                        >
+                          <div className={`flex items-center ${isCollapsed && !isMobileOpen ? 'justify-center' : 'gap-2.5'}`}>
+                            {isNavigatingThis ? (
+                              <Loader2 className={`h-4 w-4 shrink-0 animate-spin ${isActive ? 'text-white' : 'text-blue-400'}`} strokeWidth={2.2} />
+                            ) : (
+                              <item.icon className={`h-4 w-4 shrink-0 transition-transform duration-150 group-hover:scale-105 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-blue-400'}`} strokeWidth={2} />
+                            )}
+                            {(!isCollapsed || isMobileOpen) && (
+                              <span className="truncate tracking-wide">{item.name}</span>
+                            )}
+                          </div>
+                          
+                          {/* Badges de compteurs dynamiques */}
+                          {(!isCollapsed || isMobileOpen) && item.badge !== undefined && item.badge > 0 && (
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${item.badgeColor || 'bg-blue-500/20 text-blue-300'}`}>
+                              {item.badge}
+                            </span>
+                          )}
+                          {isActive && (!isCollapsed || isMobileOpen) && (!item.badge || item.badge === 0) && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-300 shrink-0" />
+                          )}
+                        </Link>
+                      )
+                    })}
+                  </div>
+                </div>
               )
             })}
           </nav>

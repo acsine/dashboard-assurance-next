@@ -5,129 +5,65 @@ import { clientsApi, contractsApi, prospectsApi, walletApi, portalClientApi } fr
 import { useAuthStore } from '@/lib/stores/auth-store'
 import Header from '@/components/dashboard/Header'
 import SystemSupervisionChart from '@/components/dashboard/SystemSupervisionChart'
-import { useState } from 'react'
 import {
   Users,
   FileText,
   Clock,
-  Wallet,
-  ArrowUpRight,
   TrendingUp,
-  AlertCircle,
-  Activity,
-  ArrowRight,
-  Plus,
   AlertTriangle,
   CreditCard,
   Inbox,
-  Smartphone,
   ShieldCheck,
   Calendar,
   CheckCircle2,
-  Loader2,
-  RefreshCw,
+  Plus,
+  ArrowUpRight,
+  ArrowRight,
+  Car,
+  ChevronRight,
+  Activity,
+  Layers,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
-
-function SpinLinkButton({
-  href,
-  className,
-  children,
-  icon: Icon,
-  iconClassName,
-}: {
-  href: string
-  className?: string
-  children: React.ReactNode
-  icon?: React.ComponentType<{ className?: string }>
-  iconClassName?: string
-}) {
-  const [loading, setLoading] = useState(false)
-
-  return (
-    <Link
-      href={href}
-      onClick={() => setLoading(true)}
-      className={className}
-    >
-      {loading ? (
-        <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
-      ) : Icon ? (
-        <Icon className={iconClassName || 'h-3.5 w-3.5 shrink-0'} />
-      ) : null}
-      <span>{children}</span>
-    </Link>
-  )
-}
 
 export default function DashboardOverview() {
   const t = useTranslations('dashboard')
   const { user } = useAuthStore()
 
   // Queries
-  const {
-    data: clients = [],
-    isLoading: loadingClients,
-    isFetching: fetchingClients,
-  } = useQuery({
+  const { data: clients = [], isLoading: loadingClients } = useQuery({
     queryKey: ['clients'],
     queryFn: () => clientsApi.list(),
   })
 
-  const {
-    data: contracts = [],
-    isLoading: loadingContracts,
-    isFetching: fetchingContracts,
-  } = useQuery({
+  const { data: contracts = [], isLoading: loadingContracts } = useQuery({
     queryKey: ['contracts'],
     queryFn: () => contractsApi.list(),
   })
 
-  const {
-    data: prospects = [],
-    isLoading: loadingProspects,
-    isFetching: fetchingProspects,
-  } = useQuery({
+  const { data: prospects = [], isLoading: loadingProspects } = useQuery({
     queryKey: ['prospects'],
     queryFn: () => prospectsApi.list(),
   })
 
-  const {
-    data: withdrawals = [],
-    isLoading: loadingWithdrawals,
-    isFetching: fetchingWithdrawals,
-  } = useQuery({
-    queryKey: ['withdrawals-pending'],
-    queryFn: () => walletApi.listPendingWithdrawals(),
-  })
-
-  const {
-    data: portalKpis,
-    isLoading: loadingPortalKpis,
-    isFetching: fetchingPortalKpis,
-  } = useQuery({
+  const { data: portalKpis, isLoading: loadingPortalKpis } = useQuery({
     queryKey: ['portal-kpis'],
     queryFn: () => portalClientApi.kpis(),
   })
 
-  const isInitialLoading =
-    loadingClients || loadingContracts || loadingProspects || loadingWithdrawals || loadingPortalKpis
-  const isRefreshing =
-    !isInitialLoading &&
-    (fetchingClients || fetchingContracts || fetchingProspects || fetchingWithdrawals || fetchingPortalKpis)
-
-  // Calculations
+  // Safe data arrays
   const safeClients = Array.isArray(clients) ? clients : []
   const safeContracts = Array.isArray(contracts) ? contracts : []
   const safeProspects = Array.isArray(prospects) ? prospects : []
-  const safeWithdrawals = Array.isArray(withdrawals) ? withdrawals : []
 
+  // Metrics calculation
   const paidContracts = safeContracts.filter((c) => c.status?.toUpperCase() === 'PAYE')
   const totalPremium = paidContracts.reduce((acc, c) => acc + (c.pttc ?? c.prime_ttc ?? 0), 0)
-  const pendingConversions = safeProspects.filter(
-    (p) => p.status === 'EN_ATTENTE_VALIDATION',
-  ).length
+  const pendingConversions = safeProspects.filter((p) => p.status === 'EN_ATTENTE_VALIDATION').length
+  const pendingPaymentsCount = Number(portalKpis?.pending_client_payments ?? 0)
+  const openClaimsCount = Number(portalKpis?.open_claims ?? 0)
+  const openRequestsCount = Number(portalKpis?.open_requests ?? 0)
 
   const todayDateStr = new Date().toLocaleDateString('fr-FR', {
     weekday: 'long',
@@ -136,361 +72,330 @@ export default function DashboardOverview() {
     year: 'numeric',
   })
 
-  const kpis = [
+  // 4 Macro KPIs Stratégiques
+  const macroKpis = [
     {
-      title: 'Clients Assurés Actifs',
-      value: safeClients.length || 0,
-      icon: Users,
-      color: 'blue',
-      description: 'Répertoire national clients',
-      link: '/dashboard/clients',
-      badge: 'Clientele',
-      loading: loadingClients,
-    },
-    {
-      title: 'Volume Primes (TTC)',
+      title: 'Primes Encaissées (TTC)',
       value: `${totalPremium.toLocaleString('fr-FR')} FCFA`,
+      subtitle: `${paidContracts.length} contrat(s) soldé(s)`,
       icon: TrendingUp,
       color: 'emerald',
-      description: `${paidContracts.length} contrats validés`,
-      link: '/dashboard/contracts',
-      badge: 'Chiffre d\'Affaires',
+      href: '/dashboard/contracts',
       loading: loadingContracts,
     },
     {
-      title: 'Prospects en Pipeline',
-      value: safeProspects.length || 0,
-      icon: Clock,
-      color: 'amber',
-      description:
-        pendingConversions > 0
-          ? `${pendingConversions} conversion(s) à valider`
-          : 'Prospects synchronisés',
-      link: '/dashboard/prospects',
-      badge: 'Opportunités',
-      loading: loadingProspects,
-    },
-    {
-      title: 'Retraits de Wallet',
-      value: safeWithdrawals.length || 0,
-      icon: Wallet,
-      color: 'indigo',
-      description: 'Demandes agents en attente',
-      link: '/dashboard/wallet',
-      badge: 'Commissions',
-      loading: loadingWithdrawals,
-    },
-    {
-      title: 'Comptes Portail Client',
-      value: portalKpis?.portal_active_clients ?? safeClients.length,
-      icon: Smartphone,
+      title: 'Polices & Devis CIMA',
+      value: safeContracts.length || 0,
+      subtitle: `${paidContracts.length} actives · ${safeContracts.length - paidContracts.length} devis/attente`,
+      icon: ShieldCheck,
       color: 'blue',
-      description: 'Utilisateurs d\'application mobile',
-      link: '/dashboard/clients',
-      badge: 'Digital',
-      loading: loadingPortalKpis || loadingClients,
+      href: '/dashboard/contracts',
+      loading: loadingContracts,
     },
     {
-      title: 'Dossiers Sinistres Ouverts',
-      value: portalKpis?.open_claims ?? '0',
+      title: 'Dossiers Sinistres CIMA',
+      value: openClaimsCount,
+      subtitle: openClaimsCount > 0 ? 'Dossiers sous instruction / expertise' : 'Aucun sinistre en cours',
       icon: AlertTriangle,
-      color: 'rose',
-      description: 'File d\'instruction sinistres',
-      link: '/dashboard/sinistres',
-      badge: 'Urgence',
+      color: openClaimsCount > 0 ? 'rose' : 'slate',
+      href: '/dashboard/sinistres',
       loading: loadingPortalKpis,
     },
     {
-      title: 'Paiements Déclarés',
-      value: portalKpis?.pending_client_payments ?? '0',
-      icon: CreditCard,
+      title: 'Portefeuille Assurés',
+      value: safeClients.length || 0,
+      subtitle: `${portalKpis?.portal_active_clients ?? safeClients.length} comptes mobiles actifs`,
+      icon: Users,
       color: 'indigo',
-      description: 'Justificatifs à valider',
-      link: '/dashboard/paiements-declares',
-      badge: 'Encaissements',
-      loading: loadingPortalKpis,
+      href: '/dashboard/clients',
+      loading: loadingClients || loadingPortalKpis,
+    },
+  ]
+
+  // Cartes du Centre d'Action Prioritaire (Tâches en attente d'arbitrage)
+  const priorityTasks = [
+    {
+      title: 'Encaissements à Valider',
+      count: pendingPaymentsCount,
+      description: 'Paiements déclarés en attente de vérification bancaire/MM',
+      actionLabel: 'Traiter les paiements',
+      href: '/dashboard/paiements-declares',
+      tone: pendingPaymentsCount > 0 ? 'amber' : 'neutral',
+      icon: CreditCard,
+    },
+    {
+      title: 'Sinistres à Instruire',
+      count: openClaimsCount,
+      description: 'Déclarations CIMA nécessitant un mandat ou un chiffrage',
+      actionLabel: 'Gérer les sinistres',
+      href: '/dashboard/sinistres',
+      tone: openClaimsCount > 0 ? 'rose' : 'neutral',
+      icon: AlertTriangle,
+    },
+    {
+      title: 'Prospects à Convertir',
+      count: pendingConversions,
+      description: 'Demandes de devis éligibles à une souscription immédiate',
+      actionLabel: 'Convertir en contrat',
+      href: '/dashboard/prospects',
+      tone: pendingConversions > 0 ? 'blue' : 'neutral',
+      icon: Clock,
     },
     {
       title: 'Demandes & Avenants',
-      value: portalKpis?.open_requests ?? '0',
+      count: openRequestsCount,
+      description: 'Sollicitations et modifications contractuelles des assurés',
+      actionLabel: 'Consulter le support',
+      href: '/dashboard/demandes-clients',
+      tone: openRequestsCount > 0 ? 'emerald' : 'neutral',
       icon: Inbox,
-      color: 'emerald',
-      description: 'Requêtes support ouvertes',
-      link: '/dashboard/demandes-clients',
-      badge: 'Support',
-      loading: loadingPortalKpis,
     },
   ]
 
   return (
-    <div className="flex-1 flex flex-col bg-slate-50/60 min-h-screen">
-      <Header
-        title={t('title')}
-        subtitle={t('subtitle')}
-      />
+    <div className="flex-1 flex flex-col bg-slate-50/70 min-h-screen">
+      <Header title={t('title')} subtitle={t('subtitle')} />
 
-      <div className="p-6 sm:p-8 space-y-8 flex-1">
-        
-        {/* Welcome Hero Banner */}
-        <div
-          className="relative rounded-2xl text-white py-4 px-5 sm:px-6 overflow-hidden shadow-lg border border-blue-900/40"
-          style={{ background: 'linear-gradient(135deg, #0b192c 0%, #1b365d 60%, #0f172a 100%)' }}
-        >
-          <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-blue-500/10 blur-[80px] rounded-full pointer-events-none" />
-          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="space-y-1.5">
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-400/15 backdrop-blur-md border border-amber-400/30 text-amber-300 text-[11px] font-extrabold capitalize shadow-xs">
-                  <Calendar className="h-3 w-3 text-amber-400" />
-                  <span>{todayDateStr}</span>
+      <main className="p-5 sm:p-7 space-y-7 flex-1 max-w-7xl w-full mx-auto">
+        {/* Bannière Executive ProMax */}
+        <section className="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-700 capitalize">
+                <Calendar className="h-3 w-3 text-slate-500" />
+                {todayDateStr}
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200/60">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Système Opérationnel
+              </span>
+            </div>
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+              Bonjour, {user?.full_name || 'Gestionnaire'} 👋
+            </h1>
+            <p className="text-xs text-slate-500 font-medium max-w-2xl">
+              Supervision de la production d'assurance automobile, suivi des encaissements et pilotage des dossiers sinistres CIMA.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5 shrink-0">
+            <Link href="/dashboard/contracts/new">
+              <button className="flex items-center gap-2 px-4 py-2.5 text-xs font-black bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer border-0">
+                <Plus className="h-4 w-4" />
+                <span>Créer une Police / Devis</span>
+              </button>
+            </Link>
+          </div>
+        </section>
+
+        {/* 4 KPIs Macro Stratégiques */}
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {macroKpis.map((kpi, idx) => {
+            const Icon = kpi.icon
+            return (
+              <Link
+                key={idx}
+                href={kpi.href}
+                className="group rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all flex flex-col justify-between"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-500">{kpi.title}</span>
+                  <span
+                    className={`flex h-9 w-9 items-center justify-center rounded-xl transition-colors ${
+                      kpi.color === 'emerald'
+                        ? 'bg-emerald-50 text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white'
+                        : kpi.color === 'blue'
+                        ? 'bg-blue-50 text-blue-700 group-hover:bg-blue-600 group-hover:text-white'
+                        : kpi.color === 'rose'
+                        ? 'bg-rose-50 text-rose-700 group-hover:bg-rose-600 group-hover:text-white'
+                        : 'bg-indigo-50 text-indigo-700 group-hover:bg-indigo-600 group-hover:text-white'
+                    }`}
+                  >
+                    <Icon className="h-4.5 w-4.5" />
+                  </span>
                 </div>
-                <div
-                  aria-live="polite"
-                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-slate-100 text-[11px] font-extrabold shadow-xs"
-                >
-                  {isInitialLoading ? (
-                    <>
-                      <Loader2 className="h-3 w-3 animate-spin text-blue-300" />
-                      <span>Chargement des données…</span>
-                    </>
-                  ) : isRefreshing ? (
-                    <>
-                      <RefreshCw className="h-3 w-3 animate-spin text-blue-300" />
-                      <span>Actualisation en cours…</span>
-                    </>
+
+                <div className="mt-4">
+                  {kpi.loading ? (
+                    <div className="h-7 w-24 bg-slate-100 rounded-md animate-pulse my-1" />
                   ) : (
-                    <>
-                      <CheckCircle2 className="h-3 w-3 text-emerald-400" />
-                      <span>Données à jour</span>
-                    </>
+                    <p className="text-2xl font-black text-slate-900 tracking-tight">{kpi.value}</p>
                   )}
+                  <p className="text-[11px] font-medium text-slate-400 mt-1 truncate">{kpi.subtitle}</p>
                 </div>
+
+                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] font-bold text-blue-700 group-hover:text-blue-900">
+                  <span>Accéder à la gestion</span>
+                  <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+                </div>
+              </Link>
+            )
+          })}
+        </section>
+
+        {/* Centre d'Arbitrage & Actions Prioritaires (Tasks & Urgences) */}
+        <section className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-2xs space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-700 border border-amber-200/60">
+                <Activity className="h-4 w-4" />
+              </span>
+              <div>
+                <h2 className="text-sm font-black uppercase tracking-wider text-slate-900">
+                  Centre d'Actions Prioritaires
+                </h2>
+                <p className="text-xs text-slate-500">Dossiers en attente d'arbitrage ou de validation par le gestionnaire</p>
               </div>
-              <h2 className="text-xl sm:text-2xl font-black tracking-tight leading-tight text-white drop-shadow-xs">
-                Bonjour, {user?.full_name || 'Gestionnaire'} 👋
-              </h2>
-              <p className="text-slate-200 text-xs font-semibold max-w-xl leading-snug">
-                Supervision en temps réel des opérations d'assurance, validation des encaissements et suivi du portefeuille client.
-              </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-              <Link href="/dashboard/contracts/new">
-                <button className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-black bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer border-0">
-                  <Plus className="h-3.5 w-3.5 stroke-[3]" />
-                  <span>Créer une Police / Devis</span>
+            <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full">
+              {pendingPaymentsCount + openClaimsCount + pendingConversions + openRequestsCount} tâche(s) active(s)
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            {priorityTasks.map((task, idx) => {
+              const Icon = task.icon
+              const hasAlert = task.count > 0
+
+              const toneStyles = {
+                amber: 'border-amber-200 bg-amber-50/50 text-amber-900 hover:bg-amber-50',
+                rose: 'border-rose-200 bg-rose-50/50 text-rose-900 hover:bg-rose-50',
+                blue: 'border-blue-200 bg-blue-50/50 text-blue-900 hover:bg-blue-50',
+                emerald: 'border-emerald-200 bg-emerald-50/50 text-emerald-900 hover:bg-emerald-50',
+                neutral: 'border-slate-200/70 bg-slate-50/40 text-slate-700 hover:bg-slate-50',
+              }[task.tone]
+
+              const badgeColor = {
+                amber: 'bg-amber-500 text-white',
+                rose: 'bg-rose-500 text-white',
+                blue: 'bg-blue-600 text-white',
+                emerald: 'bg-emerald-600 text-white',
+                neutral: 'bg-slate-200 text-slate-600',
+              }[task.tone]
+
+              return (
+                <Link
+                  key={idx}
+                  href={task.href}
+                  className={`rounded-2xl border p-4 flex flex-col justify-between transition-all hover:shadow-xs group cursor-pointer ${toneStyles}`}
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Icon className="h-4.5 w-4.5 opacity-80" />
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-black shadow-2xs ${badgeColor}`}>
+                        {task.count}
+                      </span>
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-sm tracking-tight text-slate-900">{task.title}</h3>
+                      <p className="text-[11px] text-slate-500 mt-1 leading-snug">{task.description}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-2.5 border-t border-slate-200/60 flex items-center justify-between text-xs font-bold text-slate-800 group-hover:text-blue-700">
+                    <span>{task.actionLabel}</span>
+                    <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+        </section>
+
+        {/* Section Double Colonne : Dernières Polices (2/3) & Graphique de Supervision (1/3) */}
+        <section className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
+          {/* Polices Récentes */}
+          <div className="xl:col-span-2 rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-2xs">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+              <div>
+                <h2 className="text-sm font-black uppercase tracking-wider text-slate-900">
+                  Dernières Polices & Souscriptions
+                </h2>
+                <p className="text-xs text-slate-500">Flux des récents contrats émis et devis automobiles</p>
+              </div>
+
+              <Link href="/dashboard/contracts">
+                <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-50 rounded-xl transition-colors cursor-pointer">
+                  <span>Voir tous les contrats</span>
+                  <ArrowUpRight className="h-3.5 w-3.5" />
                 </button>
               </Link>
             </div>
-          </div>
-        </div>
 
-        {/* Quick Actions Shortcuts Bar */}
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs">
-              <Activity className="h-5 w-5" />
-            </div>
-            <div>
-              <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">
-                Actions Opérationnelles Rapides
-              </h3>
-              <p className="text-xs font-medium text-slate-500">Raccourcis vers les tâches fréquentes</p>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <Link href="/dashboard/clients/new">
-              <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-extrabold bg-slate-100 hover:bg-slate-200 text-slate-900 rounded-xl transition-all cursor-pointer">
-                <Plus className="h-3.5 w-3.5 text-blue-600" />
-                Client
-              </button>
-            </Link>
-            <Link href="/dashboard/sinistres">
-              <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-extrabold bg-slate-100 hover:bg-slate-200 text-slate-900 rounded-xl transition-all cursor-pointer">
-                <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
-                Sinistre
-              </button>
-            </Link>
-            <Link href="/dashboard/paiements-declares">
-              <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-extrabold bg-slate-100 hover:bg-slate-200 text-slate-900 rounded-xl transition-all cursor-pointer">
-                <CreditCard className="h-3.5 w-3.5 text-indigo-600" />
-                Paiement
-              </button>
-            </Link>
-          </div>
-        </div>
-
-        {/* KPI Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {kpis.map((kpi, i) => (
-            <div
-              key={i}
-              className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between group"
-            >
-              <div className="flex justify-between items-start">
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-700 border border-slate-200">
-                  {kpi.badge}
-                </span>
-                <span
-                  className={`p-2.5 rounded-xl text-sm transition-all duration-200 ${
-                    kpi.color === 'blue'
-                      ? 'bg-blue-50 text-blue-700 group-hover:bg-blue-600 group-hover:text-white'
-                      : kpi.color === 'emerald'
-                      ? 'bg-emerald-50 text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white'
-                      : kpi.color === 'amber'
-                      ? 'bg-amber-50 text-amber-700 group-hover:bg-amber-600 group-hover:text-white'
-                      : kpi.color === 'rose'
-                      ? 'bg-rose-50 text-rose-700 group-hover:bg-rose-600 group-hover:text-white'
-                      : 'bg-indigo-50 text-indigo-700 group-hover:bg-indigo-600 group-hover:text-white'
-                  }`}
-                >
-                  <kpi.icon className="h-5 w-5" />
-                </span>
+            {loadingContracts ? (
+              <div className="space-y-2.5 py-4">
+                {[0, 1, 2, 3].map((item) => (
+                  <div key={item} className="h-14 rounded-xl bg-slate-100 animate-pulse" />
+                ))}
               </div>
-              <div className="mt-4">
-                <span className="text-xs font-bold text-slate-500 block">{kpi.title}</span>
-                {kpi.loading ? (
-                  <>
-                    <span
-                      role="status"
-                      aria-label={`Chargement de ${kpi.title}`}
-                      className="mt-2 block h-8 w-28 rounded-lg bg-slate-200 animate-pulse"
-                    />
-                    <span className="mt-2 block h-3 w-40 rounded bg-slate-100 animate-pulse" />
-                  </>
-                ) : (
-                  <>
-                    <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-tight block mt-1">
-                      {kpi.value}
-                    </span>
-                    <p className="text-[11px] font-medium text-slate-400 mt-1">{kpi.description}</p>
-                  </>
-                )}
+            ) : safeContracts.length === 0 ? (
+              <div className="py-12 text-center text-slate-400">
+                <FileText className="h-9 w-9 mx-auto text-slate-300 mb-2" />
+                <p className="text-xs font-bold">Aucune police enregistrée</p>
               </div>
-              <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between">
-                <Link
-                  href={kpi.link}
-                  className="text-xs font-bold text-blue-700 hover:text-blue-900 flex items-center gap-1.5 transition-colors"
-                >
-                  Gérer
-                  <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
-                </Link>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Dashboard Content Grid */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          
-          {/* Contracts List Widget */}
-          <div className="xl:col-span-2 bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-6 flex flex-col justify-between">
-            <div>
-              <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
-                <div>
-                  <h3 className="font-extrabold text-slate-900 text-base sm:text-lg tracking-tight">
-                    Polices d'Assurances Récentes
-                  </h3>
-                  <p className="text-xs font-medium text-slate-500 mt-0.5">
-                    Dernières polices émises et devis en cours
-                  </p>
-                </div>
-                <Link href="/dashboard/contracts">
-                  <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-extrabold text-blue-700 hover:bg-blue-50 rounded-xl transition-colors cursor-pointer">
-                    <span>Tout voir</span>
-                    <ArrowUpRight className="h-4 w-4" />
-                  </button>
-                </Link>
-              </div>
-
-              {loadingContracts ? (
-                <div role="status" aria-label="Chargement des polices d'assurance" className="space-y-3 py-2">
-                  {Array.from({ length: 5 }).map((_, index) => (
-                    <div key={index} className="flex items-center gap-4">
-                      <div className="flex-1 space-y-1.5">
-                        <div className="h-3.5 w-28 rounded bg-slate-200 animate-pulse" />
-                        <div className="h-2.5 w-16 rounded bg-slate-100 animate-pulse" />
-                      </div>
-                      <div className="h-3 w-14 rounded bg-slate-100 animate-pulse" />
-                      <div className="h-3.5 w-24 rounded bg-slate-200 animate-pulse" />
-                      <div className="h-5 w-16 rounded-full bg-slate-100 animate-pulse" />
-                    </div>
-                  ))}
-                  <p className="pt-2 text-center text-[11px] font-semibold text-slate-400">
-                    Chargement des polices d'assurance…
-                  </p>
-                </div>
-              ) : safeContracts.length === 0 ? (
-                <div className="py-12 text-center text-slate-400">
-                  <FileText className="h-10 w-10 mx-auto text-slate-300 mb-3" />
-                  <p className="text-sm font-medium">Aucun contrat enregistré</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-100 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
-                        <th className="pb-3 px-2">N° Police / Produit</th>
-                        <th className="pb-3 px-2">Branche</th>
-                        <th className="pb-3 px-2">Prime TTC</th>
-                        <th className="pb-3 px-2">Statut</th>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                      <th className="pb-3 px-2">ID Police</th>
+                      <th className="pb-3 px-2">Formule / Branche</th>
+                      <th className="pb-3 px-2">Prime TTC</th>
+                      <th className="pb-3 px-2">Statut</th>
+                      <th className="pb-3 px-2 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {safeContracts.slice(0, 5).map((contract) => (
+                      <tr key={contract.id} className="hover:bg-slate-50/70 transition-colors group">
+                        <td className="py-3 px-2">
+                          <Link
+                            href={`/dashboard/contracts/${contract.id}`}
+                            className="font-mono font-bold text-slate-900 group-hover:text-blue-700 transition-colors"
+                          >
+                            {contract.contract_number || contract.id.substring(0, 8).toUpperCase()}
+                          </Link>
+                        </td>
+                        <td className="py-3 px-2 text-slate-600 font-medium">
+                          {contract.product_type} · {contract.subscription_type || 'Annuelle'}
+                        </td>
+                        <td className="py-3 px-2 font-black text-slate-900 font-mono">
+                          {(contract.pttc ?? contract.prime_ttc ?? 0).toLocaleString('fr-FR')} XAF
+                        </td>
+                        <td className="py-3 px-2">
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold inline-block border ${
+                              contract.status === 'PAYE'
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                : 'bg-amber-50 text-amber-800 border-amber-200'
+                            }`}
+                          >
+                            {contract.status === 'PAYE' ? 'Actif / Soldé' : contract.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-2 text-right">
+                          <Link
+                            href={`/dashboard/contracts/${contract.id}`}
+                            className="text-xs font-bold text-blue-700 hover:underline"
+                          >
+                            Détails &rarr;
+                          </Link>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {safeContracts.slice(0, 6).map((contract) => (
-                        <tr key={contract.id} className="hover:bg-slate-50/80 transition-colors group">
-                          <td className="py-3.5 px-2">
-                            <span className="font-extrabold text-sm text-slate-900 block group-hover:text-blue-700 transition-colors">
-                              {contract.id.substring(0, 8).toUpperCase()}
-                            </span>
-                            <span className="text-[11px] font-semibold text-slate-400 block mt-0.5">
-                              {contract.product_type}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-2 font-semibold text-slate-700">
-                            {contract.product_line || 'AUTO'}
-                          </td>
-                          <td className="py-3.5 px-2 font-black text-slate-900">
-                            {(contract.prime_ttc || 0).toLocaleString('fr-FR')} FCFA
-                          </td>
-                          <td className="py-3.5 px-2">
-                            <span
-                              className={`px-2.5 py-1 rounded-full text-[10px] font-black inline-block border ${
-                                contract.status === 'PAYE'
-                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                  : 'bg-amber-50 text-amber-800 border-amber-200'
-                              }`}
-                            >
-                              {contract.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            {safeContracts.length > 6 && (
-              <div className="mt-6 pt-4 border-t border-slate-100 text-center">
-                <Link
-                  href="/dashboard/contracts"
-                  className="text-xs font-bold text-blue-700 hover:text-blue-900 transition-colors"
-                >
-                  Voir l'intégralité des polices d'assurance →
-                </Link>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
 
-          {/* Network System Health Widget */}
-          <SystemSupervisionChart />
-
-        </div>
-
-      </div>
+          {/* Graphique de Production Mensuelle */}
+          <div className="xl:col-span-1">
+            <SystemSupervisionChart />
+          </div>
+        </section>
+      </main>
     </div>
   )
 }

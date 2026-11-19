@@ -83,6 +83,10 @@
     }
   },
   "nav": {
+    "sectionOperations": "Insurance Operations",
+    "sectionCommercial": "Commercial Network",
+    "sectionFinance": "Finance & Treasury",
+    "sectionSystem": "System & Support",
     "overview": "Overview",
     "clients": "Clients",
     "claims": "Claims",

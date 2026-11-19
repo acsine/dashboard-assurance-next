@@ -83,6 +83,10 @@
     }
   },
   "nav": {
+    "sectionOperations": "Opérations Assurances",
+    "sectionCommercial": "Réseau Commercial",
+    "sectionFinance": "Finance & Trésorerie",
+    "sectionSystem": "Système & Support",
     "overview": "Vue d'ensemble",
     "clients": "Clients",
     "claims": "Sinistres",
