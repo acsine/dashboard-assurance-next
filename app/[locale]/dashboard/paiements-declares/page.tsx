@@ -24,6 +24,8 @@ import {
   MessageCircle,
   ShieldCheck,
   ZoomIn,
+  Car,
+  FileText,
 } from 'lucide-react'
 import { asList, portalClientApi, contractsApi, proxiedAssetUrl } from '@/lib/api/mobi-assur'
 import { RoleGuard } from '@/components/auth/RoleGuard'
@@ -36,6 +38,100 @@ function paymentProofUrls(payment: Record<string, any>): string[] {
   }
   if (typeof payment.proof_url === 'string' && payment.proof_url) return [payment.proof_url]
   return []
+}
+
+function TargetContractDetailsCard({
+  contractId,
+  payment,
+}: {
+  contractId: string
+  payment: Record<string, any>
+}) {
+  const { data: contract, isLoading } = useQuery({
+    queryKey: ['target-contract', contractId],
+    queryFn: () => contractsApi.get(contractId),
+    enabled: !!contractId,
+    staleTime: 60_000,
+  })
+
+  const firstVehicle = (contract as any)?.vehicles?.[0]?.vehicle
+  const vehicleMarque = payment.vehicle_marque || firstVehicle?.marque || (contract as any)?.marque
+  const vehicleModele = payment.vehicle_modele || firstVehicle?.modele || (contract as any)?.modele
+  const vehicleImmat = payment.vehicle_immat || firstVehicle?.immatriculation || (contract as any)?.immatriculation
+  const vehicleFull = [vehicleMarque, vehicleModele].filter(Boolean).join(' ')
+
+  const contractNumber =
+    payment.contract_number ||
+    (contract as any)?.contract_number ||
+    `POL-${contractId.slice(0, 8).toUpperCase()}`
+  const productType = payment.product_type || (contract as any)?.product_type || 'Automobile'
+  const subscriptionType = payment.subscription_type || (contract as any)?.subscription_type || 'Annuelle'
+  const pttc = payment.pttc ?? (contract as any)?.pttc ?? (contract as any)?.prime_ttc ?? payment.amount
+
+  return (
+    <div className="rounded-2xl border border-blue-200/90 bg-linear-to-br from-blue-50/70 to-indigo-50/40 p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-white shadow-2xs">
+            <Car className="h-4 w-4" />
+          </span>
+          <div>
+            <span className="text-[11px] font-black uppercase tracking-wider text-blue-900 block">
+              Contrat Cible & Véhicule Assuré
+            </span>
+            <span className="text-[10px] text-blue-700 font-medium">Police à déverrouiller</span>
+          </div>
+        </div>
+
+        <span className="font-mono text-xs font-black bg-blue-700 text-white px-2.5 py-1 rounded-lg shadow-2xs">
+          {contractNumber}
+        </span>
+      </div>
+
+      {/* Détails Véhicule & Formule */}
+      <div className="rounded-xl bg-white/95 p-3 border border-blue-100 shadow-2xs space-y-2">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-slate-500 font-medium">Véhicule assuré :</span>
+          <div className="text-right">
+            <span className="font-extrabold text-slate-900 block">
+              {vehicleFull || (isLoading ? 'Chargement du véhicule...' : 'Véhicule Automobile')}
+            </span>
+            {vehicleImmat && (
+              <span className="font-mono text-[11px] font-black text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 inline-block mt-0.5">
+                {vehicleImmat}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100">
+          <span className="text-slate-500 font-medium">Formule souscrite :</span>
+          <span className="font-bold text-slate-800">
+            {productType} · {subscriptionType}
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between text-xs pt-1">
+          <span className="text-slate-500 font-medium">Prime TTC prévue :</span>
+          <span className="font-mono font-black text-slate-900">
+            {Number(pttc || 0).toLocaleString('fr-FR')} XAF
+          </span>
+        </div>
+      </div>
+
+      {/* ID Système discret & Lien vers le contrat */}
+      <div className="flex items-center justify-between text-[11px] text-slate-500 pt-0.5 px-1">
+        <span className="font-mono text-[10px] text-slate-400">ID: {contractId.slice(0, 8)}...</span>
+        <Link
+          href={`/dashboard/contracts/${contractId}`}
+          target="_blank"
+          className="font-bold text-blue-700 hover:text-blue-900 hover:underline inline-flex items-center gap-1 text-[11px]"
+        >
+          Ouvrir la fiche contrat <ExternalLink className="h-3 w-3" />
+        </Link>
+      </div>
+    </div>
+  )
 }
 
 export default function PaiementsDeclaresPage() {
@@ -281,16 +377,30 @@ export default function PaiementsDeclaresPage() {
                           <td className="px-4 py-3.5 font-semibold text-slate-800">
                             {String(p.payer_name || 'Client anonyme')}
                           </td>
-                          <td className="px-4 py-3.5 font-mono text-xs">
+                          <td className="px-4 py-3.5 text-xs">
                             {p.contract_id ? (
-                              <Link
-                                href={`/dashboard/contracts/${String(p.contract_id)}`}
-                                className="text-blue-600 hover:text-blue-800 hover:underline font-semibold"
-                              >
-                                {String(p.contract_id).slice(0, 8).toUpperCase()}...
-                              </Link>
+                              <div className="space-y-1">
+                                {Boolean(p.vehicle_immat || p.vehicle_marque) ? (
+                                  <div>
+                                    <span className="font-bold text-slate-900 block truncate max-w-[160px]">
+                                      {[p.vehicle_marque, p.vehicle_modele].filter(Boolean).map(String).join(' ')}
+                                    </span>
+                                    {Boolean(p.vehicle_immat) ? (
+                                      <span className="font-mono text-[10px] font-extrabold text-blue-800 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200/60 inline-block mt-0.5">
+                                        {String(p.vehicle_immat)}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                ) : null}
+                                <Link
+                                  href={`/dashboard/contracts/${String(p.contract_id)}`}
+                                  className="text-blue-600 hover:text-blue-800 hover:underline font-mono font-semibold block text-[11px]"
+                                >
+                                  {p.contract_number ? String(p.contract_number) : `${String(p.contract_id).slice(0, 8).toUpperCase()}...`}
+                                </Link>
+                              </div>
                             ) : (
-                              '—'
+                              <span className="text-slate-400">—</span>
                             )}
                           </td>
                           <td className="px-4 py-3.5 text-xs">
@@ -446,13 +556,15 @@ export default function PaiementsDeclaresPage() {
                   {String(selectedPaymentForValidation.method || 'Mobile Money')}
                 </span>
               </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-500">Contrat cible :</span>
-                <span className="font-mono font-bold text-slate-700">
-                  {String(selectedPaymentForValidation.contract_id || '—')}
-                </span>
-              </div>
             </div>
+
+            {/* Contrat et Véhicule Cible ProMax */}
+            {selectedPaymentForValidation.contract_id ? (
+              <TargetContractDetailsCard
+                contractId={String(selectedPaymentForValidation.contract_id)}
+                payment={selectedPaymentForValidation}
+              />
+            ) : null}
 
             {/* Preuves jointes */}
             {(() => {
@@ -549,10 +661,29 @@ export default function PaiementsDeclaresPage() {
               </button>
             </div>
 
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Le paiement déclaré pour le contrat <strong>{String(selectedPaymentForRejection.contract_id)}</strong> d'un montant de{' '}
-              <strong>{Number(selectedPaymentForRejection.amount || 0).toLocaleString('fr-FR')} XAF</strong> sera marqué comme non reçu ou invalide.
-            </p>
+            <div className="p-3.5 rounded-2xl bg-rose-50/70 border border-rose-200/80 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Contrat cible :</span>
+                <span className="font-mono font-bold text-slate-900">
+                  {selectedPaymentForRejection.contract_number || `POL-${String(selectedPaymentForRejection.contract_id).slice(0, 8).toUpperCase()}`}
+                </span>
+              </div>
+              {(selectedPaymentForRejection.vehicle_marque || selectedPaymentForRejection.vehicle_immat) && (
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 font-medium">Véhicule :</span>
+                  <span className="font-bold text-slate-900">
+                    {[selectedPaymentForRejection.vehicle_marque, selectedPaymentForRejection.vehicle_modele].filter(Boolean).join(' ')}
+                    {selectedPaymentForRejection.vehicle_immat ? ` (${selectedPaymentForRejection.vehicle_immat})` : ''}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Montant déclaré :</span>
+                <span className="font-mono font-extrabold text-rose-700">
+                  {Number(selectedPaymentForRejection.amount || 0).toLocaleString('fr-FR')} XAF
+                </span>
+              </div>
+            </div>
 
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 block">Motif du rejet (facultatif) :</label>
@@ -606,7 +737,10 @@ export default function PaiementsDeclaresPage() {
               <h3 className="text-lg font-black text-slate-900">Police CIMA Activée avec Succès !</h3>
               <p className="text-xs text-slate-500 mt-1">
                 Le règlement de {Number(lastValidatedPayment.amount || 0).toLocaleString('fr-FR')} XAF pour le contrat{' '}
-                <span className="font-mono font-bold text-slate-800">{String(lastValidatedPayment.contract_id).slice(0, 8).toUpperCase()}</span> a été validé.
+                <span className="font-mono font-bold text-slate-800">
+                  {lastValidatedPayment.contract_number || String(lastValidatedPayment.contract_id).slice(0, 8).toUpperCase()}
+                </span>
+                {lastValidatedPayment.vehicle_immat ? ` (${lastValidatedPayment.vehicle_immat})` : ''} a été validé avec succès.
               </p>
             </div>
 
