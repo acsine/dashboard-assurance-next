@@ -32,15 +32,19 @@ import {
   ShieldCheck,
   CircleDollarSign,
   AlertTriangle,
+  ExternalLink,
 } from 'lucide-react'
 import { RoleGuard } from '@/components/auth/RoleGuard'
 import { useTranslations } from 'next-intl'
 
 
+type ClientTab = 'synthese' | 'contrats' | 'documents' | 'finance_sinistres'
+
 export default function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const tCommon = useTranslations('common')
   const { id } = use(params)
   const queryClient = useQueryClient()
+  const [activeTab, setActiveTab] = useState<ClientTab>('synthese')
   const [showAddVehicle, setShowAddVehicle] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
 
@@ -288,11 +292,67 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
           <SummaryCard label="Paiements en attente" value={loadingDossier ? '…' : dossier?.pending_payments_count ?? 0} icon={CircleDollarSign} tone="amber" />
         </section>
 
+        {/* Navigation Onglets ProMax */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-slate-200">
+          {[
+            {
+              id: 'synthese' as const,
+              label: 'Synthèse & Véhicules',
+              icon: Car,
+              count: vehicles.length,
+            },
+            {
+              id: 'contrats' as const,
+              label: 'Contrats & Devis CIMA',
+              icon: FileText,
+              count: clientContracts.length,
+            },
+            {
+              id: 'documents' as const,
+              label: 'Coffre-fort Documents & Cartes Roses',
+              icon: ShieldCheck,
+              count: paidContractsCount,
+            },
+            {
+              id: 'finance_sinistres' as const,
+              label: 'Paiements & Sinistres',
+              icon: CircleDollarSign,
+              count: (dossier?.payments?.length || 0) + (dossier?.sinistres?.length || 0),
+            },
+          ].map((tab) => {
+            const Icon = tab.icon
+            const isActive = activeTab === tab.id
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-white/80 text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200/80'
+                }`}
+              >
+                <Icon className={`h-4 w-4 ${isActive ? 'text-white' : 'text-slate-500'}`} />
+                <span>{tab.label}</span>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                    isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
       <div className="space-y-8">
-        {/* Main Grid */}
-        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
-          {/* Card left: Info Profile */}
-          <aside className="space-y-6 lg:sticky lg:top-6 lg:col-span-4">
+        {/* ONGLET 1 : SYNTHÈSE & VÉHICULES */}
+        {activeTab === 'synthese' && (
+          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+            {/* Card left: Info Profile */}
+            <aside className="space-y-6 lg:sticky lg:top-6 lg:col-span-4">
             <Card>
               <CardHeader className="flex-row items-center justify-between space-y-0 border-b border-slate-100">
                 <div>
@@ -612,200 +672,378 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
               </CardContent>
             </Card>
 
-            {/* Contracts section */}
-            <Card>
-              <CardHeader className="flex-row items-center justify-between space-y-0 border-b border-slate-100">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-indigo-700">Couverture</p>
-                  <CardTitle className="mt-1 flex items-center gap-2 text-lg">
-                    <FileText className="h-5 w-5 text-indigo-600" /> Contrats et polices
-                  </CardTitle>
-                  <p className="mt-1 text-sm text-slate-500">Suivi des devis, contrats actifs et encaissements.</p>
-                </div>
-                <Link href={`/dashboard/contracts/new?client_id=${id}`}>
-                  <button className="flex min-h-11 items-center gap-2 rounded-xl bg-blue-50 px-4 py-2 text-sm font-bold text-blue-700 transition-colors hover:bg-blue-100">
-                    <Plus className="h-3.5 w-3.5" />
-                    Créer un contrat
+            {/* Aperçu rapide contrat actif dans la Synthèse */}
+            {clientContracts.length > 0 && (
+              <Card className="border-blue-100 bg-linear-to-br from-blue-50/50 to-indigo-50/30">
+                <CardHeader className="flex-row items-center justify-between space-y-0 pb-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider text-blue-700">Dernière souscription</p>
+                    <CardTitle className="mt-1 text-base">Contrat en cours</CardTitle>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('contrats')}
+                    className="text-xs font-bold text-blue-700 hover:underline flex items-center gap-1"
+                  >
+                    Voir tous les contrats ({clientContracts.length}) <ExternalLink className="h-3 w-3" />
                   </button>
-                </Link>
-              </CardHeader>
-              <CardContent className="pt-6">
-                {loadingContracts ? (
-                  <div className="space-y-3" aria-label="Chargement des contrats">
-                    {[0, 1, 2].map((item) => <div key={item} className="h-16 animate-pulse rounded-xl bg-slate-100" />)}
-                  </div>
-                ) : clientContracts.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-slate-200 py-10 text-center">
-                    <FileText className="mx-auto h-8 w-8 text-slate-300" />
-                    <p className="mt-3 text-sm font-bold text-slate-700">Aucun contrat ou devis</p>
-                    <p className="mt-1 text-sm text-slate-500">Créez la première souscription de ce client.</p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="border-b border-gray-100">
-                          <th className="pb-3 px-2 text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                            ID Police
-                          </th>
-                          <th className="pb-3 px-2 text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                            Produit
-                          </th>
-                          <th className="pb-3 px-2 text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                            Tarif (TTC)
-                          </th>
-                          <th className="pb-3 px-2 text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                            Statut
-                          </th>
-                          <th className="pb-3 px-2 text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {clientContracts.map((contract) => (
-                          <tr key={contract.id} className="border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50">
-                            <td className="py-4 px-2 whitespace-nowrap font-mono font-bold text-sm text-gray-900">
-                              <Link
-                                href={`/dashboard/contracts/${contract.id}`}
-                                className="text-blue-600 hover:underline"
-                              >
-                                {contract.id.substring(0, 8).toUpperCase()}
-                              </Link>
-                            </td>
-                            <td className="py-4 px-2 whitespace-nowrap text-sm text-gray-600">
-                              {contract.product_type} / {contract.subscription_type}
-                            </td>
-                            <td className="py-4 px-2 whitespace-nowrap font-bold text-sm text-gray-900">
-                              {(contract.pttc ?? contract.prime_ttc ?? 0).toLocaleString('fr-FR')} FCFA
-                            </td>
-                            <td className="py-4 px-2 whitespace-nowrap">
-                              <span
-                                className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                                  contract.status === 'PAYE'
-                                    ? 'bg-green-50 text-green-700'
-                                    : 'bg-amber-50 text-amber-700'
-                                }`}
-                              >
-                                {contract.status}
-                              </span>
-                            </td>
-                            <td className="py-4 px-2 whitespace-nowrap">
-                              <Link
-                                href={`/dashboard/contracts/${contract.id}`}
-                                className="inline-flex min-h-11 items-center text-sm font-bold text-blue-700 hover:underline"
-                              >
-                                Voir documents
-                              </Link>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Documents générés par contrat */}
-            <ClientDocumentsPanel contracts={clientContracts} />
-
-            {dossier && (
-              <Card>
-                <CardHeader className="border-b border-slate-100">
-                  <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Historique</p>
-                  <CardTitle className="mt-1 flex items-center gap-2 text-lg">
-                    <ShieldCheck className="h-5 w-5 text-emerald-600" /> Activité du dossier
-                  </CardTitle>
-                  <p className="mt-1 text-sm text-slate-500">Sinistres, paiements déclarés et pièces téléversées.</p>
                 </CardHeader>
-                <CardContent className="pt-6 space-y-6">
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
-                      <span className="block text-xs font-semibold text-amber-800">Paiements en attente</span>
-                      <strong className="mt-1 block text-2xl text-slate-950">{dossier.pending_payments_count ?? 0}</strong>
+                <CardContent className="pt-2">
+                  <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl bg-white p-4 border border-blue-100">
+                    <div>
+                      <span className="font-mono font-black text-sm text-slate-900 block">
+                        {clientContracts[0].id.substring(0, 8).toUpperCase()}
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        {clientContracts[0].product_type} / {clientContracts[0].subscription_type}
+                      </span>
                     </div>
-                    <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
-                      <span className="block text-xs font-semibold text-blue-800">Sinistres</span>
-                      <strong className="mt-1 block text-2xl text-slate-950">{dossier.sinistres?.length ?? 0}</strong>
+                    <div>
+                      <span className="text-xs text-slate-500 block">Prime TTC</span>
+                      <span className="text-sm font-black text-slate-900">
+                        {(clientContracts[0].pttc ?? clientContracts[0].prime_ttc ?? 0).toLocaleString('fr-FR')} FCFA
+                      </span>
                     </div>
-                    <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
-                      <span className="block text-xs font-semibold text-emerald-800">Documents</span>
-                      <strong className="mt-1 block text-2xl text-slate-950">{dossier.documents?.length ?? 0}</strong>
+                    <div>
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                          clientContracts[0].status === 'PAYE'
+                            ? 'bg-emerald-50 text-emerald-700'
+                            : 'bg-amber-50 text-amber-700'
+                        }`}
+                      >
+                        {clientContracts[0].status}
+                      </span>
                     </div>
-                  </div>
-
-                  <div>
-                    <h4 className="text-xs font-bold uppercase text-gray-400 mb-2">Sinistres</h4>
-                    {(dossier.sinistres || []).length === 0 ? (
-                      <p className="text-xs text-gray-400">Aucun sinistre</p>
-                    ) : (
-                      <ul className="space-y-2">
-                        {dossier.sinistres.map((s: any) => (
-                          <li key={s.id} className="rounded-xl border border-gray-100 p-3 text-xs">
-                            <strong>{s.reference}</strong> — {s.title}
-                            <span className="ml-2 text-amber-600 font-semibold">{s.status}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-
-                  <div>
-                    <h4 className="text-xs font-bold uppercase text-gray-400 mb-2">Paiements</h4>
-                    {(dossier.payments || []).length === 0 ? (
-                      <p className="text-xs text-gray-400">Aucun paiement</p>
-                    ) : (
-                      <ul className="space-y-2">
-                        {dossier.payments.map((p) => (
-                          <li key={p.id} className="rounded-xl border border-gray-100 p-3 text-xs flex justify-between">
-                            <span>
-                              {Number(p.amount).toLocaleString('fr-FR')} FCFA · {p.method}
-                              {p.payer_name ? ` · ${p.payer_name}` : ''}
-                              {p.reference_externe ? (
-                                <span className="ml-1 font-mono text-blue-700"> · réf: {p.reference_externe}</span>
-                              ) : p.has_reference ? ' · réf. déclarée' : ''}
-                            </span>
-                            <span className={p.status === 'SUCCESS' ? 'text-green-600 font-bold' : 'text-amber-600 font-bold'}>
-                              {p.status}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-
-                  <div>
-                    <h4 className="text-xs font-bold uppercase text-gray-400 mb-2">Documents dossier</h4>
-                    {(dossier.documents || []).length === 0 ? (
-                      <p className="text-xs text-gray-400">Aucun document uploadé</p>
-                    ) : (
-                      <ul className="space-y-2">
-                        {dossier.documents.map((d) => (
-                          <li key={d.id} className="rounded-xl border border-gray-100 p-3 text-xs flex justify-between items-center">
-                            <span>
-                              <strong>{d.doc_type}</strong> {d.file_name || ''}
-                            </span>
-                            {(d.signed_url || d.file_url) && (
-                              <a
-                                href={d.signed_url || d.file_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 font-semibold hover:underline"
-                              >
-                                Ouvrir
-                              </a>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
+                    <Link
+                      href={`/dashboard/contracts/${clientContracts[0].id}`}
+                      className="text-xs font-bold text-blue-700 hover:underline"
+                    >
+                      Détails contrat &rarr;
+                    </Link>
                   </div>
                 </CardContent>
               </Card>
             )}
           </div>
         </div>
+      )}
+
+      {/* ONGLET 2 : CONTRATS & POLICES */}
+      {activeTab === 'contrats' && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader className="flex-row items-center justify-between space-y-0 border-b border-slate-100">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-indigo-700">Couverture & Devis CIMA</p>
+                <CardTitle className="mt-1 flex items-center gap-2 text-lg">
+                  <FileText className="h-5 w-5 text-indigo-600" /> Contrats et polices d'assurance
+                </CardTitle>
+                <p className="mt-1 text-sm text-slate-500">Suivi des devis, contrats souscrits, encaissements et attestations.</p>
+              </div>
+              <RoleGuard permission="agency:mutate" fallback={null}>
+                <Link href={`/dashboard/contracts/new?client_id=${id}`}>
+                  <button className="flex min-h-11 items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-blue-700 shadow-xs">
+                    <Plus className="h-4 w-4" />
+                    Créer un contrat
+                  </button>
+                </Link>
+              </RoleGuard>
+            </CardHeader>
+            <CardContent className="pt-6">
+              {loadingContracts ? (
+                <div className="space-y-3" aria-label="Chargement des contrats">
+                  {[0, 1, 2].map((item) => <div key={item} className="h-16 animate-pulse rounded-xl bg-slate-100" />)}
+                </div>
+              ) : clientContracts.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-200 py-12 text-center">
+                  <FileText className="mx-auto h-10 w-10 text-slate-300" />
+                  <p className="mt-3 text-base font-bold text-slate-700">Aucun contrat ou devis</p>
+                  <p className="mt-1 text-sm text-slate-500">Créez la première souscription automobile de ce client.</p>
+                  <RoleGuard permission="agency:mutate" fallback={null}>
+                    <Link href={`/dashboard/contracts/new?client_id=${id}`} className="mt-4 inline-block">
+                      <Button variant="primary" size="sm">
+                        <Plus className="h-4 w-4 mr-1.5" /> Créer un contrat
+                      </Button>
+                    </Link>
+                  </RoleGuard>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-100">
+                        <th className="pb-3 px-3 text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+                          ID Police
+                        </th>
+                        <th className="pb-3 px-3 text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+                          Formule / Produit
+                        </th>
+                        <th className="pb-3 px-3 text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+                          Tarif Total (TTC)
+                        </th>
+                        <th className="pb-3 px-3 text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+                          Statut
+                        </th>
+                        <th className="pb-3 px-3 text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {clientContracts.map((contract) => (
+                        <tr key={contract.id} className="transition-colors hover:bg-slate-50/70">
+                          <td className="py-4 px-3 whitespace-nowrap font-mono font-bold text-sm text-slate-900">
+                            <Link
+                              href={`/dashboard/contracts/${contract.id}`}
+                              className="text-blue-600 hover:underline"
+                            >
+                              {contract.id.substring(0, 8).toUpperCase()}
+                            </Link>
+                          </td>
+                          <td className="py-4 px-3 whitespace-nowrap text-sm text-slate-600">
+                            {contract.product_type} / {contract.subscription_type}
+                          </td>
+                          <td className="py-4 px-3 whitespace-nowrap font-black text-sm text-slate-900">
+                            {(contract.pttc ?? contract.prime_ttc ?? 0).toLocaleString('fr-FR')} FCFA
+                          </td>
+                          <td className="py-4 px-3 whitespace-nowrap">
+                            <span
+                              className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                contract.status === 'PAYE'
+                                  ? 'bg-emerald-50 text-emerald-700'
+                                  : 'bg-amber-50 text-amber-700'
+                              }`}
+                            >
+                              {contract.status}
+                            </span>
+                          </td>
+                          <td className="py-4 px-3 whitespace-nowrap">
+                            <Link
+                              href={`/dashboard/contracts/${contract.id}`}
+                              className="inline-flex min-h-10 items-center gap-1.5 text-xs font-bold text-blue-700 hover:underline"
+                            >
+                              Gérer le contrat &rarr;
+                            </Link>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* ONGLET 3 : COFFRE-FORT DOCUMENTS */}
+      {activeTab === 'documents' && (
+        <div className="space-y-8">
+          {/* Documents officiels d'assurance */}
+          <ClientDocumentsPanel contracts={clientContracts} />
+
+          {/* Justificatifs KYC et Pièces du dossier */}
+          <Card>
+            <CardHeader className="border-b border-slate-100">
+              <p className="text-xs font-bold uppercase tracking-wider text-blue-700">Conformité & KYC</p>
+              <CardTitle className="mt-1 flex items-center gap-2 text-lg">
+                <ShieldCheck className="h-5 w-5 text-blue-600" /> Justificatifs et pièces du dossier
+              </CardTitle>
+              <p className="mt-1 text-sm text-slate-500">CNI, permis de conduire et cartes grises téléversés par l'assuré.</p>
+            </CardHeader>
+            <CardContent className="pt-6">
+              {(dossier?.documents || []).length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-200 py-10 text-center">
+                  <FileText className="mx-auto h-8 w-8 text-slate-300" />
+                  <p className="mt-3 text-sm font-bold text-slate-700">Aucun justificatif téléversé</p>
+                  <p className="mt-1 text-sm text-slate-500">Le client n'a pas encore importé de documents justificatifs.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {(dossier?.documents || []).map((d: any) => (
+                    <div
+                      key={d.id}
+                      className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 flex flex-col justify-between gap-3"
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
+                          <FileText className="h-5 w-5" />
+                        </span>
+                        <div className="min-w-0">
+                          <span className="block truncate text-sm font-bold text-slate-900">
+                            {d.doc_type || 'Document'}
+                          </span>
+                          <span className="block truncate text-xs text-slate-500">
+                            {d.file_name || 'Sans titre'}
+                          </span>
+                        </div>
+                      </div>
+                      {(d.signed_url || d.file_url) && (
+                        <a
+                          href={d.signed_url || d.file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-white px-3 py-2 text-xs font-bold text-blue-700 border border-slate-200 hover:bg-blue-50 transition-colors"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                          Visualiser le justificatif
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* ONGLET 4 : FINANCES & SINISTRES */}
+      {activeTab === 'finance_sinistres' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Section Paiements & Encaissements */}
+          <Card>
+            <CardHeader className="flex-row items-center justify-between space-y-0 border-b border-slate-100">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Encaissements</p>
+                <CardTitle className="mt-1 flex items-center gap-2 text-lg">
+                  <CircleDollarSign className="h-5 w-5 text-emerald-600" /> Paiements déclarés
+                </CardTitle>
+                <p className="mt-1 text-sm text-slate-500">Règlements reçus ou en cours de vérification.</p>
+              </div>
+              <Link href="/dashboard/paiements-declares">
+                <button className="flex min-h-9 items-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition-colors">
+                  <ExternalLink className="h-3 w-3" />
+                  Validation des paiements
+                </button>
+              </Link>
+            </CardHeader>
+            <CardContent className="pt-6">
+              {(dossier?.payments || []).length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-200 py-10 text-center">
+                  <CircleDollarSign className="mx-auto h-8 w-8 text-slate-300" />
+                  <p className="mt-3 text-sm font-bold text-slate-700">Aucun paiement enregistré</p>
+                  <p className="mt-1 text-sm text-slate-500">Aucun versement ou déclaration reçu pour l'instant.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {(dossier?.payments || []).map((p: any) => (
+                    <div
+                      key={p.id}
+                      className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 flex items-center justify-between gap-3"
+                    >
+                      <div>
+                        <p className="text-sm font-black text-slate-900">
+                          {Number(p.amount).toLocaleString('fr-FR')} FCFA
+                        </p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Méthode: <span className="font-semibold text-slate-700">{p.method}</span>
+                          {p.payer_name ? ` · Payeur: ${p.payer_name}` : ''}
+                        </p>
+                        {p.reference_externe && (
+                          <p className="text-[11px] font-mono text-blue-700 mt-1">
+                            Réf: {p.reference_externe}
+                          </p>
+                        )}
+                      </div>
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-bold ${
+                          p.status === 'SUCCESS'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : p.status === 'REJECTED'
+                            ? 'bg-rose-100 text-rose-800'
+                            : 'bg-amber-100 text-amber-800'
+                        }`}
+                      >
+                        {p.status === 'SUCCESS' ? 'Validé' : p.status === 'REJECTED' ? 'Rejeté' : 'En attente'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Section Sinistres CIMA */}
+          <Card>
+            <CardHeader className="flex-row items-center justify-between space-y-0 border-b border-slate-100">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-rose-700">Assistance CIMA</p>
+                <CardTitle className="mt-1 flex items-center gap-2 text-lg">
+                  <AlertTriangle className="h-5 w-5 text-rose-600" /> Sinistres déclarés
+                </CardTitle>
+                <p className="mt-1 text-sm text-slate-500">Dossiers accidents et indemnisations CIMA.</p>
+              </div>
+              <Link href="/dashboard/sinistres">
+                <button className="flex min-h-9 items-center gap-1.5 rounded-xl bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors">
+                  <ExternalLink className="h-3 w-3" />
+                  Gestionnaire Sinistres
+                </button>
+              </Link>
+            </CardHeader>
+            <CardContent className="pt-6">
+              {(dossier?.sinistres || []).length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-200 py-10 text-center">
+                  <ShieldCheck className="mx-auto h-8 w-8 text-slate-300" />
+                  <p className="mt-3 text-sm font-bold text-slate-700">Aucun sinistre déclaré</p>
+                  <p className="mt-1 text-sm text-slate-500">Ce client n'a aucun accident ou sinistre en cours.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {(dossier?.sinistres || []).map((s: any) => (
+                    <div
+                      key={s.id}
+                      className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 flex items-center justify-between gap-3"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-black text-sm text-blue-700">
+                            {s.reference || s.claim_number || 'SINISTRE'}
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            {s.incident_date ? new Date(s.incident_date).toLocaleDateString('fr-FR') : ''}
+                          </span>
+                        </div>
+                        <p className="text-xs font-bold text-slate-800 mt-1">
+                          {s.title || s.description || 'Déclaration accident'}
+                        </p>
+                        {s.location && (
+                          <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1">
+                            <MapPin className="h-3 w-3 text-slate-400" />
+                            {s.location}
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-bold ${
+                            s.status === 'CLOTURE' || s.status === 'RESOLU'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : s.status === 'REFUSE'
+                              ? 'bg-rose-100 text-rose-800'
+                              : 'bg-amber-100 text-amber-800'
+                          }`}
+                        >
+                          {s.status}
+                        </span>
+                        <div className="mt-2">
+                          <Link
+                            href="/dashboard/sinistres"
+                            className="text-xs font-bold text-blue-700 hover:underline inline-flex items-center gap-1"
+                          >
+                            Suivre CIMA <ExternalLink className="h-3 w-3" />
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
       </div>
       </main>
     </div>

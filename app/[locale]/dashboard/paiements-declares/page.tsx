@@ -21,6 +21,9 @@ import {
   Search,
   X,
   FileCheck,
+  MessageCircle,
+  ShieldCheck,
+  ZoomIn,
 } from 'lucide-react'
 import { asList, portalClientApi, contractsApi, proxiedAssetUrl } from '@/lib/api/mobi-assur'
 import { RoleGuard } from '@/components/auth/RoleGuard'
@@ -49,11 +52,13 @@ export default function PaiementsDeclaresPage() {
   const items = asList<Record<string, unknown>>(data)
   const failures = asList<Record<string, unknown>>(failuresQ.data)
 
-  const [validatingPaymentId, setValidatingPaymentId] = useState<string | null>(null)
-  const [rejectingPaymentId, setRejectingPaymentId] = useState<string | null>(null)
+  const [selectedPaymentForValidation, setSelectedPaymentForValidation] = useState<Record<string, any> | null>(null)
+  const [selectedPaymentForRejection, setSelectedPaymentForRejection] = useState<Record<string, any> | null>(null)
+  const [lastValidatedPayment, setLastValidatedPayment] = useState<Record<string, any> | null>(null)
   const [receivedReference, setReceivedReference] = useState('')
   const [rejectionReason, setRejectionReason] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+  const [previewProofUrl, setPreviewProofUrl] = useState<string | null>(null)
 
   const remindMut = useMutation({
     mutationFn: () => portalClientApi.runReminders(),
@@ -77,10 +82,17 @@ export default function PaiementsDeclaresPage() {
       contractsApi.validatePayment(contractId, paymentId, {
         received_reference: receivedReference,
       }),
-    onSuccess: () => {
-      toast.success('Paiement validé avec succès')
+    onSuccess: (_, variables) => {
+      toast.success('Paiement validé avec succès ! Contrat activé et attestations CIMA disponibles.')
       qc.invalidateQueries({ queryKey: ['pending-client-payments'] })
-      setValidatingPaymentId(null)
+      qc.invalidateQueries({ queryKey: ['contracts'] })
+      if (selectedPaymentForValidation) {
+        setLastValidatedPayment({
+          ...selectedPaymentForValidation,
+          validated_reference: variables.receivedReference,
+        })
+      }
+      setSelectedPaymentForValidation(null)
       setReceivedReference('')
     },
     onError: (e: any) => {
@@ -104,7 +116,7 @@ export default function PaiementsDeclaresPage() {
     onSuccess: () => {
       toast.success('Paiement rejeté avec succès')
       qc.invalidateQueries({ queryKey: ['pending-client-payments'] })
-      setRejectingPaymentId(null)
+      setSelectedPaymentForRejection(null)
       setRejectionReason('')
     },
     onError: (e: any) => {
@@ -245,8 +257,6 @@ export default function PaiementsDeclaresPage() {
                   <tbody className="divide-y divide-slate-100 text-slate-700">
                     {filteredItems.map((p) => {
                       const proofs = paymentProofUrls(p)
-                      const isThisValidating = validatingPaymentId === String(p.id)
-                      const isThisRejecting = rejectingPaymentId === String(p.id)
 
                       return (
                         <tr key={String(p.id)} className="hover:bg-slate-50/70 transition-colors align-middle">
@@ -289,17 +299,16 @@ export default function PaiementsDeclaresPage() {
                             ) : (
                               <div className="flex flex-wrap gap-1.5 max-w-[160px]">
                                 {proofs.map((url, idx) => (
-                                  <a
+                                  <button
+                                    type="button"
                                     key={idx}
-                                    href={proxiedAssetUrl(url)}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100 border border-emerald-200/80 transition-colors"
+                                    onClick={() => setPreviewProofUrl(proxiedAssetUrl(url))}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100 border border-emerald-200/80 transition-colors cursor-pointer"
                                   >
                                     <FileCheck className="h-3 w-3 text-emerald-600" />
                                     Preuve {idx + 1}
-                                    <ExternalLink className="h-2.5 w-2.5 opacity-60" />
-                                  </a>
+                                    <ZoomIn className="h-2.5 w-2.5 opacity-60" />
+                                  </button>
                                 ))}
                               </div>
                             )}
@@ -308,134 +317,42 @@ export default function PaiementsDeclaresPage() {
                             {p.created_at ? new Date(String(p.created_at)).toLocaleDateString('fr-FR') : '—'}
                           </td>
                           <td className="px-4 py-3.5 text-right">
-                            <div className="flex justify-end items-center gap-2">
-                              {isThisValidating ? (
-                                <div className="flex flex-col gap-1.5 text-left min-w-[220px] bg-slate-50 p-3 rounded-xl border border-blue-200 shadow-sm animate-in fade-in-50">
-                                  <span className="text-[10px] text-slate-600 font-bold uppercase tracking-wider">
-                                    Référence de transaction reçue :
-                                  </span>
-                                  <Input
-                                    className="h-8 text-xs font-mono bg-white"
-                                    placeholder="Ex: N° transaction MoMo/OM"
-                                    value={receivedReference}
-                                    onChange={(e) => setReceivedReference(e.target.value)}
-                                    disabled={validateMut.isPending}
-                                  />
-                                  <div className="flex gap-1.5 mt-1">
-                                    <Button
-                                      size="sm"
-                                      variant="success"
-                                      className="h-7 text-[11px] flex-1 text-white font-bold"
-                                      disabled={validateMut.isPending || !receivedReference.trim()}
-                                      isLoading={validateMut.isPending}
-                                      onClick={() => {
-                                        validateMut.mutate({
-                                          contractId: String(p.contract_id),
-                                          paymentId: String(p.id),
-                                          receivedReference: receivedReference.trim(),
-                                        })
-                                      }}
-                                    >
-                                      Confirmer
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-7 text-[11px] flex-1"
-                                      disabled={validateMut.isPending}
-                                      onClick={() => {
-                                        setValidatingPaymentId(null)
-                                        setReceivedReference('')
-                                      }}
-                                    >
-                                      Annuler
-                                    </Button>
-                                  </div>
-                                </div>
-                              ) : isThisRejecting ? (
-                                <div className="flex flex-col gap-1.5 text-left min-w-[220px] bg-rose-50/80 p-3 rounded-xl border border-rose-200 shadow-sm animate-in fade-in-50">
-                                  <span className="text-[10px] text-rose-700 font-bold uppercase tracking-wider">
-                                    Motif du rejet (facultatif) :
-                                  </span>
-                                  <Input
-                                    className="h-8 text-xs bg-white border-rose-200"
-                                    placeholder="Ex: Référence invalide, non reçu"
-                                    value={rejectionReason}
-                                    onChange={(e) => setRejectionReason(e.target.value)}
-                                    disabled={rejectMut.isPending}
-                                  />
-                                  <div className="flex gap-1.5 mt-1">
-                                    <Button
-                                      size="sm"
-                                      variant="destructive"
-                                      className="h-7 text-[11px] flex-1 font-bold bg-rose-600 hover:bg-rose-700 text-white"
-                                      disabled={rejectMut.isPending}
-                                      isLoading={rejectMut.isPending}
-                                      onClick={() => {
-                                        rejectMut.mutate({
-                                          contractId: String(p.contract_id),
-                                          paymentId: String(p.id),
-                                          reason: rejectionReason.trim() || undefined,
-                                        })
-                                      }}
-                                    >
-                                      Rejeter
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-7 text-[11px] flex-1"
-                                      disabled={rejectMut.isPending}
-                                      onClick={() => {
-                                        setRejectingPaymentId(null)
-                                        setRejectionReason('')
-                                      }}
-                                    >
-                                      Annuler
-                                    </Button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <>
-                                  {p.contract_id && (
-                                    <Link
-                                      href={`/dashboard/contracts/${String(p.contract_id)}`}
-                                      className="inline-flex items-center gap-1 text-xs text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-50 px-2.5 py-1.5 rounded-lg transition-colors font-semibold bg-white"
-                                    >
-                                      <Eye className="h-3.5 w-3.5" />
-                                      Détails
-                                    </Link>
-                                  )}
-                                  <RoleGuard permission="payments:manage" fallback={null}>
-                                    <Button
-                                      size="sm"
-                                      variant="success"
-                                      className="text-white h-8 text-xs font-bold"
-                                      onClick={() => {
-                                        setValidatingPaymentId(String(p.id))
-                                        setRejectingPaymentId(null)
-                                        setReceivedReference('')
-                                      }}
-                                    >
-                                      <Check className="h-3.5 w-3.5 mr-1" />
-                                      Valider
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-8 text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
-                                      onClick={() => {
-                                        setRejectingPaymentId(String(p.id))
-                                        setValidatingPaymentId(null)
-                                        setRejectionReason('')
-                                      }}
-                                    >
-                                      <XCircle className="h-3.5 w-3.5 mr-1" />
-                                      Rejeter
-                                    </Button>
-                                  </RoleGuard>
-                                </>
-                              )}
+                            <div className="flex justify-end items-center gap-1.5">
+                              {p.contract_id ? (
+                                <Link
+                                  href={`/dashboard/contracts/${String(p.contract_id)}`}
+                                  className="inline-flex items-center gap-1 text-xs text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-50 px-2.5 py-1.5 rounded-lg transition-colors font-semibold bg-white"
+                                >
+                                  <Eye className="h-3.5 w-3.5" />
+                                  Détails
+                                </Link>
+                              ) : null}
+                              <RoleGuard permission="payments:manage" fallback={null}>
+                                <Button
+                                  size="sm"
+                                  variant="success"
+                                  className="text-white h-8 text-xs font-bold"
+                                  onClick={() => {
+                                    setSelectedPaymentForValidation(p)
+                                    setReceivedReference(String(p.reference_externe || ''))
+                                  }}
+                                >
+                                  <Check className="h-3.5 w-3.5 mr-1" />
+                                  Valider
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
+                                  onClick={() => {
+                                    setSelectedPaymentForRejection(p)
+                                    setRejectionReason('')
+                                  }}
+                                >
+                                  <XCircle className="h-3.5 w-3.5 mr-1" />
+                                  Rejeter
+                                </Button>
+                              </RoleGuard>
                             </div>
                           </td>
                         </tr>
@@ -487,6 +404,269 @@ export default function PaiementsDeclaresPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Modal de Confirmation de Validation ProMax */}
+      {selectedPaymentForValidation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-xl w-full shadow-2xl border border-slate-200 space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
+                  <ShieldCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Confirmation de Validation du Paiement</h3>
+                  <p className="text-xs text-slate-500">Contrôle de conformité avant déverrouillage de la police</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedPaymentForValidation(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 text-lg font-bold"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Récapitulatif du versement */}
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-500 font-medium">Montant à valider :</span>
+                <span className="text-lg font-black text-slate-900 font-mono">
+                  {Number(selectedPaymentForValidation.amount || 0).toLocaleString('fr-FR')} XAF
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-500">Nom du payeur :</span>
+                <span className="font-bold text-slate-800">{String(selectedPaymentForValidation.payer_name || 'Non renseigné')}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-500">Mode de paiement :</span>
+                <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200/60">
+                  {String(selectedPaymentForValidation.method || 'Mobile Money')}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-500">Contrat cible :</span>
+                <span className="font-mono font-bold text-slate-700">
+                  {String(selectedPaymentForValidation.contract_id || '—')}
+                </span>
+              </div>
+            </div>
+
+            {/* Preuves jointes */}
+            {(() => {
+              const proofs = paymentProofUrls(selectedPaymentForValidation)
+              if (proofs.length === 0) return null
+              return (
+                <div className="space-y-1.5">
+                  <span className="text-xs font-bold text-slate-700 block">Preuve(s) de versement transmise(s) :</span>
+                  <div className="flex flex-wrap gap-2">
+                    {proofs.map((url, idx) => (
+                      <button
+                        type="button"
+                        key={idx}
+                        onClick={() => setPreviewProofUrl(proxiedAssetUrl(url))}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-xs font-bold text-emerald-800 hover:bg-emerald-100 border border-emerald-300 transition-colors"
+                      >
+                        <FileCheck className="h-4 w-4 text-emerald-600" />
+                        Examiner la preuve {idx + 1}
+                        <ZoomIn className="h-3 w-3 opacity-70" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
+
+            {/* Saisie / vérification de référence */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-800 block">
+                Référence / ID de transaction constatée sur votre compte *
+              </label>
+              <Input
+                placeholder="Ex: CI240518.1720.A12345"
+                value={receivedReference}
+                onChange={(e) => setReceivedReference(e.target.value)}
+                className="text-xs font-mono font-bold bg-white h-10 border-slate-300 focus:border-emerald-600 focus:ring-emerald-600/20"
+              />
+              <p className="text-[11px] text-slate-500">
+                Pré-remplie avec la référence déclarée par le client. Vous pouvez la corriger d'après votre SMS marchand.
+              </p>
+            </div>
+
+            {/* Avertissement CIMA */}
+            <div className="p-3.5 rounded-xl bg-emerald-50/80 border border-emerald-200/80 text-xs text-emerald-900 leading-relaxed font-medium">
+              ⚡ <strong>Activation immédiate :</strong> La validation passe le contrat au statut <strong>PAYE / ACTIF</strong>, génère les attestations CIMA officielles et déverrouille le compte de l'assuré sur l'application mobile.
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={validateMut.isPending}
+                onClick={() => setSelectedPaymentForValidation(null)}
+                className="rounded-xl text-xs font-bold"
+              >
+                Annuler
+              </Button>
+              <Button
+                type="button"
+                disabled={validateMut.isPending || !receivedReference.trim()}
+                onClick={() => {
+                  validateMut.mutate({
+                    contractId: String(selectedPaymentForValidation.contract_id),
+                    paymentId: String(selectedPaymentForValidation.id),
+                    receivedReference: receivedReference.trim(),
+                  })
+                }}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs px-5"
+              >
+                {validateMut.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <ShieldCheck className="h-4 w-4 mr-1.5" />}
+                Confirmer et Activer la police
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Rejet du Paiement */}
+      {selectedPaymentForRejection && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-base font-bold text-rose-950 flex items-center gap-2">
+                <XCircle className="h-5 w-5 text-rose-600" />
+                Rejeter la déclaration de paiement
+              </h3>
+              <button
+                type="button"
+                onClick={() => setSelectedPaymentForRejection(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 text-lg font-bold"
+              >
+                ×
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Le paiement déclaré pour le contrat <strong>{String(selectedPaymentForRejection.contract_id)}</strong> d'un montant de{' '}
+              <strong>{Number(selectedPaymentForRejection.amount || 0).toLocaleString('fr-FR')} XAF</strong> sera marqué comme non reçu ou invalide.
+            </p>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 block">Motif du rejet (facultatif) :</label>
+              <Input
+                placeholder="Ex: Référence introuvable sur le relevé Orange Money..."
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                className="text-xs bg-white"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={rejectMut.isPending}
+                onClick={() => setSelectedPaymentForRejection(null)}
+                className="rounded-xl text-xs font-bold"
+              >
+                Annuler
+              </Button>
+              <Button
+                type="button"
+                disabled={rejectMut.isPending}
+                onClick={() => {
+                  rejectMut.mutate({
+                    contractId: String(selectedPaymentForRejection.contract_id),
+                    paymentId: String(selectedPaymentForRejection.id),
+                    reason: rejectionReason.trim() || undefined,
+                  })
+                }}
+                className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold"
+              >
+                {rejectMut.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <XCircle className="h-4 w-4 mr-1.5" />}
+                Confirmer le rejet
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Succès & Alerte WhatsApp Assuré */}
+      {lastValidatedPayment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl border border-slate-200 text-center space-y-4">
+            <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-sm">
+              <CheckCircle2 className="h-8 w-8 text-emerald-600" />
+            </div>
+
+            <div>
+              <h3 className="text-lg font-black text-slate-900">Police CIMA Activée avec Succès !</h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Le règlement de {Number(lastValidatedPayment.amount || 0).toLocaleString('fr-FR')} XAF pour le contrat{' '}
+                <span className="font-mono font-bold text-slate-800">{String(lastValidatedPayment.contract_id).slice(0, 8).toUpperCase()}</span> a été validé.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200/80 text-left text-xs text-emerald-950 space-y-2">
+              <p className="font-bold flex items-center gap-1.5">
+                <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                Contrat actif & compte débloqué
+              </p>
+              <p className="text-[11px] text-emerald-800">
+                Vous pouvez maintenant envoyer une confirmation directe à l'assuré sur WhatsApp.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setLastValidatedPayment(null)}
+                className="w-full sm:flex-1 rounded-xl text-xs font-bold"
+              >
+                Fermer
+              </Button>
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(
+                  `Bonjour ${lastValidatedPayment.payer_name || 'cher assuré'}, votre paiement de ${Number(lastValidatedPayment.amount || 0).toLocaleString('fr-FR')} XAF (Réf: ${lastValidatedPayment.validated_reference || ''}) a été validé avec succès par BETHEL ASSURANCES. Votre contrat est désormais actif et vos attestations CIMA sont disponibles sur votre application !`
+                )}`}
+                target="_blank"
+                rel="noreferrer"
+                className="w-full sm:flex-1 inline-flex items-center justify-center h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors"
+              >
+                <MessageCircle className="h-4 w-4 mr-1.5" />
+                Alerter WhatsApp
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox Visualisation Preuve */}
+      {previewProofUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in"
+          onClick={() => setPreviewProofUrl(null)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh] flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={() => setPreviewProofUrl(null)}
+              className="absolute -top-10 right-0 text-white hover:text-slate-300 p-1 font-bold text-lg"
+            >
+              × Fermer
+            </button>
+            <img
+              src={previewProofUrl}
+              alt="Preuve de paiement"
+              className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl border border-white/20 bg-white"
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import dynamic from 'next/dynamic'
 import Header from '@/components/dashboard/Header'
 import { Button } from '@/components/ui/button'
 import SearchableSelect from '@/components/ui/searchable-select'
@@ -24,11 +25,26 @@ import {
   Copy,
   MessageCircle,
   Coins,
-  CheckCheck
+  CheckCheck,
+  Image as ImageIcon,
+  ZoomIn,
+  X
 } from 'lucide-react'
 import { asList, sinistresApi, type SinistreItem } from '@/lib/api/mobi-assur'
 import ExcelImportModal from '@/components/excel/ExcelImportModal'
 import { useTranslations } from 'next-intl'
+
+const SinistreMapPreview = dynamic(
+  () => import('@/components/dashboard/SinistreMapPreview'),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-56 w-full rounded-2xl bg-amber-50/50 border border-amber-200/60 animate-pulse flex items-center justify-center text-xs font-bold text-amber-700">
+        Chargement de la carte GPS...
+      </div>
+    ),
+  }
+)
 
 const STATUSES = [
   'DECLARE',
@@ -67,6 +83,7 @@ export default function SinistresPage() {
   const [selected, setSelected] = useState<SinistreItem | null>(null)
   const [note, setNote] = useState('')
   const [newStatus, setNewStatus] = useState('EN_COURS')
+  const [activePhotoUrl, setActivePhotoUrl] = useState<string | null>(null)
 
   // Modals CIMA
   const [isMandateModalOpen, setIsMandateModalOpen] = useState(false)
@@ -304,64 +321,111 @@ export default function SinistresPage() {
               </CardHeader>
 
               <CardContent className="p-6 flex-1 overflow-y-auto space-y-6">
-                {/* CIMA 6-Step Progress Stepper */}
+                {/* Stepper CIMA 4 Macro-Phases Synchronisé avec l'application mobile */}
                 <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50/80 via-slate-50 to-indigo-50/80 border border-blue-100 shadow-2xs space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-blue-800 flex items-center gap-1.5">
                       <ShieldAlert className="h-3.5 w-3.5 text-blue-600" />
-                      Procédure de Règlement Automobile (Code CIMA)
+                      Procédure de Règlement Automobile (Code CIMA - 4 Étapes)
                     </span>
                     <span className="text-[11px] font-bold text-slate-500">
                       Étape active : {(STATUS_CONFIG[detail.status] || STATUS_CONFIG.DECLARE).label}
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                     {[
-                      { num: 1, label: 'Déclaration', active: ['DECLARE', 'DECLARATION_RECUE', 'EN_COURS', 'EN_INSTRUCTION', 'EXPERTISE_MANDATEE', 'RAPPORT_DEPOSE', 'OFFRE_ET_QUITTANCE', 'REGLE_ET_CLOTURE'].includes(detail.status) },
-                      { num: 2, label: 'Instruction', active: ['EN_COURS', 'EN_INSTRUCTION', 'EXPERTISE_MANDATEE', 'RAPPORT_DEPOSE', 'OFFRE_ET_QUITTANCE', 'REGLE_ET_CLOTURE'].includes(detail.status) },
-                      { num: 3, label: 'Expertise', active: ['EXPERTISE_MANDATEE', 'RAPPORT_DEPOSE', 'OFFRE_ET_QUITTANCE', 'REGLE_ET_CLOTURE'].includes(detail.status) },
-                      { num: 4, label: 'Rapport', active: ['RAPPORT_DEPOSE', 'OFFRE_ET_QUITTANCE', 'REGLE_ET_CLOTURE'].includes(detail.status) },
-                      { num: 5, label: 'Offre & Quittance', active: ['OFFRE_ET_QUITTANCE', 'REGLE_ET_CLOTURE'].includes(detail.status) },
-                      { num: 6, label: 'Règlement', active: ['REGLE_ET_CLOTURE'].includes(detail.status) },
+                      {
+                        num: 1,
+                        title: "1. Déclaration par l'assuré",
+                        desc: "Constat, GPS et photos transmis",
+                        active: true,
+                        current: ['DECLARE', 'DECLARATION_RECUE', 'EN_COURS', 'EN_INSTRUCTION'].includes(detail.status),
+                      },
+                      {
+                        num: 2,
+                        title: "2. Expertise & Chiffrage",
+                        desc: "Mandatement expert et rapport",
+                        active: ['EXPERTISE_MANDATEE', 'RAPPORT_DEPOSE', 'OFFRE_ET_QUITTANCE', 'REGLE_ET_CLOTURE'].includes(detail.status),
+                        current: ['EXPERTISE_MANDATEE', 'RAPPORT_DEPOSE'].includes(detail.status),
+                      },
+                      {
+                        num: 3,
+                        title: "3. Quittance d'indemnisation",
+                        desc: "Offre d'accord & signature quittance",
+                        active: ['OFFRE_ET_QUITTANCE', 'REGLE_ET_CLOTURE'].includes(detail.status),
+                        current: detail.status === 'OFFRE_ET_QUITTANCE',
+                      },
+                      {
+                        num: 4,
+                        title: "4. Paiement & Clôture",
+                        desc: "Règlement MoMo / Virement validé",
+                        active: ['REGLE_ET_CLOTURE', 'CLOS'].includes(detail.status),
+                        current: ['REGLE_ET_CLOTURE', 'CLOS'].includes(detail.status),
+                      },
                     ].map((step) => (
                       <div
                         key={step.num}
-                        className={`p-2 rounded-xl border text-center transition-all ${
-                          step.active
-                            ? 'bg-blue-600 text-white border-blue-600 font-bold shadow-2xs'
+                        className={`p-3 rounded-xl border text-left transition-all ${
+                          step.current
+                            ? 'bg-blue-600 text-white border-blue-600 font-bold shadow-xs ring-2 ring-blue-500/30'
+                            : step.active
+                            ? 'bg-emerald-50 text-emerald-900 border-emerald-200/80 font-bold'
                             : 'bg-white/80 text-slate-400 border-slate-200/80 font-medium'
                         }`}
                       >
-                        <p className="text-[10px] opacity-80">Étape {step.num}</p>
-                        <p className="text-[11px] truncate">{step.label}</p>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                            step.current ? 'bg-white/20 text-white' : step.active ? 'bg-emerald-200/60 text-emerald-800' : 'bg-slate-100 text-slate-500'
+                          }`}>
+                            Étape {step.num}
+                          </span>
+                          {step.active && !step.current && (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                          )}
+                        </div>
+                        <p className="text-xs truncate">{step.title}</p>
+                        <p className={`text-[10px] truncate mt-0.5 ${step.current ? 'text-blue-100' : 'text-slate-500'}`}>
+                          {step.desc}
+                        </p>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Location & GPS Info */}
+                {/* Location & GPS Interactive Map Preview */}
                 {(detail.location || detail.gps_lat != null) && (
-                  <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-amber-50/60 border border-amber-200/60 text-xs">
-                    <div className="flex items-center gap-2 text-amber-900 font-semibold">
-                      <MapPin className="h-4 w-4 text-amber-600 shrink-0" />
-                      <span>Lieu : {detail.location || 'Localisation GPS'}</span>
-                      {detail.incident_at && (
-                        <span className="text-amber-700/80 font-normal">
-                          · Date accident : {new Date(detail.incident_at).toLocaleDateString('fr-FR')}
-                        </span>
+                  <div className="space-y-3 p-4 rounded-2xl bg-amber-50/50 border border-amber-200/80">
+                    <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-2 text-amber-900 font-semibold">
+                        <MapPin className="h-4 w-4 text-amber-600 shrink-0" />
+                        <span>Lieu : {detail.location || 'Localisation GPS de l\'accident'}</span>
+                        {detail.incident_at && (
+                          <span className="text-amber-700/80 font-normal">
+                            · Date accident : {new Date(detail.incident_at).toLocaleDateString('fr-FR')}
+                          </span>
+                        )}
+                      </div>
+                      {detail.gps_lat != null && detail.gps_lng != null && (
+                        <a
+                          href={`https://www.google.com/maps?q=${detail.gps_lat},${detail.gps_lng}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-amber-100 text-amber-800 font-bold rounded-lg border border-amber-300 shadow-2xs"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          Ouvrir Google Maps ({detail.gps_lat.toFixed(4)}, {detail.gps_lng.toFixed(4)})
+                        </a>
                       )}
                     </div>
+
                     {detail.gps_lat != null && detail.gps_lng != null && (
-                      <a
-                        href={`https://www.google.com/maps?q=${detail.gps_lat},${detail.gps_lng}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-amber-100 text-amber-800 font-bold rounded-lg border border-amber-300 shadow-2xs"
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        Ouvrir GPS ({detail.gps_lat.toFixed(4)}, {detail.gps_lng.toFixed(4)})
-                      </a>
+                      <SinistreMapPreview
+                        lat={detail.gps_lat}
+                        lng={detail.gps_lng}
+                        address={detail.location || undefined}
+                        reference={detail.reference}
+                      />
                     )}
                   </div>
                 )}
@@ -408,6 +472,21 @@ export default function SinistresPage() {
                       {settleMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCheck className="h-3.5 w-3.5" />}
                       Régler & Clôturer
                     </Button>
+                  )}
+
+                  {/* Alerter l'assuré par WhatsApp */}
+                  {((detail as any).client_phone || (detail as any).client?.phone || (selected as any)?.client_phone) && (
+                    <a
+                      href={`https://wa.me/${String((detail as any).client_phone || (detail as any).client?.phone || (selected as any)?.client_phone).replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                        `Bonjour, votre dossier de sinistre automobile réf: ${detail.reference} est actuellement à l'étape : ${(STATUS_CONFIG[detail.status] || STATUS_CONFIG.DECLARE).label}. Votre assureur BETHEL ASSURANCES reste à votre disposition.`
+                      )}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center h-8 px-3 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs"
+                    >
+                      <MessageCircle className="h-3.5 w-3.5 mr-1.5" />
+                      Alerter l'assuré (WhatsApp)
+                    </a>
                   )}
                 </div>
 
@@ -495,6 +574,64 @@ export default function SinistresPage() {
                   </div>
                 </div>
 
+                {/* Visual Gallery of Photos (Accident, Constat, Dégâts) */}
+                {(() => {
+                  const allDocs = (detail.documents || []) as any[]
+                  const photos = allDocs.filter((d: any) => {
+                    const url = String(d.file_url || d.signed_url || '')
+                    const name = String(d.file_name || '')
+                    const type = String(d.doc_type || '').toLowerCase()
+                    return (
+                      url.match(/\.(jpg|jpeg|png|webp|gif)/i) ||
+                      name.match(/\.(jpg|jpeg|png|webp|gif)/i) ||
+                      type.includes('photo') ||
+                      type.includes('constat') ||
+                      type.includes('degat') ||
+                      type.includes('choc')
+                    )
+                  })
+
+                  if (photos.length === 0) return null
+
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                          <ImageIcon className="h-3.5 w-3.5 text-blue-600" />
+                          Galerie Photos du Sinistre ({photos.length} image{photos.length > 1 ? 's' : ''})
+                        </h4>
+                        <span className="text-[11px] text-slate-400">Cliquez pour agrandir</span>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                        {photos.map((p: any, idx: number) => {
+                          const imgUrl = p.file_url || p.signed_url || ''
+                          const label = p.file_name || p.doc_type || `Photo ${idx + 1}`
+                          return (
+                            <div
+                              key={p.id || idx}
+                              onClick={() => setActivePhotoUrl(imgUrl)}
+                              className="group relative h-28 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 cursor-pointer shadow-2xs hover:shadow-md transition-all"
+                            >
+                              <img
+                                src={imgUrl}
+                                alt={label}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                              />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                                <ZoomIn className="h-5 w-5" />
+                              </div>
+                              <div className="absolute bottom-0 inset-x-0 p-1 bg-black/60 backdrop-blur-xs text-[10px] text-white truncate font-medium">
+                                {label}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })()}
+
                 {/* Timeline */}
                 <div className="space-y-2">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Historique d'instruction</h4>
@@ -516,9 +653,9 @@ export default function SinistresPage() {
                   </div>
                 </div>
 
-                {/* Documents */}
+                {/* Documents non-images */}
                 <div className="space-y-2">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Pièces justificatives</h4>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Rapports & Pièces jointes</h4>
                   <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/70">
                     <ul className="space-y-2">
                       {(detail.documents || []).map((d) => (
@@ -804,6 +941,29 @@ export default function SinistresPage() {
                 </Button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox Photo Preview Modal */}
+      {activePhotoUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in"
+          onClick={() => setActivePhotoUrl(null)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh] flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={() => setActivePhotoUrl(null)}
+              className="absolute -top-10 right-0 text-white hover:text-slate-300 p-1"
+            >
+              <X className="h-6 w-6" />
+            </button>
+            <img
+              src={activePhotoUrl}
+              alt="Aperçu du sinistre"
+              className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl border border-white/20"
+            />
           </div>
         </div>
       )}
