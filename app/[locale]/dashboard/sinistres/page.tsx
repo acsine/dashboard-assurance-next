@@ -35,7 +35,7 @@ import {
   Activity,
   Layers
 } from 'lucide-react'
-import { asList, sinistresApi, type SinistreItem } from '@/lib/api/mobi-assur'
+import { asList, sinistresApi, type SinistreItem, proxiedAssetUrl } from '@/lib/api/mobi-assur'
 import ExcelImportModal from '@/components/excel/ExcelImportModal'
 import { useTranslations } from 'next-intl'
 
@@ -794,7 +794,7 @@ export default function SinistresPage() {
 
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                       {photos.map((p: any, idx: number) => {
-                        const imgUrl = p.file_url || p.signed_url || ''
+                        const imgUrl = proxiedAssetUrl(p.file_url || p.signed_url)
                         const label = p.file_name || p.doc_type || `Photo ${idx + 1}`
                         return (
                           <div
@@ -853,7 +853,7 @@ export default function SinistresPage() {
                           {d.file_name || d.doc_type}
                         </span>
                         <a
-                          href={d.file_url}
+                          href={proxiedAssetUrl(d.file_url || (d as any).signed_url)}
                           target="_blank"
                           rel="noreferrer"
                           className="text-xs font-bold text-blue-600 hover:text-blue-700 underline"

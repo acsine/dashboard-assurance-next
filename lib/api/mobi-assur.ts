@@ -8,7 +8,14 @@ import { validateUploadFile } from '@/lib/files/validation'
 
 const BFF_BASE = '/api/backend'
 
-export function proxiedAssetUrl(value: string): string {
+export function proxiedAssetUrl(value?: string | null): string {
+  if (!value) return ''
+  if (value.startsWith('imagekit://')) {
+    const parts = value.replace('imagekit://', '').split('/')
+    parts.shift() // retirer file_id
+    const path = parts.join('/')
+    return `https://ik.imagekit.io/Nkengmui1998/${path}`
+  }
   if (value.startsWith('http://') || value.startsWith('https://')) {
     // URLs signées externes (Supabase / CDN) : lecture directe
     try {

@@ -33,11 +33,13 @@ import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 
 function paymentProofUrls(payment: Record<string, any>): string[] {
+  let urls: string[] = []
   if (Array.isArray(payment.proof_urls) && payment.proof_urls.length > 0) {
-    return payment.proof_urls.filter(Boolean)
+    urls = payment.proof_urls.filter(Boolean)
+  } else if (typeof payment.proof_url === 'string' && payment.proof_url) {
+    urls = [payment.proof_url]
   }
-  if (typeof payment.proof_url === 'string' && payment.proof_url) return [payment.proof_url]
-  return []
+  return urls.map((u) => proxiedAssetUrl(u)).filter(Boolean)
 }
 
 function TargetContractDetailsCard({

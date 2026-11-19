@@ -36,11 +36,13 @@ import {
 } from 'lucide-react'
 
 function paymentProofUrls(payment: Payment): string[] {
+  let urls: string[] = []
   if (Array.isArray(payment.proof_urls) && payment.proof_urls.length > 0) {
-    return payment.proof_urls.filter(Boolean)
+    urls = payment.proof_urls.filter(Boolean) as string[]
+  } else if (payment.proof_url) {
+    urls = [payment.proof_url]
   }
-  if (payment.proof_url) return [payment.proof_url]
-  return []
+  return urls.map((u) => proxiedAssetUrl(u)).filter(Boolean)
 }
 
 export default function ContractDetailPage({ params }: { params: Promise<{ id: string }> }) {

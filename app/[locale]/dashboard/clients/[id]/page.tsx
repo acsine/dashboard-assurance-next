@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState, use } from 'react'
-import { clientsApi, contractsApi, suggestCarteRoseSerial, portalClientApi } from '@/lib/api/mobi-assur'
+import { clientsApi, contractsApi, suggestCarteRoseSerial, portalClientApi, proxiedAssetUrl } from '@/lib/api/mobi-assur'
 import Header from '@/components/dashboard/Header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -881,7 +881,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
                       </div>
                       {(d.signed_url || d.file_url) && (
                         <a
-                          href={d.signed_url || d.file_url}
+                          href={proxiedAssetUrl(d.signed_url || d.file_url)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-white px-3 py-2 text-xs font-bold text-blue-700 border border-slate-200 hover:bg-blue-50 transition-colors"
