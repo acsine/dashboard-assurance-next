@@ -517,9 +517,10 @@ export default function PaiementsDeclaresPage() {
 
       {/* Modal de Confirmation de Validation ProMax */}
       {selectedPaymentForValidation && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in">
-          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-xl w-full shadow-2xl border border-slate-200 space-y-5">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs p-3 sm:p-4 flex min-h-full items-center justify-center animate-in fade-in">
+          <div className="bg-white rounded-3xl p-5 sm:p-7 max-w-xl w-full shadow-2xl border border-slate-200 flex flex-col max-h-[92vh] my-auto">
+            {/* Header (fixe) */}
+            <div className="flex items-center justify-between pb-3.5 border-b border-slate-100 shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
                   <ShieldCheck className="h-5 w-5" />
@@ -538,82 +539,85 @@ export default function PaiementsDeclaresPage() {
               </button>
             </div>
 
-            {/* Récapitulatif du versement */}
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-slate-500 font-medium">Montant à valider :</span>
-                <span className="text-lg font-black text-slate-900 font-mono">
-                  {Number(selectedPaymentForValidation.amount || 0).toLocaleString('fr-FR')} XAF
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-500">Nom du payeur :</span>
-                <span className="font-bold text-slate-800">{String(selectedPaymentForValidation.payer_name || 'Non renseigné')}</span>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-500">Mode de paiement :</span>
-                <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200/60">
-                  {String(selectedPaymentForValidation.method || 'Mobile Money')}
-                </span>
-              </div>
-            </div>
-
-            {/* Contrat et Véhicule Cible ProMax */}
-            {selectedPaymentForValidation.contract_id ? (
-              <TargetContractDetailsCard
-                contractId={String(selectedPaymentForValidation.contract_id)}
-                payment={selectedPaymentForValidation}
-              />
-            ) : null}
-
-            {/* Preuves jointes */}
-            {(() => {
-              const proofs = paymentProofUrls(selectedPaymentForValidation)
-              if (proofs.length === 0) return null
-              return (
-                <div className="space-y-1.5">
-                  <span className="text-xs font-bold text-slate-700 block">Preuve(s) de versement transmise(s) :</span>
-                  <div className="flex flex-wrap gap-2">
-                    {proofs.map((url, idx) => (
-                      <button
-                        type="button"
-                        key={idx}
-                        onClick={() => setPreviewProofUrl(proxiedAssetUrl(url))}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-xs font-bold text-emerald-800 hover:bg-emerald-100 border border-emerald-300 transition-colors"
-                      >
-                        <FileCheck className="h-4 w-4 text-emerald-600" />
-                        Examiner la preuve {idx + 1}
-                        <ZoomIn className="h-3 w-3 opacity-70" />
-                      </button>
-                    ))}
-                  </div>
+            {/* Contenu Défilable */}
+            <div className="overflow-y-auto pr-1 py-4 space-y-4 flex-1 overscroll-contain">
+              {/* Récapitulatif du versement */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-500 font-medium">Montant à valider :</span>
+                  <span className="text-lg font-black text-slate-900 font-mono">
+                    {Number(selectedPaymentForValidation.amount || 0).toLocaleString('fr-FR')} XAF
+                  </span>
                 </div>
-              )
-            })()}
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-500">Nom du payeur :</span>
+                  <span className="font-bold text-slate-800">{String(selectedPaymentForValidation.payer_name || 'Non renseigné')}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-500">Mode de paiement :</span>
+                  <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200/60">
+                    {String(selectedPaymentForValidation.method || 'Mobile Money')}
+                  </span>
+                </div>
+              </div>
 
-            {/* Saisie / vérification de référence */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-800 block">
-                Référence / ID de transaction constatée sur votre compte *
-              </label>
-              <Input
-                placeholder="Ex: CI240518.1720.A12345"
-                value={receivedReference}
-                onChange={(e) => setReceivedReference(e.target.value)}
-                className="text-xs font-mono font-bold bg-white h-10 border-slate-300 focus:border-emerald-600 focus:ring-emerald-600/20"
-              />
-              <p className="text-[11px] text-slate-500">
-                Pré-remplie avec la référence déclarée par le client. Vous pouvez la corriger d'après votre SMS marchand.
-              </p>
+              {/* Contrat et Véhicule Cible ProMax */}
+              {selectedPaymentForValidation.contract_id ? (
+                <TargetContractDetailsCard
+                  contractId={String(selectedPaymentForValidation.contract_id)}
+                  payment={selectedPaymentForValidation}
+                />
+              ) : null}
+
+              {/* Preuves jointes */}
+              {(() => {
+                const proofs = paymentProofUrls(selectedPaymentForValidation)
+                if (proofs.length === 0) return null
+                return (
+                  <div className="space-y-1.5">
+                    <span className="text-xs font-bold text-slate-700 block">Preuve(s) de versement transmise(s) :</span>
+                    <div className="flex flex-wrap gap-2">
+                      {proofs.map((url, idx) => (
+                        <button
+                          type="button"
+                          key={idx}
+                          onClick={() => setPreviewProofUrl(proxiedAssetUrl(url))}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-xs font-bold text-emerald-800 hover:bg-emerald-100 border border-emerald-300 transition-colors"
+                        >
+                          <FileCheck className="h-4 w-4 text-emerald-600" />
+                          Examiner la preuve {idx + 1}
+                          <ZoomIn className="h-3 w-3 opacity-70" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {/* Saisie / vérification de référence */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-800 block">
+                  Référence / ID de transaction constatée sur votre compte *
+                </label>
+                <Input
+                  placeholder="Ex: CI240518.1720.A12345"
+                  value={receivedReference}
+                  onChange={(e) => setReceivedReference(e.target.value)}
+                  className="text-xs font-mono font-bold bg-white h-10 border-slate-300 focus:border-emerald-600 focus:ring-emerald-600/20"
+                />
+                <p className="text-[11px] text-slate-500">
+                  Pré-remplie avec la référence déclarée par le client. Vous pouvez la corriger d'après votre SMS marchand.
+                </p>
+              </div>
+
+              {/* Avertissement CIMA */}
+              <div className="p-3.5 rounded-xl bg-emerald-50/80 border border-emerald-200/80 text-xs text-emerald-900 leading-relaxed font-medium">
+                ⚡ <strong>Activation immédiate :</strong> La validation passe le contrat au statut <strong>PAYE / ACTIF</strong>, génère les attestations CIMA officielles et déverrouille le compte de l'assuré sur l'application mobile.
+              </div>
             </div>
 
-            {/* Avertissement CIMA */}
-            <div className="p-3.5 rounded-xl bg-emerald-50/80 border border-emerald-200/80 text-xs text-emerald-900 leading-relaxed font-medium">
-              ⚡ <strong>Activation immédiate :</strong> La validation passe le contrat au statut <strong>PAYE / ACTIF</strong>, génère les attestations CIMA officielles et déverrouille le compte de l'assuré sur l'application mobile.
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center justify-end gap-3 pt-2">
+            {/* Footer / Boutons d'action (fixe en bas) */}
+            <div className="flex items-center justify-end gap-3 pt-3.5 border-t border-slate-100 shrink-0 bg-white">
               <Button
                 type="button"
                 variant="outline"
@@ -645,8 +649,8 @@ export default function PaiementsDeclaresPage() {
 
       {/* Modal de Rejet du Paiement */}
       {selectedPaymentForRejection && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in">
-          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-200 space-y-4">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs p-3 sm:p-4 flex min-h-full items-center justify-center animate-in fade-in">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-200 space-y-4 max-h-[92vh] overflow-y-auto my-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="text-base font-bold text-rose-950 flex items-center gap-2">
                 <XCircle className="h-5 w-5 text-rose-600" />
