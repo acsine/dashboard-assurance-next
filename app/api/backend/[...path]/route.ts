@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
-import { fetchBackend } from '@/lib/auth/backend'
+import { fetchBackend, backendUrl } from '@/lib/auth/backend'
 import { canProxy } from '@/lib/auth/roles'
 import {
   readSession,
@@ -34,12 +34,40 @@ async function handler(
   request: NextRequest,
   context: { params: Promise<{ path: string[] }> },
 ) {
+  const { path: segments } = await context.params
+  const path = backendPath(segments, request.nextUrl.search)
+
+  // Accès public transparent (ex: portail expert automobile magic-link, devis ouverts)
+  if (segments[0] === 'public') {
+    try {
+      const headers = new Headers()
+      const contentType = request.headers.get('content-type')
+      if (contentType && !contentType.includes('multipart/form-data')) headers.set('Content-Type', contentType)
+      const backend = await fetch(backendUrl(path), {
+        method: request.method,
+        headers,
+        body: await requestBody(request),
+        cache: 'no-store',
+      })
+      const responseHeaders = new Headers()
+      for (const name of ['content-type', 'content-disposition', 'cache-control']) {
+        const value = backend.headers.get(name)
+        if (value) responseHeaders.set(name, value)
+      }
+      return new NextResponse(backend.body, {
+        status: backend.status,
+        headers: responseHeaders,
+      })
+    } catch (error) {
+      console.error('Erreur proxy public:', error)
+      return NextResponse.json({ detail: 'Erreur de communication avec le service distant' }, { status: 502 })
+    }
+  }
+
   const cookieStore = await cookies()
   const session = await readSession(cookieStore.get(SESSION_COOKIE)?.value)
   if (!session) return NextResponse.json({ detail: 'Non authentifié' }, { status: 401 })
 
-  const { path: segments } = await context.params
-  const path = backendPath(segments, request.nextUrl.search)
   if (!canProxy(session.user.role, request.method, `/${segments.join('/')}`)) {
     return NextResponse.json({ detail: 'Action interdite pour ce rôle' }, { status: 403 })
   }

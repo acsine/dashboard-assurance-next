@@ -72,9 +72,11 @@ async function mobiRequest<T>(
   })
 
   if (res.status === 401) {
-    const { forceSessionExpiredLogout } = await import('@/lib/auth/session-expired')
-    await forceSessionExpiredLogout('Session expirée. Veuillez vous reconnecter.')
-    throw new MobiAssurApiError('Session expirée', 401)
+    if (!path.startsWith('/public')) {
+      const { forceSessionExpiredLogout } = await import('@/lib/auth/session-expired')
+      await forceSessionExpiredLogout('Session expirée. Veuillez vous reconnecter.')
+    }
+    throw new MobiAssurApiError('Non autorisé ou session expirée', 401)
   }
 
   if (!res.ok) {
@@ -166,9 +168,11 @@ async function fetchFile(path: string, init?: RequestInit): Promise<Response> {
     ...init,
   })
   if (res.status === 401) {
-    const { forceSessionExpiredLogout } = await import('@/lib/auth/session-expired')
-    await forceSessionExpiredLogout('Session expirée. Veuillez vous reconnecter.')
-    throw new MobiAssurApiError('Session expirée', 401)
+    if (!path.startsWith('/public')) {
+      const { forceSessionExpiredLogout } = await import('@/lib/auth/session-expired')
+      await forceSessionExpiredLogout('Session expirée. Veuillez vous reconnecter.')
+    }
+    throw new MobiAssurApiError('Non autorisé ou session expirée', 401)
   }
   if (!res.ok) {
     let msg = 'Erreur lors du téléchargement du fichier'
@@ -2543,6 +2547,39 @@ export const sinistresApi = {
   settle: (id: string) =>
     mobiRequest<SinistreItem>(`/admin/sinistres/${id}/settle`, {
       method: 'POST',
+    }),
+}
+
+export interface ExpertClaimDetail extends SinistreItem {
+  vehicle?: {
+    immatriculation?: string
+    marque_modele?: string
+    usage?: string
+    valeur_neuve?: number | null
+    valeur_venale?: number | null
+  } | null
+  documents?: Array<{
+    id: string
+    doc_type: string
+    file_url: string
+    file_name?: string
+  }>
+}
+
+export interface SubmitExpertReportPayload {
+  chiffrage_expert: number
+  valeur_venale?: number | null
+  summary?: string
+  reparable?: boolean
+}
+
+export const expertApi = {
+  getClaim: (magicToken: string) =>
+    mobiRequest<ExpertClaimDetail>(`/public/expert/sinistres/${magicToken}`),
+  submitReport: (magicToken: string, data: SubmitExpertReportPayload) =>
+    mobiRequest<SinistreItem>(`/public/expert/sinistres/${magicToken}/report`, {
+      method: 'POST',
+      body: JSON.stringify(data),
     }),
 }
 
