@@ -693,7 +693,7 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
                                 <Input
                                   value={receivedReference}
                                   onChange={(e) => setReceivedReference(e.target.value)}
-                                  placeholder="Référence reçue"
+                                  placeholder="Saisissez la référence constatée sur votre compte marchand..."
                                   className="text-xs"
                                 />
                                 <div className="flex gap-2">

@@ -444,7 +444,7 @@ export default function PaiementsDeclaresPage() {
                                   className="text-white h-8 text-xs font-bold"
                                   onClick={() => {
                                     setSelectedPaymentForValidation(p)
-                                    setReceivedReference(String(p.reference_externe || ''))
+                                    setReceivedReference('')
                                   }}
                                 >
                                   <Check className="h-3.5 w-3.5 mr-1" />
@@ -600,13 +600,13 @@ export default function PaiementsDeclaresPage() {
                   Référence / ID de transaction constatée sur votre compte *
                 </label>
                 <Input
-                  placeholder="Ex: CI240518.1720.A12345"
+                  placeholder="Saisissez la référence relevée sur votre compte / SMS marchand..."
                   value={receivedReference}
                   onChange={(e) => setReceivedReference(e.target.value)}
                   className="text-xs font-mono font-bold bg-white h-10 border-slate-300 focus:border-emerald-600 focus:ring-emerald-600/20"
                 />
                 <p className="text-[11px] text-slate-500">
-                  Pré-remplie avec la référence déclarée par le client. Vous pouvez la corriger d'après votre SMS marchand.
+                  Contrôle antifraude CIMA : saisissez manuellement la référence reçue sur votre terminal marchand pour certifier l&apos;encaissement.
                 </p>
               </div>
 
