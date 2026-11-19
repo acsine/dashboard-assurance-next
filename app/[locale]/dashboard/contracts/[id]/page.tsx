@@ -31,6 +31,8 @@ import {
   Download,
   ExternalLink,
   Upload,
+  XCircle,
+  AlertTriangle,
 } from 'lucide-react'
 
 function paymentProofUrls(payment: Payment): string[] {
@@ -53,6 +55,8 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
   const [uploadedProofUrls, setUploadedProofUrls] = useState<string[]>([])
   const [validatingPaymentId, setValidatingPaymentId] = useState<string | null>(null)
   const [receivedReference, setReceivedReference] = useState('')
+  const [selectedPaymentForRejection, setSelectedPaymentForRejection] = useState<Payment | null>(null)
+  const [rejectionReason, setRejectionReason] = useState('')
   const [uploadingProof, setUploadingProof] = useState(false)
   const [carteRoseSerial, setCarteRoseSerial] = useState(() => suggestCarteRoseSerial(id))
   const [carteRoseAssigned, setCarteRoseAssigned] = useState(false)
@@ -133,6 +137,27 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
     },
     onError: (err: any) => {
       toast.error(err.message || 'Erreur lors de la validation du paiement')
+    },
+  })
+
+  // Reject Payment Mutation
+  const rejectPaymentMutation = useMutation({
+    mutationFn: ({
+      paymentId,
+      reason,
+    }: {
+      paymentId: string
+      reason?: string
+    }) => contractsApi.rejectPayment(id, paymentId, { rejection_reason: reason }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contract', id] })
+      queryClient.invalidateQueries({ queryKey: ['contract-payments', id] })
+      setSelectedPaymentForRejection(null)
+      setRejectionReason('')
+      toast.success('Paiement rejeté avec succès. L\'assuré a été notifié.')
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Erreur lors du rejet du paiement')
     },
   })
 
@@ -581,10 +606,31 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
                               </span>
                             )}
                           </div>
-                          <span className={payment.status === 'SUCCESS' ? 'font-bold text-green-600' : 'font-bold text-amber-600'}>
-                            {payment.status}
+                          <span className={
+                            payment.status === 'SUCCESS'
+                              ? 'font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200'
+                              : payment.status === 'REJECTED'
+                              ? 'font-bold text-rose-700 bg-rose-50 px-2.5 py-1 rounded-full border border-rose-200'
+                              : 'font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200'
+                          }>
+                            {payment.status === 'REJECTED' ? 'REJETÉ' : payment.status}
                           </span>
                         </div>
+                        {payment.status === 'REJECTED' && (
+                          <div className="mt-2.5 p-2.5 rounded-xl bg-rose-50/80 border border-rose-200 text-xs text-rose-950 space-y-1">
+                            <div className="font-bold flex items-center gap-1.5 text-rose-700">
+                              <XCircle className="h-4 w-4" />
+                              Paiement rejeté
+                            </div>
+                            {payment.rejection_reason ? (
+                              <p className="text-[11.5px] text-rose-800">
+                                <strong>Motif :</strong> {payment.rejection_reason}
+                              </p>
+                            ) : (
+                              <p className="text-[11px] text-rose-600">Aucun motif spécifique précisé.</p>
+                            )}
+                          </div>
+                        )}
                         {!needsReference && proofRequired && (
                         <div className="mt-2 space-y-1">
                           <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
@@ -664,9 +710,9 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
                                         received_reference: receivedReference.trim(),
                                       })
                                     }
-                                    className="flex-1 text-white"
+                                    className="flex-1 text-white bg-emerald-600 hover:bg-emerald-700 font-bold"
                                   >
-                                    Confirmer
+                                    Confirmer la validation
                                   </Button>
                                   <Button
                                     type="button"
@@ -682,26 +728,39 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
                                 </div>
                               </div>
                             ) : (
-                              <button
-                                type="button"
-                                disabled={validatePaymentMutation.isPending || !canValidate}
-                                onClick={() => {
-                                  if (needsReference) {
-                                    setValidatingPaymentId(payment.id)
-                                    setReceivedReference('')
-                                    return
+                              <div className="mt-3 flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  disabled={validatePaymentMutation.isPending || !canValidate}
+                                  onClick={() => {
+                                    if (needsReference) {
+                                      setValidatingPaymentId(payment.id)
+                                      setReceivedReference('')
+                                      return
+                                    }
+                                    validatePaymentMutation.mutate({ paymentId: payment.id })
+                                  }}
+                                  title={
+                                    !canValidate
+                                      ? 'Preuve ou référence requise pour valider'
+                                      : 'Valider ce versement'
                                   }
-                                  validatePaymentMutation.mutate({ paymentId: payment.id })
-                                }}
-                                title={
-                                  !canValidate
-                                    ? 'Preuve ou référence requise pour valider'
-                                    : 'Valider ce versement'
-                                }
-                                className="mt-3 w-full rounded-lg bg-emerald-600 px-3 py-2 font-semibold text-white disabled:opacity-50"
-                              >
-                                Valider ce versement
-                              </button>
+                                  className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3 py-2 text-xs font-bold text-white transition shadow-xs disabled:opacity-50"
+                                >
+                                  Valider ce versement
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedPaymentForRejection(payment)
+                                    setRejectionReason('')
+                                  }}
+                                  className="rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 px-3 py-2 text-xs font-bold text-rose-700 transition inline-flex items-center gap-1.5"
+                                >
+                                  <XCircle className="h-3.5 w-3.5" />
+                                  Rejeter
+                                </button>
+                              </div>
                             )}
                           </RoleGuard>
                         )}
@@ -733,6 +792,89 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
           </div>
         </div>
       </div>
+
+      {/* Modal Rejet de Paiement */}
+      {selectedPaymentForRejection && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                <XCircle className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-slate-900">Rejeter ce versement</h3>
+                <p className="text-xs text-slate-500">
+                  L'assuré sera notifié avec le motif afin de soumettre une nouvelle preuve conforme.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Montant déclaré :</span>
+                <span className="font-mono font-black text-rose-700 text-sm">
+                  {Number(selectedPaymentForRejection.amount || 0).toLocaleString('fr-FR')} FCFA
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Mode de paiement :</span>
+                <span className="font-bold text-slate-800">{selectedPaymentForRejection.method}</span>
+              </div>
+              {selectedPaymentForRejection.payer_name && (
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 font-medium">Payeur :</span>
+                  <span className="font-medium text-slate-800">{selectedPaymentForRejection.payer_name}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 block">
+                Motif du rejet (transmis à l'assuré) :
+              </label>
+              <Input
+                placeholder="Ex: Référence introuvable sur le relevé Orange Money, montant erroné..."
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                className="text-xs h-10 rounded-xl"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={rejectPaymentMutation.isPending}
+                onClick={() => {
+                  setSelectedPaymentForRejection(null)
+                  setRejectionReason('')
+                }}
+                className="rounded-xl text-xs font-bold h-10 px-4"
+              >
+                Annuler
+              </Button>
+              <Button
+                type="button"
+                disabled={rejectPaymentMutation.isPending}
+                onClick={() => {
+                  rejectPaymentMutation.mutate({
+                    paymentId: selectedPaymentForRejection.id,
+                    reason: rejectionReason.trim() || undefined,
+                  })
+                }}
+                className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold h-10 px-4"
+              >
+                {rejectPaymentMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                ) : (
+                  <XCircle className="h-4 w-4 mr-1.5" />
+                )}
+                Confirmer le rejet
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
