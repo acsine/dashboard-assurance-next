@@ -2551,6 +2551,8 @@ export const sinistresApi = {
 }
 
 export interface ExpertClaimDetail extends SinistreItem {
+  summary?: string | null
+  reparable?: boolean | null
   vehicle?: {
     immatriculation?: string
     marque_modele?: string
